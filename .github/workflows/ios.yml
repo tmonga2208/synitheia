@@ -1,0 +1,130 @@
+name: iOS build
+
+# Produces an UNSIGNED .ipa as a downloadable artifact.
+#
+# Unsigned is a deliberate choice, not a limitation we forgot about. Signing in CI means
+# putting an Apple signing certificate and a provisioning profile into GitHub secrets, and
+# that is only worth doing once there is a paid developer account and something to distribute
+# TO. Until then the .ipa is re-signed locally (Sideloadly / AltStore) with a free Apple ID.
+#
+# What this DOES prove, on every push, is that the app still compiles for a real device —
+# which the simulator does not tell you: it builds for a different architecture, skips code
+# signing entirely, and happily tolerates a missing entitlement.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+concurrency:
+  # A push that supersedes an in-flight build should cancel it. A 20-minute macOS run is the
+  # most expensive thing in this repo; queueing two of them for the same branch is waste.
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Pick the newest Xcode 16 the runner actually has. Hardcoding "Xcode_16.app" breaks
+      # the day GitHub ships 16.2 and drops the plain 16 symlink — a failure that looks like
+      # a code problem and is not one.
+      - name: Select Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)"
+          XCODE="${XCODE:-/Applications/Xcode.app}"
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The API resolves @synitheia/shared through an exports map whose `default` points at
+      # dist. Metro takes the `react-native` condition and reads src — but the shared package
+      # must still be built, or a stale dist can be bundled instead of the source of truth.
+      - name: Build shared package
+        run: pnpm --filter @synitheia/shared build
+
+      - name: Typecheck and test
+        run: pnpm typecheck && pnpm test
+
+      # ios/ is not committed. Regenerating it here means the native project is derived from
+      # app.json on every build — the URL schemes, the HealthKit entitlement, and the bundle
+      # id cannot silently drift from the config that is under review.
+      - name: Prebuild native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios --no-install
+
+      - name: Install pods
+        working-directory: apps/mobile/ios
+        run: pod install
+
+      # The scheme is derived from the app name by prebuild and sanitised ("Synítheia" ->
+      # "Syntheia"). Reading it back rather than hardcoding it means renaming the app does not
+      # silently break this workflow with a "scheme not found" three steps later.
+      - name: Resolve scheme
+        id: scheme
+        working-directory: apps/mobile/ios
+        run: |
+          WORKSPACE="$(ls -d *.xcworkspace | head -1)"
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          echo "workspace=$WORKSPACE" >> "$GITHUB_OUTPUT"
+          echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
+          echo "Building scheme '$SCHEME' from '$WORKSPACE'"
+
+      - name: Archive (unsigned)
+        working-directory: apps/mobile/ios
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -workspace "${{ steps.scheme.outputs.workspace }}" \
+            -scheme "${{ steps.scheme.outputs.scheme }}" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Synitheia.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS=""
+
+      # `xcodebuild -exportArchive` cannot export without a signing identity, so the .ipa is
+      # assembled by hand. An .ipa is only a zip with the .app inside a Payload/ directory —
+      # there is nothing else to it, and doing it this way needs no certificate at all.
+      - name: Package .ipa
+        run: |
+          APP="$(ls -d "$RUNNER_TEMP/Synitheia.xcarchive/Products/Applications/"*.app | head -1)"
+          echo "Packaging $(basename "$APP")"
+
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/Payload/"
+
+          cd "$RUNNER_TEMP"
+          zip -qry Synitheia-unsigned.ipa Payload
+
+          ls -lh Synitheia-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Synitheia-unsigned-ipa
+          path: ${{ runner.temp }}/Synitheia-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
