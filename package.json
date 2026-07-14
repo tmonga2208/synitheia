@@ -1,0 +1,25 @@
+{
+  "name": "synitheia",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.18.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter=./packages/* build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "db:up": "docker compose up -d mongo",
+    "db:down": "docker compose down",
+    "api": "pnpm --filter @synitheia/api dev",
+    "mobile": "pnpm --filter @synitheia/mobile start"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  }
+}

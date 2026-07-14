@@ -1,0 +1,100 @@
+{
+  "expo": {
+    "name": "Synítheia",
+    "slug": "synitheia",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": [
+      "synitheia",
+      "com.googleusercontent.apps.491586558032-vfm2c1bb95gloce2bkbhkluu79ren83c"
+    ],
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#FBF9F6"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.synitheia.app",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "CFBundleName": "Synítheia",
+        "NSHealthShareUsageDescription": "Synítheia reads your steps, workouts, and sleep so your day appears on your timeline without you having to log it. You can turn this off at any time in Connected Context.",
+        "NSCalendarsFullAccessUsageDescription": "Synítheia reads your calendar to give your day structure and to notice patterns like skipped workouts on days with late meetings. It never writes to your calendar.",
+        "NSLocationWhenInUseUsageDescription": "Synítheia recognises places you visit often so it can suggest an expense or a meal instead of asking you to type it.",
+        "NSPhotoLibraryUsageDescription": "Synítheia reads payment screenshots you choose to share, so a transaction can be added without typing it out.",
+        "NSCameraUsageDescription": "Synítheia can read a receipt you photograph so you don't have to type it in.",
+        "NSContactsUsageDescription": "Synítheia lets you pick who you split an expense with. Only the names you choose are saved — your contacts are never uploaded."
+      }
+    },
+    "android": {
+      "package": "com.synitheia.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#FBF9F6"
+      },
+      "permissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_CONTACTS"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_SMS"
+      ],
+      "intentFilters": [
+        {
+          "action": "android.intent.action.SEND",
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "image/*"
+            },
+            {
+              "mimeType": "text/plain"
+            }
+          ]
+        }
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-apple-authentication",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Synítheia reads your steps, workouts, sleep, and body measurements so your day fills itself in, and so it can estimate your calories from real numbers instead of asking you to guess.",
+          "NSHealthUpdateUsageDescription": "Synítheia never writes to Apple Health. It only reads.",
+          "background": false
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Synítheia lets you pick who you split an expense with. Only the names you choose are saved — your contacts are never uploaded."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Synítheia reads payment screenshots you choose to share, so a transaction can be added without typing it out."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#7D927D"
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://localhost:4000",
+      "googleIosClientId": "491586558032-vfm2c1bb95gloce2bkbhkluu79ren83c.apps.googleusercontent.com"
+    }
+  }
+}

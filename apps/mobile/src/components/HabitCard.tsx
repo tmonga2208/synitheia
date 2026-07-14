@@ -1,0 +1,214 @@
+import { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { Check, Plus } from 'lucide-react-native';
+import {
+  HABIT_MEASURES,
+  formatHabitProgress,
+  formatHabitTarget,
+  measureOf,
+  type TodayResponse,
+} from '@synitheia/shared';
+import { Card, Text, Touchable } from './primitives.js';
+import { iconFor } from './IconPicker.js';
+import { MIN_TAP_TARGET, accentFor, motion, palette, radius, spacing } from '../theme/tokens.js';
+
+/** A habit as Today sees it: the domain record plus this local day's progress. */
+export type TodayHabit = TodayResponse['habits'][number];
+
+interface HabitCardProps {
+  habit: TodayHabit;
+  /** Opens the habit's detail screen. */
+  onPress: (habit: TodayHabit) => void;
+  /** Logs one occurrence. The parent owns the optimistic update. */
+  onLog: (habit: TodayHabit) => void;
+}
+
+/**
+ * "3,500 / 8,000 steps • Daily • 14D Streak".
+ *
+ * A habit that measures something shows where you are NOW, not just where you are going —
+ * a bare goal on a half-finished habit is a worse affordance than a progress fraction. A
+ * plain check has nothing to count, so it shows only the period and the streak.
+ */
+function metadataFor(habit: TodayHabit): string {
+  const period = habit.frequency === 'daily' ? 'Daily' : 'Weekly';
+  const measure = measureOf(habit);
+
+  const goal =
+    measure === 'check'
+      ? period
+      : habit.todayComplete || habit.todayCount === 0
+        ? `${formatHabitTarget(habit)} ${period.toLowerCase()}`
+        : formatHabitProgress(habit, habit.todayCount);
+
+  // A zero streak is a beginning, not a failure. "0D Streak" reads as a scolding.
+  const streak = habit.currentStreak > 0 ? `${habit.currentStreak}D Streak` : 'First Day';
+
+  return [goal, streak].join(' • ');
+}
+
+/**
+ * The habit row.
+ *
+ * Every card is tinted with its OWN accent — border, icon chip, metadata, and the
+ * completion affordance. It is the most distinctive thing in the design language:
+ * a list of habits should read as a list of individual rituals, not as rows in a table.
+ */
+export function HabitCard({ habit, onPress, onLog }: HabitCardProps) {
+  const accent = accentFor(habit.color);
+  const { Icon } = iconFor(habit.icon);
+  const measure = measureOf(habit);
+  const isCounter = measure !== 'check';
+
+  // 0 → open, 1 → complete. Everything that reacts to completion reads this one value,
+  // so the wash, the ring fill, and the check all resolve together.
+  const done = useSharedValue(habit.todayComplete ? 1 : 0);
+
+  useEffect(() => {
+    done.value = habit.todayComplete
+      ? withSpring(1, motion.spring)
+      : withTiming(0, { duration: motion.press.duration * 2 });
+  }, [habit.todayComplete, done]);
+
+  const washStyle = useAnimatedStyle(() => ({ opacity: done.value * 0.6 }));
+
+  const affordanceStyle = useAnimatedStyle(() => ({
+    // A gentle overshoot on completion — the one moment in the card worth celebrating.
+    transform: [{ scale: interpolate(done.value, [0, 0.5, 1], [1, 1.12, 1]) }],
+  }));
+
+  const fillStyle = useAnimatedStyle(() => ({ opacity: done.value }));
+  const plusStyle = useAnimatedStyle(() => ({ opacity: 1 - done.value }));
+  const checkStyle = useAnimatedStyle(() => ({ opacity: done.value }));
+
+  const metadata = metadataFor(habit);
+
+  return (
+    <Touchable
+      accessibilityRole="button"
+      accessibilityLabel={`${habit.name}. ${metadata}.`}
+      accessibilityHint="Opens this habit"
+      haptic={false}
+      onPress={() => onPress(habit)}
+    >
+      <Card accent={accent.base} padded={false} style={styles.card}>
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: accent.wash }, washStyle]}
+        />
+
+        <View style={styles.row}>
+          <View style={[styles.iconChip, { backgroundColor: accent.wash }]}>
+            <Icon size={22} color={accent.text} strokeWidth={1.5} />
+          </View>
+
+          <View style={styles.copy}>
+            <Text variant="cardTitle" numberOfLines={1}>
+              {habit.name}
+            </Text>
+            <Text variant="caption" color={accent.text} numberOfLines={1}>
+              {metadata}
+            </Text>
+          </View>
+
+          <Touchable
+            accessibilityRole="checkbox"
+            accessibilityLabel={
+              habit.todayComplete
+                ? `${habit.name} is complete for today`
+                : isCounter
+                  ? `Add ${HABIT_MEASURES[measure].step} to ${habit.name}, ${formatHabitProgress(habit, habit.todayCount)}`
+                  : `Complete ${habit.name}`
+            }
+            accessibilityState={{ checked: habit.todayComplete, disabled: habit.todayComplete }}
+            // Guarded rather than `disabled`: Touchable dims disabled targets to 45%, and a
+            // completed habit's check should read as an achievement, not a greyed-out control.
+            onPress={() => {
+              if (!habit.todayComplete) onLog(habit);
+            }}
+            style={styles.affordanceTarget}
+          >
+            <Animated.View
+              style={[styles.affordance, { borderColor: accent.base }, affordanceStyle]}
+            >
+              <Animated.View
+                style={[
+                  StyleSheet.absoluteFill,
+                  styles.affordanceFill,
+                  { backgroundColor: accent.base },
+                  fillStyle,
+                ]}
+              />
+
+              {isCounter ? (
+                <Animated.View style={plusStyle}>
+                  <Plus size={20} color={accent.base} strokeWidth={2} />
+                </Animated.View>
+              ) : null}
+
+              <Animated.View style={[styles.check, checkStyle]}>
+                <Check size={20} color={palette.white} strokeWidth={2.5} />
+              </Animated.View>
+            </Animated.View>
+          </Touchable>
+        </View>
+      </Card>
+    </Touchable>
+  );
+}
+
+const AFFORDANCE = 48;
+
+const styles = StyleSheet.create({
+  card: {
+    // The wash sits under the content and must be clipped by the card's own radius.
+    overflow: 'hidden',
+    padding: spacing.base,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+  },
+  iconChip: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  copy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  affordanceTarget: {
+    minWidth: MIN_TAP_TARGET,
+    minHeight: MIN_TAP_TARGET,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  affordance: {
+    width: AFFORDANCE,
+    height: AFFORDANCE,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  affordanceFill: {
+    borderRadius: radius.full,
+  },
+  check: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.expo/
+ios/
+android/
+.next/
+
+# Never commit secrets.
+.env
+.env.local
+*.local
+
+.DS_Store
