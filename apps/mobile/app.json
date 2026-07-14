@@ -93,7 +93,7 @@
       ]
     ],
     "extra": {
-      "apiUrl": "http://localhost:4000",
+      "apiUrl": "https://api-production-ee61.up.railway.app",
       "googleIosClientId": "491586558032-vfm2c1bb95gloce2bkbhkluu79ren83c.apps.googleusercontent.com"
     }
   }
