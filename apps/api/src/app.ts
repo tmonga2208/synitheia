@@ -24,6 +24,8 @@ import { registerInferenceRoutes } from './modules/inference/routes.js';
 import { registerSubscriptionRoutes } from './modules/subscriptions/routes.js';
 import { registerHealthRoutes } from './modules/health/routes.js';
 import { registerCalendarRoutes } from './modules/calendar/routes.js';
+import { registerWeatherRoutes } from './modules/weather/routes.js';
+import { registerLocationRoutes } from './modules/location/routes.js';
 import { registerPrivacyRoutes } from './modules/privacy/routes.js';
 import type { Env } from './config/env.js';
 
@@ -159,6 +161,8 @@ export async function buildApp(env: Env): Promise<FastifyInstance> {
       await registerSubscriptionRoutes(api);
       await registerHealthRoutes(api);
       await registerCalendarRoutes(api);
+      await registerWeatherRoutes(api);
+      await registerLocationRoutes(api);
       await registerPrivacyRoutes(api);
     },
     { prefix: '/v1' },

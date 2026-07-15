@@ -34,6 +34,8 @@ import { ApiError, api } from '../src/api/client.js';
 import { healthSourceName } from '../src/health/healthkit.js';
 import { connectHealth, useHealthSync } from '../src/health/useHealthSync.js';
 import { connectCalendar, useCalendarSync } from '../src/calendar/useCalendarSync.js';
+import { connectWeather, useWeatherSync } from '../src/weather/useWeatherSync.js';
+import { connectLocation, useLocationSync } from '../src/location/useLocationSync.js';
 import type {
   DataSourceItem,
   DataSourceStatus,
@@ -118,6 +120,8 @@ export default function Privacy() {
 
   const { sync: syncHealth } = useHealthSync(false);
   const { sync: syncCalendar } = useCalendarSync();
+  const { sync: syncWeather } = useWeatherSync();
+  const { sync: syncLocation } = useLocationSync();
 
   const updateSource = useMutation({
     mutationFn: async (input: {
@@ -165,6 +169,32 @@ export default function Privacy() {
         }
       }
 
+      // Weather rides on location permission — foreground only, and only the approximate area.
+      if (input.source === 'weather' && input.status === 'connected') {
+        const result = await connectWeather();
+        if (result === 'unavailable') {
+          throw new Error('This device cannot provide a location for weather.');
+        }
+        if (result === 'unauthorized') {
+          throw new Error(
+            'Weather needs location access to know where to look. You can allow it for Synítheia in Settings.',
+          );
+        }
+      }
+
+      // Location — the same foreground grant, used to recognise places rather than fetch weather.
+      if (input.source === 'location' && input.status === 'connected') {
+        const result = await connectLocation();
+        if (result === 'unavailable') {
+          throw new Error("This device can't provide a location.");
+        }
+        if (result === 'unauthorized') {
+          throw new Error(
+            'Location access was not granted. You can allow it for Synítheia in Settings.',
+          );
+        }
+      }
+
       return api.put<unknown>(`/data-sources/${input.source}`, {
         status: input.status,
         aiAllowed: input.aiAllowed,
@@ -175,6 +205,8 @@ export default function Privacy() {
       // Pull straight away, so turning a source on visibly does something.
       if (input.source === 'health' && input.status === 'connected') void syncHealth();
       if (input.source === 'calendar' && input.status === 'connected') void syncCalendar();
+      if (input.source === 'weather' && input.status === 'connected') void syncWeather();
+      if (input.source === 'location' && input.status === 'connected') void syncLocation();
     },
 
     onSettled: () => queryClient.invalidateQueries({ queryKey: SOURCES_KEY }),
