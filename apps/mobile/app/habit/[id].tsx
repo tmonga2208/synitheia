@@ -15,10 +15,10 @@ import {
   Card,
   Chip,
   ErrorState,
-  LoadingState,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { SkeletonList } from '../../src/components/Skeleton.js';
 import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { iconFor } from '../../src/components/IconPicker.js';
 import { api } from '../../src/api/client.js';
@@ -111,7 +111,7 @@ export default function HabitDetail() {
   if (habitsQuery.isPending) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
-        <LoadingState label="Loading this habit" />
+        <SkeletonList />
       </SafeAreaView>
     );
   }

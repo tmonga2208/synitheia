@@ -1,6 +1,8 @@
-import { Tabs } from 'expo-router';
-import { Home, LayoutGrid, User } from 'lucide-react-native';
-import { palette, type } from '../../src/theme/tokens.js';
+import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
+import trackPng from '../../src/assets/tabs/track.png';
+import todayPng from '../../src/assets/tabs/today.png';
+import youPng from '../../src/assets/tabs/you.png';
+import { palette } from '../../src/theme/tokens.js';
 
 /**
  * Three destinations, with Today in the middle.
@@ -10,80 +12,53 @@ import { palette, type } from '../../src/theme/tokens.js';
  * first item in a list of features. Track sits to its left because that is where the day
  * comes from; You sits to its right because that is where you go to change how it behaves.
  *
- * Insights is deliberately NOT a tab any more. A whole destination for a feature that is off
- * by default, and that "only speaks when it has something to say", is a tab that is empty
- * most of the time — the app's own thesis, filed away in a drawer nobody opens. It now
- * surfaces inside Today, where the day it is talking about already is, and the full history
- * is one tap deeper.
- *
  * "Track" is a verb, not "Trackers". Nobody thinks "I will go to my trackers"; they think
  * "I want to log this" or "how much have I spent". The tab is named for the intent.
- *
- * The bar itself is the platform's own — the OS's blur, safe-area handling, height, and
- * behaviour on every device, none of it reimplemented. Only the tint is ours.
- *
- * A true native tab bar (react-native-bottom-tabs, for iOS 26 Liquid Glass) was attempted
- * and reverted: its Fabric component does not link into the app binary under this project's
- * Expo SDK 52 + New-Architecture + hoisted-pnpm setup, the same wall the native date picker
- * hit. The supported path to native tabs is expo-router's own NativeTabs, which lands in
- * Expo SDK 54 — an upgrade, not a component swap.
  */
 
 /**
- * Today is the landing tab, even though Track is declared FIRST.
+ * This is the platform's REAL tab bar, not a React re-creation of one.
  *
- * Declaration order is what puts Today in the centre of the bar — but expo-router also treats
- * the first declared screen as the initial route, so ordering alone silently landed every cold
- * start on Track. This is the documented way to say "leftmost is not home".
+ * expo-router's NativeTabs renders a UITabBarController on iOS and a Material
+ * BottomNavigationView on Android — so each OS draws its own bar. Built against the iOS 26
+ * SDK, that means Liquid Glass with nothing asked for: the system provides the material,
+ * the blur, the minimise-on-scroll, the safe-area handling. We supply the destinations, the
+ * icons, and the tint; the OS supplies everything about how a tab bar should look and feel.
+ *
+ * Icons are the platform's own too. iOS takes an SF Symbol; Android takes a raster (a React
+ * SVG component cannot be handed to a native tab item), so each icon names a symbol for iOS
+ * and points at a generated PNG of the matching glyph for Android — one <Icon> covers both.
+ *
+ * The hidden routes (insights, habits, reminders) simply have no <Trigger>. In NativeTabs a
+ * route without a trigger stays navigable but is not a tab — which is exactly the old
+ * `href: null` behaviour, expressed by omission rather than a flag.
+ */
+
+/**
+ * Today is the landing tab, even though Track's trigger is declared FIRST. Trigger order is
+ * left-to-right placement; without this, the router would also treat the first-declared
+ * route as the initial one and cold-start on Track.
  */
 export const unstable_settings = { initialRouteName: 'index' };
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: palette.sage,
-        tabBarInactiveTintColor: palette.stoneFaint,
-        tabBarLabelStyle: type.caption,
-      }}
-    >
-      <Tabs.Screen
-        name="trackers"
-        options={{
-          title: 'Track',
-          tabBarIcon: ({ color, size }) => (
-            <LayoutGrid color={color} size={size} strokeWidth={1.8} />
-          ),
-        }}
-      />
+    <NativeTabs tintColor={palette.sage}>
+      <NativeTabs.Trigger name="trackers">
+        <Icon sf="square.grid.2x2" androidSrc={trackPng} />
+        <Label>Track</Label>
+      </NativeTabs.Trigger>
 
       {/* The middle. Declaration order is left-to-right, so this is literally centre. */}
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Today',
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} strokeWidth={1.8} />,
-        }}
-      />
+      <NativeTabs.Trigger name="index">
+        <Icon sf="house" androidSrc={todayPng} />
+        <Label>Today</Label>
+      </NativeTabs.Trigger>
 
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'You',
-          tabBarIcon: ({ color, size }) => <User color={color} size={size} strokeWidth={1.8} />,
-        }}
-      />
-
-      {/*
-        Routable, never a tab. Insights is reached from Today, Habits from Today and Track,
-        Reminders from the bell. They live in this group so they keep the tab bar and its
-        insets — `href: null` is what stops them appearing as a fourth and fifth icon in a
-        bar the whole navigation model depends on holding at three.
-      */}
-      <Tabs.Screen name="insights" options={{ href: null }} />
-      <Tabs.Screen name="habits" options={{ href: null }} />
-      <Tabs.Screen name="reminders" options={{ href: null }} />
-    </Tabs>
+      <NativeTabs.Trigger name="profile">
+        <Icon sf="person" androidSrc={youPng} />
+        <Label>You</Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }

@@ -26,10 +26,10 @@ import {
   Card,
   ErrorState,
   Input,
-  LoadingState,
   Text,
   Touchable,
 } from '../src/components/primitives.js';
+import { SkeletonList } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
 import { healthSourceName } from '../src/health/healthkit.js';
 import { connectHealth, useHealthSync } from '../src/health/useHealthSync.js';
@@ -218,7 +218,7 @@ export default function Privacy() {
   if (sources.isPending || availability.isPending) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
-        <LoadingState label="Loading your context" />
+        <SkeletonList />
       </SafeAreaView>
     );
   }

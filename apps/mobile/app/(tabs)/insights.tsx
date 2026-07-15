@@ -17,10 +17,10 @@ import {
   Chip,
   EmptyState,
   ErrorState,
-  LoadingState,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { Skeleton, SkeletonList } from '../../src/components/Skeleton.js';
 import { ApiError, api } from '../../src/api/client.js';
 import type {
   InsightAvailability,
@@ -185,7 +185,7 @@ export default function Insights() {
   if (availability.isPending) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
-        <LoadingState label="Checking Synítheia" />
+        <SkeletonList />
       </SafeAreaView>
     );
   }
@@ -255,7 +255,7 @@ export default function Insights() {
         {header}
 
         {insights.isPending ? (
-          <LoadingState label="Reading your patterns" />
+          <SkeletonList rows={3} />
         ) : insights.error ? (
           <ErrorState
             message={
@@ -372,7 +372,10 @@ function InsightCard({
       {explained ? (
         <View style={styles.evidence} accessibilityLiveRegion="polite">
           {evidence.isPending ? (
-            <LoadingState />
+            <View style={{ gap: spacing.sm }}>
+              <Skeleton width="90%" height={11} />
+              <Skeleton width="65%" height={11} />
+            </View>
           ) : evidence.error || !evidence.data ? (
             <Text variant="caption" color={palette.danger}>
               {evidence.error instanceof Error

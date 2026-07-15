@@ -21,7 +21,8 @@ import {
   Target,
   Zap,
 } from 'lucide-react-native';
-import { Card, Chip, LoadingState, Text, Touchable } from '../../src/components/primitives.js';
+import { Card, Chip, Text, Touchable } from '../../src/components/primitives.js';
+import { SkeletonList } from '../../src/components/Skeleton.js';
 import { useAuth } from '../../src/store/auth.js';
 import { MIN_TAP_TARGET, motion, palette, radius, spacing } from '../../src/theme/tokens.js';
 
@@ -71,7 +72,7 @@ export default function Profile() {
   if (!user) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
-        <LoadingState />
+        <SkeletonList />
       </SafeAreaView>
     );
   }

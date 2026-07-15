@@ -9,11 +9,11 @@ import {
   Card,
   EmptyState,
   ErrorState,
-  LoadingState,
   SectionHeader,
   Text,
   Touchable,
 } from '../src/components/primitives.js';
+import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ProgressRing } from '../src/components/ProgressRing.js';
 import { ApiError, api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
@@ -85,7 +85,7 @@ export default function WaterScreen() {
     </Touchable>
   );
 
-  if (isPending) return <LoadingState label="Loading water" />;
+  if (isPending) return <SkeletonScreen />;
 
   if (error || !data) {
     return (

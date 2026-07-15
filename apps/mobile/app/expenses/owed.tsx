@@ -8,10 +8,10 @@ import {
   Card,
   EmptyState,
   ErrorState,
-  LoadingState,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { SkeletonScreen } from '../../src/components/Skeleton.js';
 import { ApiError, api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
 import { accentFor, palette, radius, spacing } from '../../src/theme/tokens.js';
@@ -105,7 +105,7 @@ export default function OwedScreen() {
     </Touchable>
   );
 
-  if (isPending) return <LoadingState label="Loading" />;
+  if (isPending) return <SkeletonScreen />;
 
   if (error || !data) {
     return (

@@ -22,10 +22,10 @@ import {
   EmptyState,
   ErrorState,
   Input,
-  LoadingState,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { SkeletonList } from '../../src/components/Skeleton.js';
 import { ApiError, api } from '../../src/api/client.js';
 import type { ListResponse, WireReminder } from '../../src/api/types.js';
 import { MIN_TAP_TARGET, palette, radius, spacing } from '../../src/theme/tokens.js';
@@ -246,7 +246,7 @@ export default function Reminders() {
   if (query.isPending) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
-        <LoadingState label="Loading your reminders" />
+        <SkeletonList />
       </SafeAreaView>
     );
   }

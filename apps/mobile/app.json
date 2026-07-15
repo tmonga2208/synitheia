@@ -4,6 +4,7 @@
     "slug": "synitheia",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": [
       "synitheia",
       "com.googleusercontent.apps.491586558032-vfm2c1bb95gloce2bkbhkluu79ren83c"
@@ -11,6 +12,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#FBF9F6"
     },
@@ -31,6 +33,7 @@
     "android": {
       "package": "com.synitheia.app",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FBF9F6"
       },
       "permissions": [

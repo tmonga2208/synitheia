@@ -18,11 +18,11 @@ import {
   Chip,
   EmptyState,
   ErrorState,
-  LoadingState,
   SectionHeader,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { SkeletonToday } from '../../src/components/Skeleton.js';
 import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { HabitCard, type TodayHabit } from '../../src/components/HabitCard.js';
 import { WeeklyChart } from '../../src/components/WeeklyChart.js';
@@ -179,13 +179,7 @@ export default function Today() {
     user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
   const currency = user?.currency ?? 'INR';
 
-  if (isPending) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <LoadingState label="Gathering your day" />
-      </SafeAreaView>
-    );
-  }
+  if (isPending) return <SkeletonToday />;
 
   if (error || !data) {
     return (

@@ -29,10 +29,10 @@ import {
   Chip,
   ErrorState,
   Input,
-  LoadingState,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { SkeletonList } from '../../src/components/Skeleton.js';
 import { DateField } from '../../src/components/DateField.js';
 import {
   SplitWith,
@@ -460,7 +460,7 @@ export default function NewExpense() {
   if (categories.isPending) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
-        <LoadingState label="Loading categories" />
+        <SkeletonList />
       </SafeAreaView>
     );
   }

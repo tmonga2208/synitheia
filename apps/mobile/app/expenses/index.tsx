@@ -9,10 +9,10 @@ import {
   Card,
   EmptyState,
   ErrorState,
-  LoadingState,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { SkeletonList } from '../../src/components/Skeleton.js';
 import { api } from '../../src/api/client.js';
 import type { ListResponse, WireExpense } from '../../src/api/types.js';
 import { useAuth } from '../../src/store/auth.js';
@@ -95,7 +95,7 @@ export default function Expenses() {
   if (query.isPending) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
-        <LoadingState label="Loading your expenses" />
+        <SkeletonList />
       </SafeAreaView>
     );
   }

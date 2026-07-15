@@ -28,10 +28,10 @@ import {
   EmptyState,
   ErrorState,
   Input,
-  LoadingState,
   Text,
   Touchable,
 } from '../src/components/primitives.js';
+import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
 import type { ListResponse, WireCategory } from '../src/api/types.js';
 import { useAuth } from '../src/store/auth.js';
@@ -111,7 +111,7 @@ export default function SubscriptionsScreen() {
     </Touchable>
   );
 
-  if (isPending) return <LoadingState label="Loading bills" />;
+  if (isPending) return <SkeletonScreen />;
 
   if (error || !data) {
     return (

@@ -9,11 +9,11 @@ import {
   Card,
   EmptyState,
   ErrorState,
-  LoadingState,
   SectionHeader,
   Text,
   Touchable,
 } from '../src/components/primitives.js';
+import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
 import { healthSourceName } from '../src/health/healthkit.js';
 import { accentFor, palette, radius, spacing } from '../src/theme/tokens.js';
@@ -85,7 +85,7 @@ export default function Body() {
     </Touchable>
   );
 
-  if (isPending) return <LoadingState label="Reading your health" />;
+  if (isPending) return <SkeletonScreen />;
 
   if (error || !data) {
     return (

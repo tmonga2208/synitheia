@@ -13,11 +13,11 @@ import {
 import {
   Chip,
   ErrorState,
-  LoadingState,
   SectionHeader,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { SkeletonTrackers } from '../../src/components/Skeleton.js';
 import { TrackerTile } from '../../src/components/TrackerTile.js';
 import { ApiError, api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
@@ -94,7 +94,7 @@ export default function Trackers() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: TODAY_KEY }),
   });
 
-  if (isPending) return <LoadingState label="Loading your day" />;
+  if (isPending) return <SkeletonTrackers />;
 
   if (error || !data) {
     return (

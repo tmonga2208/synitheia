@@ -1,13 +1,18 @@
 import { Platform } from 'react-native';
-import Healthkit, {
-  HKCategoryTypeIdentifier,
-  HKCategoryValueSleepAnalysis,
-  HKQuantityTypeIdentifier,
-  HKStatisticsOptions,
-  HKUnits,
-  UnitOfEnergy,
-  UnitOfLength,
-  UnitOfTime,
+import {
+  CategoryValueSleepAnalysis,
+  getBiologicalSexAsync,
+  getDateOfBirthAsync,
+  getMostRecentQuantitySample,
+  isHealthDataAvailableAsync,
+  queryCategorySamples,
+  queryStatisticsForQuantity,
+  queryWorkoutSamples,
+  requestAuthorization,
+} from '@kingstinct/react-native-healthkit';
+import type {
+  ObjectTypeIdentifier,
+  QuantityTypeIdentifier,
 } from '@kingstinct/react-native-healthkit';
 import {
   asLocalDate,
@@ -22,27 +27,44 @@ import {
  *
  * HealthKit data NEVER leaves the phone except through our own /health/sync, and only for
  * the fields listed below. Read-only, always: `requestAuthorization` is called with an empty
- * write array, so the app is structurally incapable of modifying the user's health record
- * even if a future bug tried to.
+ * `toShare`, so the app is structurally incapable of modifying the user's health record even
+ * if a future bug tried to.
  *
  * iOS only. Android's equivalent is Health Connect, which is a different native module — but
  * the server takes a normalized `SyncHealthInput` and knows nothing about HealthKit, so
  * adding Android means writing a second reader that returns this same shape. Nothing on the
  * server changes.
+ *
+ * The library (@kingstinct/react-native-healthkit v14) is built on Nitro modules: the API is
+ * free functions with options objects, identifiers are the full `HKQuantityTypeIdentifier…`
+ * strings, and every reading comes back as a `{ unit, quantity }` pair rather than a bare
+ * number — which is why durations are divided out of seconds explicitly below.
  */
 
-const READ_PERMISSIONS = [
-  HKQuantityTypeIdentifier.stepCount,
-  HKQuantityTypeIdentifier.activeEnergyBurned,
-  HKQuantityTypeIdentifier.appleExerciseTime,
-  HKQuantityTypeIdentifier.restingHeartRate,
-  HKQuantityTypeIdentifier.height,
-  HKQuantityTypeIdentifier.bodyMass,
-  HKCategoryTypeIdentifier.sleepAnalysis,
+/** The full HealthKit identifier strings. camelCase shorthands were removed in v14. */
+const ID = {
+  steps: 'HKQuantityTypeIdentifierStepCount',
+  activeEnergy: 'HKQuantityTypeIdentifierActiveEnergyBurned',
+  exercise: 'HKQuantityTypeIdentifierAppleExerciseTime',
+  restingHr: 'HKQuantityTypeIdentifierRestingHeartRate',
+  height: 'HKQuantityTypeIdentifierHeight',
+  bodyMass: 'HKQuantityTypeIdentifierBodyMass',
+} as const satisfies Record<string, QuantityTypeIdentifier>;
+
+const SLEEP = 'HKCategoryTypeIdentifierSleepAnalysis' as const;
+
+const READ_PERMISSIONS: readonly ObjectTypeIdentifier[] = [
+  ID.steps,
+  ID.activeEnergy,
+  ID.exercise,
+  ID.restingHr,
+  ID.height,
+  ID.bodyMass,
+  SLEEP,
   'HKCharacteristicTypeIdentifierBiologicalSex',
   'HKCharacteristicTypeIdentifierDateOfBirth',
   'HKWorkoutTypeIdentifier',
-] as const;
+];
 
 export function isSupported(): boolean {
   return Platform.OS === 'ios';
@@ -65,7 +87,7 @@ export function healthSourceName(): string {
 export async function isAvailable(): Promise<boolean> {
   if (!isSupported()) return false;
   try {
-    return await Healthkit.isHealthDataAvailable();
+    return await isHealthDataAvailableAsync();
   } catch {
     return false;
   }
@@ -84,8 +106,8 @@ export async function requestPermissions(): Promise<boolean> {
   if (!(await isAvailable())) return false;
 
   try {
-    // Empty write array. We only ever read.
-    await Healthkit.requestAuthorization(READ_PERMISSIONS as never, []);
+    // Empty `toShare`. We only ever read.
+    await requestAuthorization({ toShare: [], toRead: READ_PERMISSIONS });
     return true;
   } catch {
     return false;
@@ -107,19 +129,16 @@ function dayBounds(daysAgo: number): { start: Date; end: Date; localDate: string
 }
 
 async function sumQuantity(
-  identifier: HKQuantityTypeIdentifier,
+  identifier: QuantityTypeIdentifier,
   unit: string,
   start: Date,
   end: Date,
 ): Promise<number | null> {
   try {
-    const result = await Healthkit.queryStatisticsForQuantity(
-      identifier,
-      [HKStatisticsOptions.cumulativeSum],
-      start,
-      end,
-      unit as never,
-    );
+    const result = await queryStatisticsForQuantity(identifier, ['cumulativeSum'], {
+      filter: { date: { startDate: start, endDate: end } },
+      unit: unit as never,
+    });
 
     const value = result?.sumQuantity?.quantity;
     return typeof value === 'number' ? value : null;
@@ -130,19 +149,16 @@ async function sumQuantity(
 }
 
 async function averageQuantity(
-  identifier: HKQuantityTypeIdentifier,
+  identifier: QuantityTypeIdentifier,
   unit: string,
   start: Date,
   end: Date,
 ): Promise<number | null> {
   try {
-    const result = await Healthkit.queryStatisticsForQuantity(
-      identifier,
-      [HKStatisticsOptions.discreteAverage],
-      start,
-      end,
-      unit as never,
-    );
+    const result = await queryStatisticsForQuantity(identifier, ['discreteAverage'], {
+      filter: { date: { startDate: start, endDate: end } },
+      unit: unit as never,
+    });
 
     const value = result?.averageQuantity?.quantity;
     return typeof value === 'number' ? value : null;
@@ -153,10 +169,10 @@ async function averageQuantity(
 
 /** Asleep only — time in bed reading a book is not sleep, and Apple distinguishes them. */
 const ASLEEP_VALUES = new Set<number>([
-  HKCategoryValueSleepAnalysis.asleepUnspecified,
-  HKCategoryValueSleepAnalysis.asleepCore,
-  HKCategoryValueSleepAnalysis.asleepDeep,
-  HKCategoryValueSleepAnalysis.asleepREM,
+  CategoryValueSleepAnalysis.asleepUnspecified,
+  CategoryValueSleepAnalysis.asleepCore,
+  CategoryValueSleepAnalysis.asleepDeep,
+  CategoryValueSleepAnalysis.asleepREM,
 ]);
 
 async function readSleep(
@@ -167,10 +183,11 @@ async function readSleep(
     // Sleep for "today" starts LAST night, so the window opens 18 hours before midnight.
     const from = new Date(start.getTime() - 18 * 60 * 60 * 1000);
 
-    const samples = await Healthkit.queryCategorySamples(
-      HKCategoryTypeIdentifier.sleepAnalysis,
-      { from, to: end },
-    );
+    const samples = await queryCategorySamples(SLEEP, {
+      filter: { date: { startDate: from, endDate: end } },
+      limit: 0,
+      ascending: true,
+    });
 
     const asleep = samples.filter((s) => ASLEEP_VALUES.has(s.value as number));
     if (asleep.length === 0) return { minutes: null, from: null, to: null };
@@ -199,16 +216,15 @@ async function readSleep(
 
 async function readWorkouts(start: Date, end: Date): Promise<HealthSnapshot['workouts']> {
   try {
-    const workouts = await Healthkit.queryWorkouts({
-      from: start,
-      to: end,
-      energyUnit: UnitOfEnergy.Kilocalories,
-      distanceUnit: UnitOfLength.Meter,
+    const workouts = await queryWorkoutSamples({
+      filter: { date: { startDate: start, endDate: end } },
+      limit: 0,
     });
 
     return workouts.map((w) => ({
       kind: String(w.workoutActivityType ?? 'workout'),
-      minutes: Math.round((w.duration ?? 0) / 60),
+      // `duration` is now a Quantity in seconds, not a bare number of seconds.
+      minutes: Math.round((w.duration?.quantity ?? 0) / 60),
       energyKcal: w.totalEnergyBurned?.quantity ?? null,
     }));
   } catch {
@@ -226,10 +242,7 @@ async function readBody(): Promise<Partial<BodyMetrics>> {
   const body: Partial<BodyMetrics> = {};
 
   try {
-    const height = await Healthkit.getMostRecentQuantitySample(
-      HKQuantityTypeIdentifier.height,
-      UnitOfLength.Meter as never,
-    );
+    const height = await getMostRecentQuantitySample(ID.height, 'm' as never);
     // Apple stores height in metres; the domain speaks centimetres.
     if (height?.quantity) body.heightCm = Math.round(height.quantity * 100);
   } catch {
@@ -237,18 +250,14 @@ async function readBody(): Promise<Partial<BodyMetrics>> {
   }
 
   try {
-    // 'kg' as a literal — UnitOfMass only enumerates oz/st/lb; SI prefixes are strings.
-    const mass = await Healthkit.getMostRecentQuantitySample(
-      HKQuantityTypeIdentifier.bodyMass,
-      'kg' as never,
-    );
+    const mass = await getMostRecentQuantitySample(ID.bodyMass, 'kg' as never);
     if (mass?.quantity) body.weightKg = Math.round(mass.quantity * 10) / 10;
   } catch {
     /* not shared */
   }
 
   try {
-    const sex = await Healthkit.getBiologicalSex();
+    const sex = await getBiologicalSexAsync();
     const mapped = SEX_MAP[String(sex).toLowerCase()];
     // 'notSet' maps to nothing. An unset sex must stay unknown — see bodyInsight().
     if (mapped) body.biologicalSex = mapped;
@@ -257,7 +266,7 @@ async function readBody(): Promise<Partial<BodyMetrics>> {
   }
 
   try {
-    const dob = await Healthkit.getDateOfBirth();
+    const dob = await getDateOfBirthAsync();
     if (dob instanceof Date && !Number.isNaN(dob.getTime())) {
       body.birthDate = asLocalDate(
         `${dob.getFullYear()}-${String(dob.getMonth() + 1).padStart(2, '0')}-${String(
@@ -289,15 +298,10 @@ export async function readHealth(days = 7): Promise<SyncHealthInput | null> {
     const { start, end, localDate } = dayBounds(i);
 
     const [steps, activeEnergy, exercise, restingHr, sleep, workouts] = await Promise.all([
-      sumQuantity(HKQuantityTypeIdentifier.stepCount, HKUnits.Count, start, end),
-      sumQuantity(
-        HKQuantityTypeIdentifier.activeEnergyBurned,
-        UnitOfEnergy.Kilocalories,
-        start,
-        end,
-      ),
-      sumQuantity(HKQuantityTypeIdentifier.appleExerciseTime, UnitOfTime.Minutes, start, end),
-      averageQuantity(HKQuantityTypeIdentifier.restingHeartRate, 'count/min', start, end),
+      sumQuantity(ID.steps, 'count', start, end),
+      sumQuantity(ID.activeEnergy, 'kcal', start, end),
+      sumQuantity(ID.exercise, 'min', start, end),
+      averageQuantity(ID.restingHr, 'count/min', start, end),
       readSleep(start, end),
       readWorkouts(start, end),
     ]);

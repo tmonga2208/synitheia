@@ -8,10 +8,10 @@ import { HABIT_MEASURES, measureOf, type TodayResponse } from '@synitheia/shared
 import {
   EmptyState,
   ErrorState,
-  LoadingState,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { SkeletonList } from '../../src/components/Skeleton.js';
 import { HabitCard, type TodayHabit } from '../../src/components/HabitCard.js';
 import { api } from '../../src/api/client.js';
 import type { ListResponse, WireHabit } from '../../src/api/types.js';
@@ -129,7 +129,7 @@ export default function Habits() {
   if (habitsQuery.isPending) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
-        <LoadingState label="Gathering your habits" />
+        <SkeletonList />
       </SafeAreaView>
     );
   }

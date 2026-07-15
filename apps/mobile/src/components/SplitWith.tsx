@@ -82,7 +82,10 @@ export function SplitWith({ billMinor, currency, value, onChange }: Props) {
   const { people, payer } = value;
 
   const [picking, setPicking] = useState(false);
-  const [contacts, setContacts] = useState<Contacts.Contact[]>([]);
+  // expo-contacts (SDK 54) splits the base Contact — which no longer carries an id — from
+  // ExistingContact, the shape the store returns, which does. getContactsAsync yields the
+  // latter, and the id is what lets the same person be recognised across expenses.
+  const [contacts, setContacts] = useState<Contacts.ExistingContact[]>([]);
   const [search, setSearch] = useState('');
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
@@ -315,7 +318,7 @@ function ContactPicker({
   onClose,
 }: {
   visible: boolean;
-  contacts: Contacts.Contact[];
+  contacts: Contacts.ExistingContact[];
   search: string;
   onSearch: (v: string) => void;
   permissionError: string | null;

@@ -18,11 +18,11 @@ import {
   Card,
   Chip,
   ErrorState,
-  LoadingState,
   SectionHeader,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { SkeletonScreen } from '../../src/components/Skeleton.js';
 import { DateField } from '../../src/components/DateField.js';
 import { ReceiptConsentSheet } from '../../src/components/ReceiptConsentSheet.js';
 import { ApiError, api } from '../../src/api/client.js';
@@ -207,7 +207,7 @@ export default function ExpenseDetail() {
     </Touchable>
   );
 
-  if (isPending) return <LoadingState label="Loading" />;
+  if (isPending) return <SkeletonScreen />;
 
   if (error || !data) {
     return (
