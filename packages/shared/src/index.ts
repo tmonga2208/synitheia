@@ -5,6 +5,7 @@ export * from './domain/common.js';
 export * from './domain/personal-event.js';
 export * from './domain/user.js';
 export * from './domain/expense.js';
+export * from './domain/calendar.js';
 export * from './domain/habit.js';
 export * from './domain/streak.js';
 export * from './domain/nutrition.js';

@@ -33,6 +33,7 @@ import { SkeletonList } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
 import { healthSourceName } from '../src/health/healthkit.js';
 import { connectHealth, useHealthSync } from '../src/health/useHealthSync.js';
+import { connectCalendar, useCalendarSync } from '../src/calendar/useCalendarSync.js';
 import type {
   DataSourceItem,
   DataSourceStatus,
@@ -116,6 +117,7 @@ export default function Privacy() {
   });
 
   const { sync: syncHealth } = useHealthSync(false);
+  const { sync: syncCalendar } = useCalendarSync();
 
   const updateSource = useMutation({
     mutationFn: async (input: {
@@ -131,10 +133,34 @@ export default function Privacy() {
        * single number. Ask the OS, and only record consent if it got as far as asking.
        */
       if (input.source === 'health' && input.status === 'connected') {
-        const ok = await connectHealth();
-        if (!ok) {
+        const result = await connectHealth();
+        if (result === 'unavailable') {
           throw new Error(
-            `${healthSourceName()} is not available on this device, or permission was not granted.`,
+            `${healthSourceName()} isn't available on this device.`,
+          );
+        }
+        if (result === 'unauthorized') {
+          // The store exists but the request failed. On a real iPhone this is the HealthKit
+          // entitlement, which Apple only issues to a paid developer account — a free-Apple-ID
+          // build reads Health fine in the Simulator but not on device. Say so, because no
+          // amount of retrying or toggling Settings fixes a stripped entitlement.
+          throw new Error(
+            Platform.OS === 'ios'
+              ? "Couldn't connect Apple Health. On a real device this needs the app signed with a paid Apple Developer account — a free Apple ID removes the Health entitlement. It works in the Simulator. If you're signed in with a paid account, check Health access for Synítheia in Settings."
+              : `Couldn't connect ${healthSourceName()}. Check its permission in Settings and try again.`,
+          );
+        }
+      }
+
+      // Calendar needs no special entitlement — a plain OS grant, and ours only if it lands.
+      if (input.source === 'calendar' && input.status === 'connected') {
+        const result = await connectCalendar();
+        if (result === 'unavailable') {
+          throw new Error('This device has no calendar to read.');
+        }
+        if (result === 'unauthorized') {
+          throw new Error(
+            'Calendar access was not granted. You can allow it for Synítheia in Settings.',
           );
         }
       }
@@ -146,8 +172,9 @@ export default function Privacy() {
     },
 
     onSuccess: (_result, input) => {
-      // Pull the first week straight away, so turning Health on visibly does something.
+      // Pull straight away, so turning a source on visibly does something.
       if (input.source === 'health' && input.status === 'connected') void syncHealth();
+      if (input.source === 'calendar' && input.status === 'connected') void syncCalendar();
     },
 
     onSettled: () => queryClient.invalidateQueries({ queryKey: SOURCES_KEY }),
