@@ -20,6 +20,7 @@ import {
   Camera,
   ClipboardPaste,
   FileText,
+  Lock,
 } from 'lucide-react-native';
 import { currencyMeta, formatMoney, parseMoneyInput, ZERO } from '@synitheia/shared';
 import {
@@ -32,6 +33,7 @@ import {
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { DateField } from '../../src/components/DateField.js';
 import {
   SplitWith,
   resolveExpense,
@@ -73,8 +75,16 @@ interface UploadFile {
   type: string;
 }
 
-function fileForm(file: UploadFile): FormData {
+/**
+ * The password field is appended BEFORE the file, and that order is load-bearing.
+ *
+ * The server reads the multipart parts in the order they arrive. A password sent after
+ * the file has already been handed to the parser arrives too late to open it, and the
+ * upload fails with "this statement is password-protected" no matter what you type.
+ */
+function fileForm(file: UploadFile, password?: string): FormData {
   const form = new FormData();
+  if (password) form.append('password', password);
   form.append('file', file as unknown as Blob);
   return form;
 }
@@ -114,6 +124,7 @@ function initialEdit(draft: WireDraft, categories: WireCategory[]): DraftEdit {
 export default function NewExpense() {
   const user = useAuth((s) => s.user);
   const currency = user?.currency ?? 'INR';
+  const timezone = user?.timezone ?? 'UTC';
   const queryClient = useQueryClient();
 
   const [amount, setAmount] = useState('');
@@ -124,10 +135,26 @@ export default function NewExpense() {
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * When it happened. Defaults to now, because that is what it usually is — but it is a
+   * field, not an assumption. Expenses get added on the train home, not at the till.
+   */
+  const [occurredAt, setOccurredAt] = useState(() => new Date());
+
   const [pasting, setPasting] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [ingestion, setIngestion] = useState<WireIngestion | null>(null);
   const [edits, setEdits] = useState<DraftEdit[]>([]);
+
+  /**
+   * A statement that turned out to be locked, held so it can be retried once the user
+   * types the password — re-picking the file from scratch would be an absurd thing to ask.
+   *
+   * The password is component state and nothing else: never persisted, never logged, and
+   * dropped the moment the statement opens. It is a key to someone's bank statement.
+   */
+  const [locked, setLocked] = useState<{ file: UploadFile; message: string } | null>(null);
+  const [password, setPassword] = useState('');
 
   const categories = useQuery({
     queryKey: CATEGORIES_KEY,
@@ -222,6 +249,7 @@ export default function NewExpense() {
         categoryId,
         merchant: merchant.trim() === '' ? null : merchant.trim(),
         note: note.trim() === '' ? null : note.trim(),
+        occurredAt: occurredAt.toISOString(),
         // Nobody owes you when a friend fronted the money.
         participants:
           split.payer === null && split.people.length > 0 ? split.people : undefined,
@@ -254,6 +282,9 @@ export default function NewExpense() {
       setIngestion(result.ingestion);
       setEdits(result.ingestion.drafts.map((d) => initialEdit(d, categoryItems)));
       setError(result.ingestion.error);
+      // It opened. Drop the password rather than leave it sitting in memory.
+      setLocked(null);
+      setPassword('');
     },
     [categoryItems],
   );
@@ -270,6 +301,46 @@ export default function NewExpense() {
         err instanceof ApiError || err instanceof Error
           ? err.message
           : 'We could not read that. You can still add it by hand.',
+      );
+    } finally {
+      setIngesting(false);
+    }
+  }
+
+  /**
+   * Send a statement, with the password if we have one.
+   *
+   * This does not go through `runIngest` because a locked statement is not a failure — it
+   * is a question. Bank e-statements are almost always password-protected, so being asked
+   * for one is the ORDINARY path, and it needs the file kept and the question asked, not
+   * a red error and a shrug.
+   *
+   * The trigger is the error CODE, never the message: rewording the copy must not be able
+   * to silently break the unlock flow.
+   */
+  async function sendStatement(file: UploadFile, secret?: string): Promise<void> {
+    setError(null);
+    setIngesting(true);
+
+    try {
+      receive(
+        await api.upload<{ ingestion: WireIngestion }>(
+          '/expenses/ingest/file',
+          fileForm(file, secret),
+        ),
+      );
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'pdf_password_required') {
+        setLocked({ file, message: err.message });
+        return;
+      }
+
+      setLocked(null);
+      setPassword('');
+      setError(
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : 'We could not read that statement. You can still add it by hand.',
       );
     } finally {
       setIngesting(false);
@@ -300,23 +371,25 @@ export default function NewExpense() {
     );
   }
 
-  async function importStatement(): Promise<{ ingestion: WireIngestion } | null> {
+  async function importStatement(): Promise<void> {
     const picked = await DocumentPicker.getDocumentAsync({
       type: ['application/pdf', 'text/csv', 'text/comma-separated-values'],
       copyToCacheDirectory: true,
     });
 
     const asset = picked.canceled ? null : picked.assets[0];
-    if (!asset) return null;
+    if (!asset) return;
 
-    return api.upload<{ ingestion: WireIngestion }>(
-      '/expenses/ingest/file',
-      fileForm({
-        uri: asset.uri,
-        name: asset.name,
-        type: asset.mimeType ?? 'application/pdf',
-      }),
-    );
+    // A fresh file starts a fresh question. Carrying the previous statement's password
+    // over would try it against a document it has nothing to do with.
+    setLocked(null);
+    setPassword('');
+
+    await sendStatement({
+      uri: asset.uri,
+      name: asset.name,
+      type: asset.mimeType ?? 'application/pdf',
+    });
   }
 
   const confirm = useMutation({
@@ -445,6 +518,64 @@ export default function NewExpense() {
               <Text variant="body" color={palette.danger}>
                 {error}
               </Text>
+            </Card>
+          ) : null}
+
+          {/*
+            The statement is locked. Ask, rather than give up — this is what a bank
+            e-statement normally is, and refusing it outright made the import feature
+            useless for exactly the file people most want to import.
+          */}
+          {locked ? (
+            <Card style={styles.unlock} accessibilityLiveRegion="polite">
+              <View style={styles.unlockHead}>
+                <Lock size={16} color={palette.stoneMuted} strokeWidth={1.8} />
+                <Text variant="cardTitle" style={{ flex: 1 }}>
+                  {locked.file.name}
+                </Text>
+              </View>
+
+              <Text variant="body" color={palette.stoneMuted}>
+                {locked.message}
+              </Text>
+
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Statement password"
+                placeholderTextColor={palette.stoneFaint}
+                secureTextEntry
+                autoCapitalize="characters"
+                autoCorrect={false}
+                editable={!ingesting}
+                style={styles.passwordInput}
+                accessibilityLabel="Statement password"
+                onSubmitEditing={() => {
+                  if (password) void sendStatement(locked.file, password);
+                }}
+              />
+
+              <Text variant="caption" color={palette.stoneFaint}>
+                Used once to open the file. It is never saved.
+              </Text>
+
+              <View style={styles.unlockActions}>
+                <Button
+                  label="Cancel"
+                  variant="ghost"
+                  onPress={() => {
+                    setLocked(null);
+                    setPassword('');
+                  }}
+                />
+                <Button
+                  label="Unlock"
+                  style={{ flex: 1 }}
+                  loading={ingesting}
+                  disabled={password.length === 0 || ingesting}
+                  onPress={() => void sendStatement(locked.file, password)}
+                />
+              </View>
             </Card>
           ) : null}
 
@@ -622,6 +753,18 @@ export default function NewExpense() {
                   maxLength={120}
                 />
 
+                {/*
+                  Defaults to now, which is right most of the time — but "most of the time"
+                  is not "always", and an expense you log on the way home belongs to the
+                  meal, not to the train.
+                */}
+                <DateField
+                  label="When"
+                  value={occurredAt}
+                  timezone={timezone}
+                  onChange={setOccurredAt}
+                />
+
                 <Input
                   label="Note (optional)"
                   value={note}
@@ -672,7 +815,7 @@ export default function NewExpense() {
                   icon={<FileText size={20} color={palette.sage} strokeWidth={1.6} />}
                   label="Import a statement"
                   busy={ingesting}
-                  onPress={() => void runIngest(importStatement)}
+                  onPress={() => void importStatement()}
                 />
               </View>
             </>
@@ -951,6 +1094,32 @@ const styles = StyleSheet.create({
   errorCard: {
     marginTop: spacing.lg,
     borderColor: palette.danger,
+  },
+  unlock: {
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  unlockHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  passwordInput: {
+    minHeight: MIN_TAP_TARGET,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: palette.sand,
+    borderWidth: 1,
+    borderColor: palette.surfaceDim,
+    color: palette.stone,
+    fontSize: 16,
+    marginTop: spacing.xs,
+  },
+  unlockActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.xs,
   },
   drafts: { marginTop: spacing.xl, gap: spacing.base },
   draft: {

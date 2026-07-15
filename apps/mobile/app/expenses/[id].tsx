@@ -23,6 +23,7 @@ import {
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
+import { DateField } from '../../src/components/DateField.js';
 import { ReceiptConsentSheet } from '../../src/components/ReceiptConsentSheet.js';
 import { ApiError, api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
@@ -135,6 +136,22 @@ export default function ExpenseDetail() {
     onSuccess: invalidate,
   });
 
+  /**
+   * Move the expense to a different moment.
+   *
+   * The server recomputes which local day it belongs to — that is not something the app
+   * can be trusted to do, because the day an expense counts towards depends on the
+   * timezone the expense was RECORDED in, not the one the phone happens to be in now.
+   *
+   * `today` and `expenses` are both invalidated because re-dating a row moves it between
+   * days: leaving either stale shows the expense on two dates at once, or on neither.
+   */
+  const reschedule = useMutation({
+    mutationFn: (occurredAt: Date) =>
+      api.patch<unknown>(`/expenses/${id}`, { occurredAt: occurredAt.toISOString() }),
+    onSuccess: invalidate,
+  });
+
   const settle = useMutation({
     mutationFn: ({ index, settled }: { index: number; settled: boolean }) =>
       api.post<unknown>(`/expenses/${id}/settle`, { index, settled }),
@@ -211,15 +228,6 @@ export default function ExpenseDetail() {
   const owed = owedMinor(e.participants);
   const net = netMinor({ amountMinor: e.amountMinor, participants: e.participants });
 
-  const when = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: timezone,
-  }).format(new Date(e.occurredAt));
-
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -233,9 +241,29 @@ export default function ExpenseDetail() {
         </Text>
 
         <Text variant="heading">{e.merchant ?? e.categoryName}</Text>
-        <Text variant="body" color={palette.stoneMuted} style={{ marginTop: spacing.xs }}>
-          {when}
-        </Text>
+
+        {/*
+          The date is editable in place. It used to be a line of grey text, which meant an
+          expense imported with the wrong day — or added late, on the day you remembered
+          rather than the day you spent — was wrong forever.
+        */}
+        <View style={styles.when}>
+          <DateField
+            label="When"
+            value={new Date(e.occurredAt)}
+            timezone={timezone}
+            disabled={reschedule.isPending}
+            onChange={(next) => reschedule.mutate(next)}
+          />
+
+          {reschedule.error ? (
+            <Text variant="caption" color={palette.danger} style={{ marginTop: spacing.sm }}>
+              {reschedule.error instanceof ApiError
+                ? reschedule.error.message
+                : 'Could not move this expense.'}
+            </Text>
+          ) : null}
+        </View>
 
         {e.note ? (
           <Card style={styles.note} elevated={false}>
@@ -464,6 +492,7 @@ const styles = StyleSheet.create({
     marginLeft: -spacing.md,
   },
   amount: { marginTop: spacing.xs, marginBottom: spacing.md },
+  when: { marginTop: spacing.base },
   note: {
     backgroundColor: palette.sand,
     borderRadius: radius.md,

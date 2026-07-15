@@ -17,6 +17,7 @@ export type ErrorCode =
   | 'ai_disabled'
   | 'ai_unavailable'
   | 'ingestion_failed'
+  | 'pdf_password_required'
   | 'internal';
 
 const STATUS: Record<ErrorCode, number> = {
@@ -30,6 +31,7 @@ const STATUS: Record<ErrorCode, number> = {
   ai_disabled: 403,
   ai_unavailable: 503,
   ingestion_failed: 422,
+  pdf_password_required: 422,
   internal: 500,
 };
 
@@ -69,6 +71,18 @@ export class AppError extends Error {
   }
   static ingestionFailed(message: string, details?: unknown) {
     return new AppError('ingestion_failed', message, details);
+  }
+
+  /**
+   * The statement is locked and we need the password to open it.
+   *
+   * This is its own code, not an `ingestion_failed` with a hopeful message, because the
+   * app has to DO something specific about it — show a password field and retry — and
+   * deciding that by matching on English prose would break the first time the copy is
+   * reworded or translated.
+   */
+  static pdfPasswordRequired(message: string) {
+    return new AppError('pdf_password_required', message);
   }
 }
 

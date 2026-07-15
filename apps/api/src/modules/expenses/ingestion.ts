@@ -250,17 +250,62 @@ export async function ingestText(env: Env, user: AuthedUser, text: string) {
   ]);
 }
 
-export async function ingestPdf(env: Env, user: AuthedUser, buffer: Buffer) {
+/**
+ * pdf.js signals a locked document with a PasswordException, and the `code` says which
+ * kind: 1 = we were given no password, 2 = the one we were given is wrong.
+ *
+ * These are worth telling apart. "This statement needs a password" and "that password
+ * was wrong" send the user to two completely different places, and collapsing them into
+ * one apologetic sentence is how a bank statement becomes unimportable.
+ */
+const PASSWORD_NEEDED = 1;
+const PASSWORD_INCORRECT = 2;
+
+function isPasswordException(err: unknown): err is { name: string; code: number } {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    (err as { name?: unknown }).name === 'PasswordException'
+  );
+}
+
+/**
+ * @param password The statement's open password, when the user has supplied one. Bank
+ *   e-statements in India are almost always locked with one (a PAN, a date of birth, a
+ *   customer id). It is used to open the document and is never logged or stored — it is
+ *   a key to the user's bank statement, not data we have any business keeping.
+ */
+export async function ingestPdf(
+  env: Env,
+  user: AuthedUser,
+  buffer: Buffer,
+  password?: string,
+) {
   // pdf-parse is CJS-only and pulls in a large dependency tree; importing it lazily
   // keeps it out of the hot path for every request that is not a PDF upload.
   const { default: pdfParse } = await import('pdf-parse');
 
   let text: string;
   try {
-    const parsed = await pdfParse(buffer);
+    // pdf-parse hands its first argument straight to pdf.js's getDocument, which accepts
+    // either a buffer or a {data, password} source. Passing the object is the only way to
+    // open a locked document; there is no password option on pdf-parse itself.
+    const parsed = await pdfParse(password ? { data: buffer, password } : buffer);
     text = parsed.text;
-  } catch {
-    throw AppError.ingestionFailed('That PDF could not be read. It may be encrypted.');
+  } catch (err) {
+    if (isPasswordException(err)) {
+      throw AppError.pdfPasswordRequired(
+        err.code === PASSWORD_INCORRECT
+          ? 'That password did not open the statement. Check it and try again.'
+          : err.code === PASSWORD_NEEDED
+            ? 'This statement is password-protected. Enter the password your bank uses to open it.'
+            : 'This statement is password-protected.',
+      );
+    }
+
+    throw AppError.ingestionFailed(
+      'That PDF could not be read. It may be damaged, or not really a PDF.',
+    );
   }
 
   if (text.trim().length === 0) {

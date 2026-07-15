@@ -21,6 +21,12 @@ import { palette, type } from '../../src/theme/tokens.js';
  *
  * The bar itself is the platform's own — the OS's blur, safe-area handling, height, and
  * behaviour on every device, none of it reimplemented. Only the tint is ours.
+ *
+ * A true native tab bar (react-native-bottom-tabs, for iOS 26 Liquid Glass) was attempted
+ * and reverted: its Fabric component does not link into the app binary under this project's
+ * Expo SDK 52 + New-Architecture + hoisted-pnpm setup, the same wall the native date picker
+ * hit. The supported path to native tabs is expo-router's own NativeTabs, which lands in
+ * Expo SDK 54 — an upgrade, not a component swap.
  */
 
 /**

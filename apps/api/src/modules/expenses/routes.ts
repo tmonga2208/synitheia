@@ -162,13 +162,26 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
       const buffer = await file.toBuffer();
       const mime = file.mimetype;
 
+      /**
+       * The open password for a locked bank statement, when the user has typed one.
+       *
+       * It travels in the multipart body rather than the query string precisely because
+       * query strings end up in access logs and proxy metrics. This value is used to open
+       * the document and is then dropped — it is never logged, and never persisted.
+       */
+      const passwordField = file.fields.password;
+      const password =
+        passwordField && !Array.isArray(passwordField) && passwordField.type === 'field'
+          ? String(passwordField.value)
+          : undefined;
+
       const result = mime.startsWith('image/')
         ? await ingestion.ingestScreenshot(env, req.user, {
             base64: buffer.toString('base64'),
             mediaType: mime,
           })
         : mime === 'application/pdf'
-          ? await ingestion.ingestPdf(env, req.user, buffer)
+          ? await ingestion.ingestPdf(env, req.user, buffer, password)
           : mime === 'text/csv' || file.filename.toLowerCase().endsWith('.csv')
             ? await ingestion.ingestCsv(req.user, buffer.toString('utf8'))
             : null;
