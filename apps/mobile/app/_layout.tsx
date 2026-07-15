@@ -140,6 +140,7 @@ export default function RootLayout() {
                 <Stack.Screen name="subscriptions" />
                 <Stack.Screen name="expenses/[id]" />
                 <Stack.Screen name="nutrition" />
+                <Stack.Screen name="targets" />
               </Stack>
             </AuthGate>
           </QueryClientProvider>

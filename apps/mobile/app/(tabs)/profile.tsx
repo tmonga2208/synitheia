@@ -136,7 +136,7 @@ export default function Profile() {
             icon={<Target size={20} color={palette.sage} strokeWidth={1.6} />}
             title="Targets"
             subtitle="Water, calories, and your monthly budget"
-            onPress={() => router.push('/setup')}
+            onPress={() => router.push('/targets')}
           />
 
           <View style={styles.divider} />

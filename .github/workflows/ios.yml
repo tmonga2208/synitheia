@@ -43,16 +43,22 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # Pick the newest Xcode 16 the runner actually has. Hardcoding "Xcode_16.app" breaks
-      # the day GitHub ships 16.2 and drops the plain 16 symlink — a failure that looks like
-      # a code problem and is not one.
+      # Pick the NEWEST Xcode the runner has, whatever its number. Two reasons it must be the
+      # newest, not a pinned major:
+      #   - SDK 54 / React Native 0.81 will not build on Xcode 15.
+      #   - The Liquid Glass tab bar is a property of the iOS 26 SDK. Built against an older
+      #     SDK the app still runs and the tab bar is still native — it just renders in the
+      #     older style. Only an Xcode that ships the iOS 26 SDK produces a Liquid Glass .ipa.
+      # Sorting the Xcode_*.app dirs and taking the last gives 26 when the image has it and
+      # falls back to whatever is newest otherwise, with no hardcoded version to rot.
       - name: Select Xcode
         run: |
-          XCODE="$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)"
+          XCODE="$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)"
           XCODE="${XCODE:-/Applications/Xcode.app}"
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE"
           xcodebuild -version
+          echo "iOS SDKs available:"; xcodebuild -showsdks | grep -i "iphoneos" || true
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

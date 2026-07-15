@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { completeOnboardingSchema, currencySchema, timeZoneSchema } from '@synitheia/shared';
+import {
+  completeOnboardingSchema,
+  currencySchema,
+  timeZoneSchema,
+  updateTargetsSchema,
+} from '@synitheia/shared';
 import { Types } from 'mongoose';
 import { HabitModel, UserModel, UserPreferenceModel } from '../../db/models.js';
 import { AppError } from '../../core/errors.js';
@@ -187,6 +192,50 @@ export async function registerAuthRoutes(app: FastifyInstance, env: Env): Promis
 
     return { user: publicUser(user), preferences };
   });
+
+  // ─── Targets ──────────────────────────────────────────────────────────────
+  //
+  // Read and write the water/calorie/budget numbers on their own, outside the onboarding
+  // wizard. The screen that used these was pointed at /setup, which the onboarded-user guard
+  // bounces straight to Today — so the numbers were uneditable after day one.
+
+  api.get('/me/targets', { onRequest: [app.requireAuth] }, async (req) => {
+    const user = await UserModel.findById(req.user.id).lean();
+    if (!user) throw AppError.notFound('User');
+
+    const prefs = await UserPreferenceModel.findOne({ userId: user._id }).lean();
+
+    return {
+      trackedDomains: prefs?.trackedDomains ?? ['habits', 'expenses', 'nutrition', 'water'],
+      waterTargetMl: prefs?.waterTargetMl ?? 2500,
+      calorieTarget: prefs?.calorieTarget ?? 2000,
+      monthlyBudgetMinor: prefs?.monthlyBudgetMinor ?? null,
+      currency: user.currency ?? 'INR',
+    };
+  });
+
+  api.patch(
+    '/me/targets',
+    { onRequest: [app.requireAuth], schema: { body: updateTargetsSchema } },
+    async (req) => {
+      const userId = new Types.ObjectId(req.user.id);
+
+      // Only the fields the client sent. Absent must not blank a target the user still has —
+      // a screen that hides the water field for a non-water user must not zero their water.
+      const set: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(req.body)) {
+        if (value !== undefined) set[key] = value;
+      }
+
+      const preferences = await UserPreferenceModel.findOneAndUpdate(
+        { userId },
+        { $set: set },
+        { new: true, upsert: true },
+      ).lean();
+
+      return { preferences };
+    },
+  );
 
   api.patch(
     '/me',

@@ -143,6 +143,33 @@ export const completeOnboardingSchema = z.object({
 export type CompleteOnboardingInput = z.infer<typeof completeOnboardingSchema>;
 
 /**
+ * Editing targets AFTER onboarding — the "Targets" screen.
+ *
+ * Deliberately NOT the onboarding flow. Reusing /setup here would drag the user back
+ * through domain and habit selection, and the guard that keeps onboarded users out of
+ * onboarding would bounce them to Today before they saw a single field. This is a small,
+ * standalone update: only the numbers, each optional, so the screen can save just what
+ * changed. Bounds mirror onboarding — a 250ml daily water goal is a typo, not a choice.
+ */
+export const updateTargetsSchema = z
+  .object({
+    waterTargetMl: z.number().int().min(250).max(10_000).optional(),
+    calorieTarget: z.number().int().min(800).max(10_000).optional(),
+    monthlyBudgetMinor: z.number().int().nonnegative().nullable().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update' });
+export type UpdateTargetsInput = z.infer<typeof updateTargetsSchema>;
+
+/** What the Targets screen reads to prefill — the current numbers and which domains apply. */
+export interface TargetsView {
+  trackedDomains: TrackedDomain[];
+  waterTargetMl: number;
+  calorieTarget: number;
+  monthlyBudgetMinor: number | null;
+  currency: string;
+}
+
+/**
  * Starter habits offered during onboarding.
  *
  * A curated few, not a blank field. The single most important thing onboarding does is
