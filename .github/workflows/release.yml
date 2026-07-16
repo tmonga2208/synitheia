@@ -1,0 +1,78 @@
+name: Release
+
+# Builds both platforms and publishes a GitHub Release with the .ipa and .apk attached.
+#
+# Trigger it by pushing a version tag (git tag v0.1.0 && git push origin v0.1.0) or by
+# running it manually and typing the tag. The two builds run as reusable-workflow calls, so
+# there is one source of truth for how each platform is built — this file only gathers the
+# artifacts and cuts the release.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. v0.1.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  ios:
+    uses: ./.github/workflows/ios.yml
+
+  android:
+    uses: ./.github/workflows/android.yml
+
+  publish:
+    needs: [ios, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Both artifacts were uploaded by the called workflows in THIS run, so they download
+      # straight back by name into one folder.
+      - name: Download iOS build
+        uses: actions/download-artifact@v4
+        with:
+          name: Synitheia-unsigned-ipa
+          path: dist
+
+      - name: Download Android build
+        uses: actions/download-artifact@v4
+        with:
+          name: Synitheia-apk
+          path: dist
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: List assets
+        run: ls -lh dist
+
+      # `gh release create` fails if the release already exists (a re-run of the same tag), so
+      # fall back to uploading the assets onto the existing one with --clobber. Either path
+      # ends with both files attached to the tag's release.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          NOTES=$'Unsigned builds for sideloading.\n\n- **iOS**: re-sign the `.ipa` with a free Apple ID (Sideloadly / AltStore).\n- **Android**: install the `.apk` directly with "install unknown apps" enabled.\n\nHealth on iOS needs a paid Apple Developer account; everything else works as built.'
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber --repo "${{ github.repository }}"
+          else
+            gh release create "$TAG" dist/* \
+              --repo "${{ github.repository }}" \
+              --title "Synítheia $TAG" \
+              --notes "$NOTES"
+          fi

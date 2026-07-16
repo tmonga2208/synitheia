@@ -19,6 +19,9 @@ on:
       - 'packages/shared/**'
       - '.github/workflows/ios.yml'
   workflow_dispatch:
+  # Callable, so the Release workflow can build a fresh .ipa as one of its jobs rather than
+  # duplicating every step here. The uploaded artifact is what the release job attaches.
+  workflow_call:
 
 concurrency:
   # A push that supersedes an in-flight build should cancel it. A 20-minute macOS run is the

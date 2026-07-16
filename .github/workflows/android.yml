@@ -1,0 +1,90 @@
+name: Android build
+
+# Produces an installable release .apk as a downloadable artifact.
+#
+# Unlike iOS, an Android release build is installable straight away: Expo's generated Gradle
+# project signs the release variant with the auto-generated debug keystore, which is enough
+# to sideload. It is NOT a Play Store build — that needs an upload key in secrets — but it is
+# a real, JS-bundled, standalone app anyone can install with "unknown sources" enabled.
+#
+# Android builds on Linux, which is far cheaper and faster than the macOS runner iOS needs,
+# so this can run freely on every push.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+  # Callable from the Release workflow — see the note in ios.yml.
+  workflow_call:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # React Native 0.81 / SDK 54 build tooling requires JDK 17. The Android SDK itself is
+      # preinstalled on the ubuntu runner, so only the JDK has to be pinned.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # See ios.yml: shared must be compiled or a stale dist can be bundled instead of source.
+      - name: Build shared package
+        run: pnpm --filter @synitheia/shared build
+
+      - name: Typecheck and test
+        run: pnpm typecheck && pnpm test
+
+      # android/ is not committed. Regenerating it derives the native project — package id,
+      # permissions, the Material theme — from app.json on every build, so it cannot drift
+      # from the config under review.
+      - name: Prebuild native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: apps/mobile/android
+        run: |
+          chmod +x ./gradlew
+          # assembleRelease bundles the JS and signs with the debug keystore Expo generated —
+          # a standalone, installable app. No secrets, no upload key.
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Collect APK
+        run: |
+          APK="$(find apps/mobile/android -path '*/outputs/apk/release/*.apk' | head -1)"
+          echo "Found $APK"
+          mkdir -p "$RUNNER_TEMP/out"
+          cp "$APK" "$RUNNER_TEMP/out/Synitheia.apk"
+          ls -lh "$RUNNER_TEMP/out/Synitheia.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Synitheia-apk
+          path: ${{ runner.temp }}/out/Synitheia.apk
+          if-no-files-found: error
+          retention-days: 30
