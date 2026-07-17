@@ -239,7 +239,7 @@ export default function Today() {
             accessibilityRole="button"
             accessibilityLabel="Reminders and notifications"
             haptic={false}
-            onPress={() => router.push('/(tabs)/reminders')}
+            onPress={() => router.push('/reminders')}
             style={styles.iconButton}
           >
             <Bell size={22} color={palette.stone} strokeWidth={1.6} />
@@ -284,7 +284,7 @@ export default function Today() {
           <SectionHeader
             title="Daily Habits"
             action={data.habits.length > 0 ? 'View All' : undefined}
-            onAction={() => router.push('/(tabs)/habits')}
+            onAction={() => router.push('/habits')}
           />
 
           {data.habits.length === 0 ? (

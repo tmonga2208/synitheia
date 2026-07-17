@@ -28,7 +28,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # A cold first build downloads the whole Gradle + Android toolchain and compiles every
+    # native module (Reanimated, HealthKit/Nitro, screens, svg…); it lands close to 45 min,
+    # so 45 was cutting it fine and one run timed out mid-link. 70 leaves real headroom, and
+    # the Gradle cache below makes every build after the first far quicker.
+    timeout-minutes: 70
 
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +52,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          # Caches ~/.gradle so the toolchain and dependencies are not re-downloaded every run.
+          cache: gradle
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

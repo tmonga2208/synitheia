@@ -3,7 +3,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Info, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, Info, Sparkles } from 'lucide-react-native';
 import {
   asMinor,
   formatMoney,
@@ -19,17 +19,17 @@ import {
   ErrorState,
   Text,
   Touchable,
-} from '../../src/components/primitives.js';
-import { Skeleton, SkeletonList } from '../../src/components/Skeleton.js';
-import { ApiError, api } from '../../src/api/client.js';
+} from '../src/components/primitives.js';
+import { Skeleton, SkeletonList } from '../src/components/Skeleton.js';
+import { ApiError, api } from '../src/api/client.js';
 import type {
   InsightAvailability,
   InsightEvidence,
   ListResponse,
   WireInsight,
-} from '../../src/api/types.js';
-import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, palette, radius, spacing } from '../../src/theme/tokens.js';
+} from '../src/api/types.js';
+import { useAuth } from '../src/store/auth.js';
+import { MIN_TAP_TARGET, palette, radius, spacing } from '../src/theme/tokens.js';
 
 const AVAILABILITY_KEY = ['insights', 'availability'] as const;
 const INSIGHTS_KEY = ['insights'] as const;
@@ -173,6 +173,18 @@ export default function Insights() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
   });
 
+  const back = (
+    <Touchable
+      onPress={() => router.back()}
+      style={styles.back}
+      haptic={false}
+      accessibilityRole="button"
+      accessibilityLabel="Go back"
+    >
+      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+    </Touchable>
+  );
+
   const header = (
     <View style={styles.header}>
       <Text variant="overline" color={palette.stoneFaint}>
@@ -194,6 +206,7 @@ export default function Insights() {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
+          {back}
           {header}
           <ErrorState
             message={
@@ -219,6 +232,7 @@ export default function Insights() {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {back}
           {header}
 
           <EmptyState
@@ -252,6 +266,7 @@ export default function Insights() {
           />
         }
       >
+        {back}
         {header}
 
         {insights.isPending ? (
@@ -447,6 +462,13 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
+  },
+  back: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -spacing.md,
   },
   header: {
     paddingVertical: spacing.sm,

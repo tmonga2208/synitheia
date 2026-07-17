@@ -11,9 +11,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
-import { Bell, Minus, Plus, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Bell, Minus, Plus, Trash2 } from 'lucide-react-native';
 import type { CreateReminderInput, ReminderKind } from '@synitheia/shared';
 import {
   Button,
@@ -24,11 +25,11 @@ import {
   Input,
   Text,
   Touchable,
-} from '../../src/components/primitives.js';
-import { SkeletonList } from '../../src/components/Skeleton.js';
-import { ApiError, api } from '../../src/api/client.js';
-import type { ListResponse, WireReminder } from '../../src/api/types.js';
-import { MIN_TAP_TARGET, palette, radius, spacing } from '../../src/theme/tokens.js';
+} from '../src/components/primitives.js';
+import { SkeletonList } from '../src/components/Skeleton.js';
+import { ApiError, api } from '../src/api/client.js';
+import type { ListResponse, WireReminder } from '../src/api/types.js';
+import { MIN_TAP_TARGET, palette, radius, spacing } from '../src/theme/tokens.js';
 
 const REMINDERS_KEY = ['reminders'] as const;
 
@@ -223,6 +224,18 @@ export default function Reminders() {
     ]);
   }
 
+  const back = (
+    <Touchable
+      onPress={() => router.back()}
+      style={styles.back}
+      haptic={false}
+      accessibilityRole="button"
+      accessibilityLabel="Go back"
+    >
+      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+    </Touchable>
+  );
+
   const header = (
     <View style={styles.header}>
       <View style={styles.headerCopy}>
@@ -255,6 +268,7 @@ export default function Reminders() {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
+          {back}
           {header}
           <ErrorState
             message={
@@ -284,6 +298,7 @@ export default function Reminders() {
           />
         }
       >
+        {back}
         {header}
 
         {reminders.length === 0 ? (
@@ -534,6 +549,13 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
+  },
+  back: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -spacing.md,
   },
   header: {
     flexDirection: 'row',

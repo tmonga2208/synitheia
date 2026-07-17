@@ -3,19 +3,19 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Leaf, Plus } from 'lucide-react-native';
+import { ArrowLeft, Leaf, Plus } from 'lucide-react-native';
 import { HABIT_MEASURES, measureOf, type TodayResponse } from '@synitheia/shared';
 import {
   EmptyState,
   ErrorState,
   Text,
   Touchable,
-} from '../../src/components/primitives.js';
-import { SkeletonList } from '../../src/components/Skeleton.js';
-import { HabitCard, type TodayHabit } from '../../src/components/HabitCard.js';
-import { api } from '../../src/api/client.js';
-import type { ListResponse, WireHabit } from '../../src/api/types.js';
-import { MIN_TAP_TARGET, palette, radius, spacing } from '../../src/theme/tokens.js';
+} from '../src/components/primitives.js';
+import { SkeletonList } from '../src/components/Skeleton.js';
+import { HabitCard, type TodayHabit } from '../src/components/HabitCard.js';
+import { api } from '../src/api/client.js';
+import type { ListResponse, WireHabit } from '../src/api/types.js';
+import { MIN_TAP_TARGET, palette, radius, spacing } from '../src/theme/tokens.js';
 
 const HABITS_KEY = ['habits'] as const;
 const TODAY_KEY = ['today'] as const;
@@ -106,6 +106,18 @@ export default function Habits() {
     [habitsQuery.data, todayQuery.data],
   );
 
+  const back = (
+    <Touchable
+      onPress={() => router.back()}
+      style={styles.back}
+      haptic={false}
+      accessibilityRole="button"
+      accessibilityLabel="Go back"
+    >
+      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+    </Touchable>
+  );
+
   const header = (
     <View style={styles.header}>
       <View style={styles.headerCopy}>
@@ -138,6 +150,7 @@ export default function Habits() {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
+          {back}
           {header}
           <ErrorState
             message={
@@ -165,6 +178,7 @@ export default function Habits() {
           />
         }
       >
+        {back}
         {header}
 
         {habits.length === 0 ? (
@@ -197,6 +211,13 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
+  },
+  back: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -spacing.md,
   },
   header: {
     flexDirection: 'row',

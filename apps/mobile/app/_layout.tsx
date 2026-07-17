@@ -141,6 +141,10 @@ export default function RootLayout() {
                 <Stack.Screen name="expenses/[id]" />
                 <Stack.Screen name="nutrition" />
                 <Stack.Screen name="targets" />
+                {/* Secondary screens navigated to but never tabbed to — see (tabs)/_layout. */}
+                <Stack.Screen name="habits" />
+                <Stack.Screen name="reminders" />
+                <Stack.Screen name="insights" />
               </Stack>
             </AuthGate>
           </QueryClientProvider>

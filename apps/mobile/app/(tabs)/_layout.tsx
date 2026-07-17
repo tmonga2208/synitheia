@@ -29,11 +29,16 @@ import { palette } from '../../src/theme/tokens.js';
  * SVG component cannot be handed to a native tab item), so each icon names a symbol for iOS
  * and points at a generated PNG of the matching glyph for Android — one <Icon> covers both.
  *
- * The routable-but-hidden screens (insights, habits, reminders) each need a Trigger with
- * `hidden`. Leaving them out entirely does NOT keep them navigable — NativeTabs only knows
- * the routes it has triggers for, so a push to an unregistered one has no page and the
- * router falls back to the initial tab (Today). `hidden` is the native equivalent of the old
- * `href: null`: registered, reachable, just not drawn on the bar.
+ * Insights, Habits and Reminders are NOT tabs and do not belong here. They were briefly
+ * declared as `hidden` triggers on the theory that `hidden` is the native equivalent of the
+ * old `href: null` — registered, reachable, just not drawn on the bar. It is not:
+ * NativeTabsView FILTERS hidden triggers out of the native tab container entirely
+ * (shouldTabBeVisible === `options.hidden === false`), so no BottomTabsScreen is ever mounted
+ * for them. A push then moved the navigation state with nothing on screen to show it, and
+ * every tap that led there — the bell, the Habits tile, "What Synítheia noticed" — looked
+ * dead. They are secondary detail screens, so they live in the root Stack alongside water,
+ * nutrition and expenses and push OVER the bar — the idiomatic place for a screen you
+ * navigate to but never tab to.
  */
 
 /**
@@ -61,12 +66,6 @@ export default function TabsLayout() {
         <Icon sf="person" androidSrc={youPng} />
         <Label>You</Label>
       </NativeTabs.Trigger>
-
-      {/* Registered so they're reachable, hidden so they're not tabs. Insights is opened from
-          Today, Habits from Today and Track, Reminders from the bell. */}
-      <NativeTabs.Trigger name="insights" hidden />
-      <NativeTabs.Trigger name="habits" hidden />
-      <NativeTabs.Trigger name="reminders" hidden />
     </NativeTabs>
   );
 }

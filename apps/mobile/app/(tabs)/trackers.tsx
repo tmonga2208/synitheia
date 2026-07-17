@@ -188,7 +188,7 @@ export default function Trackers() {
               }
               caption={data.habits.length > 0 ? 'done today' : 'Tap to add one'}
               progress={data.habits.length > 0 ? habitsDone / data.habits.length : null}
-              onPress={() => router.push('/(tabs)/habits')}
+              onPress={() => router.push('/habits')}
             />
           </View>
         </View>
