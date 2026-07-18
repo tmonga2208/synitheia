@@ -37,6 +37,12 @@ import type { AuthedUser } from '../../core/auth-guard.js';
 
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+export interface IngestMeta {
+  channel?: IngestionChannel;
+  messageId?: string | null;
+  source?: unknown;
+}
+
 /** What the extractor must return. Enforced, not requested. */
 const extractionSchema = z.object({
   transactions: z
@@ -280,6 +286,7 @@ export async function ingestPdf(
   user: AuthedUser,
   buffer: Buffer,
   password?: string,
+  meta?: IngestMeta,
 ) {
   // pdf-parse is CJS-only and pulls in a large dependency tree; importing it lazily
   // keeps it out of the hot path for every request that is not a PDF upload.
@@ -314,12 +321,12 @@ export async function ingestPdf(
     );
   }
 
-  return runIngestion(env, user, 'pdf', [
+  return runIngestion(env, user, meta?.channel ?? 'pdf', [
     {
       type: 'text',
       text: `Extract every transaction from this bank/card statement:\n\n${text.slice(0, 60_000)}`,
     },
-  ]);
+  ], meta);
 }
 
 /**
@@ -396,11 +403,69 @@ export async function ingestCsv(user: AuthedUser, csv: string) {
   return persist(user, 'csv', await markDuplicates(user.id, drafts));
 }
 
+/**
+ * A forwarded bank/UPI email. Deduped on Message-ID so a provider retry cannot double-file.
+ * The HTML→text reduction happens in the webhook; this receives already-flattened text.
+ */
+export async function ingestEmail(
+  env: Env,
+  user: AuthedUser,
+  mail: { messageId: string | null; from: string | null; subject: string | null; text: string },
+) {
+  if (mail.messageId) {
+    const existing = await ExpenseIngestionModel.findOne({
+      userId: new Types.ObjectId(user.id),
+      messageId: mail.messageId,
+    })
+      .select('_id')
+      .lean();
+    if (existing) return null;
+  }
+
+  const source = { from: mail.from, subject: mail.subject, receivedAt: new Date() };
+
+  return runIngestion(
+    env,
+    user,
+    'email',
+    [
+      {
+        type: 'text',
+        text: `Extract every payment transaction from this bank/UPI email:\n\n${mail.text.slice(0, 60_000)}`,
+      },
+    ],
+    { channel: 'email', messageId: mail.messageId, source },
+  );
+}
+
+/**
+ * A password-protected statement arrived by email. We hold NO bytes — the user finishes
+ * the import in-app, where the existing upload flow can ask for the password. This record
+ * exists only so the forward does not vanish silently.
+ */
+export async function recordLockedStatement(
+  user: AuthedUser,
+  source: { from: string | null; subject: string | null; receivedAt: Date },
+  messageId: string | null,
+) {
+  return ExpenseIngestionModel.create({
+    userId: new Types.ObjectId(user.id),
+    channel: 'email',
+    status: 'needs_password',
+    drafts: [],
+    error: 'This statement is password-protected. Open it in the app to import it.',
+    messageId,
+    source,
+    expiresAt: new Date(Date.now() + DRAFT_TTL_MS),
+  });
+}
+
 async function runIngestion(
   env: Env,
   user: AuthedUser,
   channel: IngestionChannel,
   content: AiContent[],
+  meta?: IngestMeta,
 ) {
   const drafts = await extract(env, content, user.currency);
 
@@ -410,13 +475,14 @@ async function runIngestion(
     );
   }
 
-  return persist(user, channel, await markDuplicates(user.id, drafts));
+  return persist(user, meta?.channel ?? channel, await markDuplicates(user.id, drafts), meta);
 }
 
 async function persist(
   user: AuthedUser,
   channel: IngestionChannel,
   drafts: DraftTransaction[],
+  meta?: IngestMeta,
 ) {
   return ExpenseIngestionModel.create({
     userId: new Types.ObjectId(user.id),
@@ -424,6 +490,8 @@ async function persist(
     status: 'needs_review',
     drafts,
     error: null,
+    messageId: meta?.messageId ?? null,
+    source: meta?.source ?? null,
     expiresAt: new Date(Date.now() + DRAFT_TTL_MS),
   });
 }
@@ -441,7 +509,7 @@ export async function getIngestion(userId: string, id: string) {
 export async function listPendingIngestions(userId: string) {
   return ExpenseIngestionModel.find({
     userId: new Types.ObjectId(userId),
-    status: 'needs_review',
+    status: { $in: ['needs_review', 'needs_password'] },
   })
     .sort({ createdAt: -1 })
     .lean();
