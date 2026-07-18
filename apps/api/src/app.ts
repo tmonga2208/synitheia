@@ -27,6 +27,7 @@ import { registerCalendarRoutes } from './modules/calendar/routes.js';
 import { registerWeatherRoutes } from './modules/weather/routes.js';
 import { registerLocationRoutes } from './modules/location/routes.js';
 import { registerPrivacyRoutes } from './modules/privacy/routes.js';
+import { registerWebhookRoutes } from './modules/webhooks/routes.js';
 import type { Env } from './config/env.js';
 
 export async function buildApp(env: Env): Promise<FastifyInstance> {
@@ -164,6 +165,7 @@ export async function buildApp(env: Env): Promise<FastifyInstance> {
       await registerWeatherRoutes(api);
       await registerLocationRoutes(api);
       await registerPrivacyRoutes(api);
+      await registerWebhookRoutes(api, env);
     },
     { prefix: '/v1' },
   );
