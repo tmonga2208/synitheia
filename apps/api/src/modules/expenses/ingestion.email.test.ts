@@ -1,6 +1,6 @@
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // The extractor is mocked: these tests prove routing/dedup/persistence, not the model.
 vi.mock('../../ai/client.js', () => ({ callStructured: vi.fn() }));
@@ -79,5 +79,17 @@ describe('recordLockedStatement + listPendingIngestions', () => {
     expect(pending).toHaveLength(1);
     expect(pending[0]!.status).toBe('needs_password');
     expect(pending[0]!.drafts).toHaveLength(0);
+  });
+
+  it('is idempotent on messageId (a retried locked forward does not double-file)', async () => {
+    const source = { from: 'e@bank', subject: 'Statement', receivedAt: new Date() };
+    const first = await recordLockedStatement(user, source, '<locked-dup@bank>');
+    const second = await recordLockedStatement(user, source, '<locked-dup@bank>');
+
+    expect(first).not.toBeNull();
+    expect(second).toBeNull();
+    expect(
+      await ExpenseIngestionModel.countDocuments({ messageId: '<locked-dup@bank>' }),
+    ).toBe(1);
   });
 });

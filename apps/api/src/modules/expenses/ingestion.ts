@@ -448,6 +448,16 @@ export async function recordLockedStatement(
   source: { from: string | null; subject: string | null; receivedAt: Date },
   messageId: string | null,
 ) {
+  if (messageId) {
+    const existing = await ExpenseIngestionModel.findOne({
+      userId: new Types.ObjectId(user.id),
+      messageId,
+    })
+      .select('_id')
+      .lean();
+    if (existing) return null;
+  }
+
   return ExpenseIngestionModel.create({
     userId: new Types.ObjectId(user.id),
     channel: 'email',
