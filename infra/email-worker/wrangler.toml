@@ -1,0 +1,10 @@
+name = "synitheia-email-worker"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# API_URL and WEBHOOK_SECRET are set as secrets/vars, not committed:
+#   wrangler secret put WEBHOOK_SECRET
+#   wrangler deploy --var API_URL:https://<your-api-host>
+[vars]
+API_URL = "https://REPLACE_WITH_API_HOST"
