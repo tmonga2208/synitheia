@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, ChevronRight, Info, Leaf, Sparkles, Zap } from 'lucide-react-native';
 import {
   asMinor,
+  formatDayLabel,
   formatMoney,
   type SupportingMetric,
   type TodayResponse,
@@ -33,21 +34,6 @@ import { useAuth } from '../../src/store/auth.js';
 import { MIN_TAP_TARGET, palette, radius, spacing } from '../../src/theme/tokens.js';
 
 const TODAY_KEY = ['today'] as const;
-
-/**
- * A LocalDate is a bare calendar label with no timezone attached. Anchoring it at UTC
- * midnight and formatting it *in UTC* is the only way to render it without some zone
- * silently shifting it a day — which is exactly the class of bug local-date.ts exists
- * to prevent.
- */
-function formatOverline(localDate: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${localDate}T00:00:00Z`));
-}
 
 function formatMetric(metric: SupportingMetric, currency: string): string {
   switch (metric.unit) {
@@ -170,7 +156,7 @@ export default function Today() {
   const { data, error, isPending, isRefetching, refetch } = query;
 
   const overline = useMemo(
-    () => (data ? formatOverline(data.localDate) : ''),
+    () => (data ? formatDayLabel(data.localDate) : ''),
     [data],
   );
 
