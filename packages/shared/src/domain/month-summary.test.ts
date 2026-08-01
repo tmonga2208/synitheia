@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { asLocalDate, type LocalDate } from '../time/local-date.js';
 import { DEFAULT_TRACKED_DOMAINS } from './today.js';
 import {
+  flowComponentsForSummary,
   flowPercentForSummary,
+  hasAnyActivity,
   monthStats,
   monthSummaryResponseSchema,
+  type DayActivityInput,
   type FlowSummaryInput,
 } from './month-summary.js';
 
@@ -64,6 +67,69 @@ describe('flowPercentForSummary', () => {
   it('clamps an overshot component at 100', () => {
     const overshoot = summary({ water: { totalMl: 9000, targetMl: 2500, entryCount: 5 } });
     expect(flowPercentForSummary(overshoot, DEFAULT_TRACKED_DOMAINS)).toBe(100);
+  });
+});
+
+describe('flowComponentsForSummary', () => {
+  it('is the single place the activation rules live — percent delegates to it', () => {
+    const s = summary({ water: { totalMl: 1250, targetMl: 2500, entryCount: 2 } });
+    const components = flowComponentsForSummary(s, DEFAULT_TRACKED_DOMAINS);
+
+    expect(components.map((c) => c.key)).toEqual(['habits', 'water', 'nutrition']);
+    expect(components.find((c) => c.key === 'water')?.percent).toBe(50);
+  });
+
+  it('deactivates water and nutrition on an entryCount of zero, and habits on scheduled zero', () => {
+    const s = summary({
+      habits: { scheduled: 0, completionRate: 0 },
+      water: { totalMl: 0, targetMl: 2500, entryCount: 0 },
+      nutrition: { totals: { calories: 0 }, calorieTarget: 2000, entryCount: 0 },
+    });
+
+    expect(
+      flowComponentsForSummary(s, DEFAULT_TRACKED_DOMAINS).every((c) => !c.active),
+    ).toBe(true);
+  });
+
+  it('deactivates a domain the user does not track even when it has entries', () => {
+    const components = flowComponentsForSummary(summary(), ['habits']);
+
+    expect(components.find((c) => c.key === 'water')?.active).toBe(false);
+    expect(components.find((c) => c.key === 'habits')?.active).toBe(true);
+  });
+});
+
+function activity(overrides: Partial<DayActivityInput> = {}): DayActivityInput {
+  return {
+    habits: { scheduled: 0, completed: 0 },
+    water: { entryCount: 0 },
+    nutrition: { entryCount: 0 },
+    expenses: { count: 0 },
+    eventCount: 0,
+    ...overrides,
+  };
+}
+
+describe('hasAnyActivity', () => {
+  it('is false for a day the user never opened the app on', () => {
+    expect(hasAnyActivity(activity())).toBe(false);
+  });
+
+  it('is true when a habit was scheduled but missed — that is a real zero, not an absence', () => {
+    expect(hasAnyActivity(activity({ habits: { scheduled: 3, completed: 0 } }))).toBe(true);
+  });
+
+  it('is true when a habit was completed even though it has since been archived', () => {
+    // scheduledOn() drops a habit archived before the day, so `scheduled` can be 0
+    // while `completed` is not. The day still happened.
+    expect(hasAnyActivity(activity({ habits: { scheduled: 0, completed: 1 } }))).toBe(true);
+  });
+
+  it('is true for water, food, expenses, or a passive event on their own', () => {
+    expect(hasAnyActivity(activity({ water: { entryCount: 1 } }))).toBe(true);
+    expect(hasAnyActivity(activity({ nutrition: { entryCount: 1 } }))).toBe(true);
+    expect(hasAnyActivity(activity({ expenses: { count: 1 } }))).toBe(true);
+    expect(hasAnyActivity(activity({ eventCount: 1 }))).toBe(true);
   });
 });
 
