@@ -107,7 +107,7 @@ That distinction must survive the wire: `percent: 0` and "you weren't using the 
 different statements, and this codebase already refuses to collapse them elsewhere (see
 the `steps: null` reasoning in `context/aggregator.ts`).
 
-`month` is validated as `/^\d{4}-\d{2}$/`. A future month returns an empty `days` array
+`month` is validated as `/^\d{4}-(0[1-9]|1[0-2])$/`. A future month returns an empty `days` array
 rather than an error. `monthSummaryResponseSchema` is attached as the route's response
 schema, so a payload that does not match the contract fails loudly instead of shipping a
 `null` percent the client would render as the wrong tint.
