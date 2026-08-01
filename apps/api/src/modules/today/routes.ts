@@ -5,7 +5,10 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   DEFAULT_TRACKED_DOMAINS,
   addLocalDays,
+  completionRate,
   computeDailyFlow,
+  flowComponentsForSummary,
+  flowPercentForSummary,
   greetingFor,
   isHabitComplete,
   localDateSchema,
@@ -13,7 +16,6 @@ import {
   netMinor,
   startOfLocalWeek,
   todayLocalDate,
-  type FlowComponent,
   type LocalDate,
   type Participant,
 } from '@synitheia/shared';
@@ -28,7 +30,7 @@ import {
   WaterEntryModel,
 } from '../../db/models.js';
 import { timelineFor } from '../../context/engine.js';
-import { getDailySummary } from '../../context/aggregator.js';
+import { flowInputOf, getDailySummary } from '../../context/aggregator.js';
 import { runDetectors } from '../../context/detectors.js';
 import * as habits from '../habits/service.js';
 import * as subscriptions from '../subscriptions/service.js';
@@ -102,6 +104,7 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
         account,
         prefs,
         habitList,
+        scheduledHabits,
         habitLogs,
         expenses,
         nutrition,
@@ -113,6 +116,16 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
         UserModel.findById(uid, { xp: 1 }).lean(),
         UserPreferenceModel.findOne({ userId: uid }).lean(),
         habits.listHabits(user.id),
+        /**
+         * The ring's habit denominator, and NOT the same list as `habitList`.
+         *
+         * `listHabits` is what the user has right now; `scheduledOn` is what they had
+         * on `localDate` — it keeps a habit archived since then and drops one created
+         * since. That is the denominator `buildDailySummary` records, so scoring the
+         * ring against it is what stops the ring, the weekly bar and the History cell
+         * for the same date from being three different numbers.
+         */
+        habits.scheduledOn(user.id, localDate),
         HabitLogModel.find({ userId: uid, localDate }).lean(),
         ExpenseModel.find(
           { userId: uid, localDate },
@@ -154,8 +167,6 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
         };
       });
 
-      const completedCount = habitsToday.filter((h) => h.todayComplete).length;
-
       // ── Totals
       // NET. See totalsFor() — what the day cost, not what passed through the card.
       const expenseTotal = expenses.reduce(
@@ -180,32 +191,46 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
        * down by a tracker they never chose. A ring that cannot be filled is a ring quietly
        * telling you that you failed at something you never signed up for.
        */
-      const tracked = new Set(
-        (prefs?.trackedDomains as string[] | undefined) ?? DEFAULT_TRACKED_DOMAINS,
+      const tracked =
+        (prefs?.trackedDomains as string[] | undefined) ?? DEFAULT_TRACKED_DOMAINS;
+
+      /**
+       * The ring, the weekly bar and the History cell for a date are now ONE
+       * computation. `flowComponentsForSummary` is the only place in the codebase that
+       * decides when a component counts; three hand-rolled copies used to exist and
+       * they disagreed, so a grid cell and the day screen it opened could differ by 60
+       * points for the same date. Water was unconditionally active here and gated on
+       * `entryCount > 0` in the other two — the latter wins, for the reason this route
+       * already gave for nutrition and `flowComponentsForSummary` now carries: an
+       * untouched tracker is not a failure.
+       *
+       * The inputs are `scheduledHabits`, not `habitList`, and completed LOGS, not
+       * completed rows of `habitsToday` — both mirroring buildDailySummary, so that a
+       * habit archived since `localDate` still counts on the day it was kept.
+       */
+      const completedLogCount = habitLogs.filter((l) => isHabitComplete(l)).length;
+
+      const dailyFlow = computeDailyFlow(
+        flowComponentsForSummary(
+          {
+            habits: {
+              scheduled: scheduledHabits.length,
+              completionRate: completionRate(completedLogCount, scheduledHabits.length),
+            },
+            water: {
+              totalMl: waterTotal,
+              targetMl: waterTargetMl,
+              entryCount: water.length,
+            },
+            nutrition: {
+              totals: { calories },
+              calorieTarget,
+              entryCount: nutrition?.entryCount ?? 0,
+            },
+          },
+          tracked,
+        ),
       );
-
-      const components: FlowComponent[] = [
-        {
-          key: 'habits',
-          percent:
-            habitList.length > 0 ? (completedCount / habitList.length) * 100 : 0,
-          active: tracked.has('habits') && habitList.length > 0,
-        },
-        {
-          key: 'water',
-          percent: (waterTotal / waterTargetMl) * 100,
-          active: tracked.has('water'),
-        },
-        {
-          key: 'nutrition',
-          percent: (calories / calorieTarget) * 100,
-          // Even for someone who tracks food, an untouched tracker should not drag the
-          // ring down before they have eaten anything.
-          active: tracked.has('nutrition') && (nutrition?.entryCount ?? 0) > 0,
-        },
-      ];
-
-      const dailyFlow = computeDailyFlow(components);
 
       // ── Weekly chart (Monday-anchored, matching the M–S columns in the design)
       const weekStart = startOfLocalWeek(localDate);
@@ -217,30 +242,15 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
               return { localDate: day, percent: 0, isToday: false };
             }
 
+            // Same function as the ring above and the History grid — and this is also
+            // where the chart picks up `trackedDomains` gating, which its hand-rolled
+            // copy applied nowhere at all: a habits-only user's bars were capped by
+            // water and food they never signed up for.
             const summary = await getDailySummary(user.id, day);
-            const parts: FlowComponent[] = [
-              {
-                key: 'habits',
-                percent: summary.habits.completionRate * 100,
-                active: summary.habits.scheduled > 0,
-              },
-              {
-                key: 'water',
-                percent: (summary.water.totalMl / summary.water.targetMl) * 100,
-                active: summary.water.entryCount > 0,
-              },
-              {
-                key: 'nutrition',
-                percent:
-                  (summary.nutrition.totals.calories / summary.nutrition.calorieTarget) *
-                  100,
-                active: summary.nutrition.entryCount > 0,
-              },
-            ];
 
             return {
               localDate: day,
-              percent: computeDailyFlow(parts).percent,
+              percent: flowPercentForSummary(flowInputOf(summary), tracked),
               isToday: day === today,
             };
           },

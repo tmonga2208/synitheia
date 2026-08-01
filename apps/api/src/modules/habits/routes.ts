@@ -35,7 +35,7 @@ export async function registerHabitRoutes(app: FastifyInstance): Promise<void> {
       schema: { body: createHabitSchema },
     },
     async (req, reply) => {
-      const habit = await service.createHabit(req.user.id, req.body);
+      const habit = await service.createHabit(req.user, req.body);
       return reply.status(201).send({ habit });
     },
   );
@@ -64,7 +64,7 @@ export async function registerHabitRoutes(app: FastifyInstance): Promise<void> {
       schema: { params: z.object({ id: objectIdSchema }) },
     },
     async (req, reply) => {
-      await service.archiveHabit(req.user.id, req.params.id);
+      await service.archiveHabit(req.user, req.params.id);
       return reply.status(204).send();
     },
   );

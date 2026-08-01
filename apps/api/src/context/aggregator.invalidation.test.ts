@@ -1,7 +1,7 @@
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose, { Types } from 'mongoose';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { asLocalDate } from '@synitheia/shared';
+import { asLocalDate, todayLocalDate } from '@synitheia/shared';
 import {
   DailySummaryModel,
   DataSourceConnectionModel,
@@ -10,7 +10,12 @@ import {
   PersonalEventModel,
 } from '../db/models.js';
 import type { AuthedUser } from '../core/auth-guard.js';
-import { logHabit } from '../modules/habits/service.js';
+import {
+  archiveHabit,
+  createHabit,
+  logHabit,
+  scheduledOn,
+} from '../modules/habits/service.js';
 import { createEntry, deleteEntry } from '../modules/water/routes.js';
 import { rebuildDaily } from '../modules/nutrition/service.js';
 import { createExpense, updateExpense } from '../modules/expenses/service.js';
@@ -144,6 +149,104 @@ describe('call-site wiring', () => {
         localDate: DAY,
       }),
     ).toBe(0);
+  });
+
+  /**
+   * Creating and archiving a habit both move `scheduledOn()`, hence `habits.scheduled`,
+   * hence the flow percentage — with no write to any log. Without these calls a user
+   * could create a habit and leave it uncompleted, and the ring (live habits) would say
+   * 50% while the grid cell and the weekly bar (cached rollup) said 100%, indefinitely.
+   */
+  it('createHabit drops today’s summary in the user’s timezone', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = authedUser(userId);
+    const todayLocal = todayLocalDate(user.timezone);
+
+    await seedSummary(userId, todayLocal);
+
+    await createHabit(user, {
+      name: 'Read',
+      icon: 'book',
+      color: '#7D927D',
+      frequency: 'daily',
+      measure: 'check',
+      targetCount: 1,
+    });
+
+    expect(
+      await DailySummaryModel.countDocuments({
+        userId: new Types.ObjectId(userId),
+        localDate: todayLocal,
+      }),
+    ).toBe(0);
+  });
+
+  it('archiveHabit drops today’s summary and 404s on a missing id', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = authedUser(userId);
+    const todayLocal = todayLocalDate(user.timezone);
+
+    const habit = await HabitModel.create({
+      userId: new Types.ObjectId(userId),
+      name: 'Read',
+      icon: 'book',
+      color: '#7D927D',
+      frequency: 'daily',
+      measure: 'check',
+      targetCount: 1,
+    });
+
+    await seedSummary(userId, todayLocal);
+
+    await archiveHabit(user, habit._id.toString());
+
+    expect(
+      await DailySummaryModel.countDocuments({
+        userId: new Types.ObjectId(userId),
+        localDate: todayLocal,
+      }),
+    ).toBe(0);
+
+    await expect(
+      archiveHabit(user, new Types.ObjectId().toString()),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('archiving leaves PAST days alone — scheduledOn keeps a habit on days it existed', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = authedUser(userId);
+
+    const habit = await HabitModel.create({
+      userId: new Types.ObjectId(userId),
+      name: 'Read',
+      icon: 'book',
+      color: '#7D927D',
+      frequency: 'daily',
+      measure: 'check',
+      targetCount: 1,
+    });
+    // The habit has to predate DAY or scheduledOn() drops it for having been created
+    // afterwards, and this test would pass for the wrong reason.
+    await HabitModel.updateOne(
+      { _id: habit._id },
+      { $set: { createdAt: new Date('2026-07-01T00:00:00Z') } },
+      { overwriteImmutable: true },
+    );
+
+    await seedSummary(userId, DAY);
+
+    await archiveHabit(user, habit._id.toString());
+
+    // Not a "we gave up" assertion: scheduledOn() only drops an archived habit from
+    // days whose midnight falls AFTER archivedAt, so every past rollup is still
+    // correct and re-deleting them would be pure cache churn.
+    expect(
+      await DailySummaryModel.countDocuments({
+        userId: new Types.ObjectId(userId),
+        localDate: DAY,
+      }),
+    ).toBe(1);
+    expect(await scheduledOn(userId, DAY)).toHaveLength(1);
   });
 
   it('water create drops that day summary', async () => {
