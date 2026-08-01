@@ -1,4 +1,5 @@
 export * from './time/local-date.js';
+export * from './time/month-grid.js';
 export * from './money/money.js';
 
 export * from './domain/common.js';
