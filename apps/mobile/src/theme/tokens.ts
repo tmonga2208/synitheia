@@ -59,8 +59,9 @@ export function accentFor(color: string) {
  *
  * Five steps rather than a continuous ramp: a smooth gradient across 31 cells is
  * impossible to read comparatively, and the eye only needs "was this a strong day"
- * at a glance. Text flips to white at the point the sage fill is dark enough to
- * carry it, so contrast holds at both ends of the scale.
+ * at a glance. Text flips to white only on the solid top step (>= 85%), where the
+ * app's existing button convention already pairs white text with sage. At all other
+ * steps, stone text maintains contrast against the lighter fills.
  *
  * The lowest step is sand, NOT transparent. A day logged at 0% and a day with
  * nothing logged at all are different statements; the grid draws the latter as a
@@ -70,7 +71,7 @@ export function flowTint(percent: number): { background: string; text: string } 
   const clamped = Math.min(100, Math.max(0, percent));
 
   if (clamped >= 85) return { background: palette.sage, text: palette.white };
-  if (clamped >= 65) return { background: 'rgba(125, 146, 125, 0.74)', text: palette.white };
+  if (clamped >= 65) return { background: 'rgba(125, 146, 125, 0.74)', text: palette.stone };
   if (clamped >= 40) return { background: 'rgba(125, 146, 125, 0.46)', text: palette.stone };
   if (clamped >= 15) return { background: 'rgba(125, 146, 125, 0.24)', text: palette.stone };
   return { background: palette.sand, text: palette.stoneMuted };
