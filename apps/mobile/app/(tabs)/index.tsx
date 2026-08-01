@@ -3,7 +3,15 @@ import { Image, RefreshControl, ScrollView, StyleSheet, View } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, ChevronRight, Info, Leaf, Sparkles, Zap } from 'lucide-react-native';
+import {
+  Bell,
+  CalendarDays,
+  ChevronRight,
+  Info,
+  Leaf,
+  Sparkles,
+  Zap,
+} from 'lucide-react-native';
 import {
   asMinor,
   formatDayLabel,
@@ -221,15 +229,28 @@ export default function Today() {
             )}
           </Touchable>
 
-          <Touchable
-            accessibilityRole="button"
-            accessibilityLabel="Reminders and notifications"
-            haptic={false}
-            onPress={() => router.push('/reminders')}
-            style={styles.iconButton}
-          >
-            <Bell size={22} color={palette.stone} strokeWidth={1.6} />
-          </Touchable>
+          <View style={styles.headerActions}>
+            <Touchable
+              accessibilityRole="button"
+              accessibilityLabel="History"
+              accessibilityHint="Browse past days"
+              haptic={false}
+              onPress={() => router.push('/history')}
+              style={styles.iconButton}
+            >
+              <CalendarDays size={22} color={palette.stone} strokeWidth={1.6} />
+            </Touchable>
+
+            <Touchable
+              accessibilityRole="button"
+              accessibilityLabel="Reminders and notifications"
+              haptic={false}
+              onPress={() => router.push('/reminders')}
+              style={styles.iconButton}
+            >
+              <Bell size={22} color={palette.stone} strokeWidth={1.6} />
+            </Touchable>
+          </View>
         </View>
 
         {/* ─── Greeting ────────────────────────────────────────────────────── */}
@@ -495,6 +516,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: palette.sage,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   iconButton: {
     width: MIN_TAP_TARGET,

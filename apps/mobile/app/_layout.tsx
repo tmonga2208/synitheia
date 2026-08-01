@@ -146,6 +146,7 @@ export default function RootLayout() {
                 <Stack.Screen name="reminders" />
                 <Stack.Screen name="insights" />
                 <Stack.Screen name="day/[date]" />
+                <Stack.Screen name="history" />
               </Stack>
             </AuthGate>
           </QueryClientProvider>
