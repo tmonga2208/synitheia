@@ -31,9 +31,11 @@ import { MIN_TAP_TARGET, palette, spacing } from '../../src/theme/tokens.js';
 /**
  * One past day, as a record.
  *
- * Nothing here mutates. The only tappable things are timeline rows, which deep-link
- * into the underlying expense or habit — that is where editing already lives, and
- * routing corrections through it keeps streaks and XP honest.
+ * Nothing on this screen mutates data. Habit rows are tappable, but only to navigate
+ * to that habit's own detail screen — read-only navigation, not editing. Timeline
+ * entries are not interactive. Corrections are made through the relevant tracker
+ * (the habit detail screen, the expense itself, and so on), which is what keeps
+ * streaks and XP honest — they are never edited from here.
  *
  * Note what is deliberately absent: the streak and XP chips from Today. /today
  * returns those from the account's CURRENT state regardless of localDate, so
