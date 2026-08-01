@@ -65,14 +65,18 @@ native container entirely, so secondary screens live in the Stack (see the comme
 ### `app/day/[date].tsx`
 
 - Header: `‹ FRIDAY, JULY 18` in `type.overline`
-- Body: ring, streak/XP chips, every habit with its count and complete/missed state, a
-  spend · water · calories row, then the full timeline.
-- Nothing is tappable **except timeline rows**, which deep-link into the underlying record
-  (`expenses/[id]`, `habit/[id]`) — where editing already lives.
-- Horizontal swipe moves one day, so a week can be read without returning to the grid.
+- Body: ring, every habit with its count and complete/missed state, a spend · water · calories row,
+  then the full timeline. **Chips are deliberately absent:** `/today` returns `streakDays` and `xp`
+  from the account's current state regardless of `localDate`, so rendering them would assert
+  falsehoods about a past day. Making them historical would require as-of-date recomputation.
+- Nothing mutates data. Habit rows are tappable to navigate to that habit's detail screen (read-only
+  navigation, not editing). Timeline entries are not interactive; corrections are made through the
+  relevant tracker (the habit detail screen, the expense itself, and so on).
+- Horizontal swipe navigation was considered but deferred; the back-arrow-to-grid path covers the
+  navigation need and sidesteps gesture-handler complexity with no test surface.
 - Reuses `ProgressRing`, `HabitCard`, `Timeline`, and the primitives unchanged, except:
-  `HabitCard` gains a `readOnly?: boolean` prop that drops the tap affordance and the
-  press animation.
+  `HabitCard` gains a `readOnly?: boolean` prop. In read-only mode, the Plus icon is hidden, the
+  affordance stays visible but non-interactive, and tapping does nothing.
 
 ---
 
@@ -147,7 +151,7 @@ It repairs the weekly chart at the same time.
 | `shared/time/format.ts` | `formatDayLabel(localDate)` — moved out of `app/(tabs)/index.tsx` | — |
 | `shared/domain/summary.ts` | `monthSummaryResponseSchema` — the wire contract both sides compile against | existing |
 | `src/components/MonthGrid.tsx` | Renders cells, handles press. Props: `days`, `month`, `today`, `onSelect`. Fetches nothing. | tokens, `month-grid` |
-| `src/theme/tokens.ts` | `flowTint(percent)` — sage across 5 opacity steps; text flips to white above 60% so contrast holds at both ends | — |
+| `src/theme/tokens.ts` | `flowTint(percent)` — sage across 5 opacity steps; text flips to white only on the solid top step (≥85%) where button convention pairs white text with sage; other steps use stone text for contrast | — |
 | `app/history.tsx` | Fetching, month paging, stats, empty/error/loading states | `MonthGrid` |
 | `app/day/[date].tsx` | One day, read-only | `ProgressRing`, `HabitCard`, `Timeline` |
 
