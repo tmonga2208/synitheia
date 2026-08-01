@@ -102,6 +102,20 @@ export interface FlowComponent {
   active: boolean;
 }
 
+/**
+ * The trackers a user is scored against before onboarding records a preference.
+ *
+ * Duplicated as an inline literal in the Today route before this existed; both the
+ * live day and the history grid must gate on the same list or the calendar and the
+ * ring will disagree for anyone who never finished onboarding.
+ */
+export const DEFAULT_TRACKED_DOMAINS = [
+  'habits',
+  'expenses',
+  'nutrition',
+  'water',
+] as const;
+
 export function computeDailyFlow(components: readonly FlowComponent[]): {
   percent: number;
   components: { key: FlowComponent['key']; percent: number; weight: number }[];

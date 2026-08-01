@@ -16,6 +16,7 @@ import {
   type DailyNutritionDoc,
   type FoodEntryDoc,
 } from '../../db/models.js';
+import { invalidateDailySummary } from '../../context/aggregator.js';
 import { dedupeKey, emit } from '../../context/engine.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 
@@ -59,6 +60,8 @@ export async function rebuildDaily(
     },
     { upsert: true, new: true },
   );
+
+  await invalidateDailySummary(userId, localDate);
 
   return daily as DailyNutritionWithId;
 }

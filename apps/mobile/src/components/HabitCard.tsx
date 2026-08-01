@@ -28,6 +28,12 @@ interface HabitCardProps {
   onPress: (habit: TodayHabit) => void;
   /** Logs one occurrence. The parent owns the optimistic update. */
   onLog: (habit: TodayHabit) => void;
+  /**
+   * A past day. The affordance becomes a status glyph rather than a control —
+   * history is a record, and a tappable checkbox on a finished day would be an
+   * invitation to rewrite it.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -36,8 +42,15 @@ interface HabitCardProps {
  * A habit that measures something shows where you are NOW, not just where you are going —
  * a bare goal on a half-finished habit is a worse affordance than a progress fraction. A
  * plain check has nothing to count, so it shows only the period and the streak.
+ *
+ * On a past day the streak segment is DROPPED, not recomputed. `/today` returns
+ * `currentStreak` from the habit's live state regardless of the `localDate` it was asked
+ * for — the same reason the day screen has no streak or XP chips — so "14D Streak" on a
+ * July row asserts something about today, printed under a July date. The alternative,
+ * showing that day's own count instead, is already in `goal` for anything countable and
+ * has nothing to say about a check habit. Silence is the honest option.
  */
-function metadataFor(habit: TodayHabit): string {
+function metadataFor(habit: TodayHabit, readOnly: boolean): string {
   const period = habit.frequency === 'daily' ? 'Daily' : 'Weekly';
   const measure = measureOf(habit);
 
@@ -47,6 +60,8 @@ function metadataFor(habit: TodayHabit): string {
       : habit.todayComplete || habit.todayCount === 0
         ? `${formatHabitTarget(habit)} ${period.toLowerCase()}`
         : formatHabitProgress(habit, habit.todayCount);
+
+  if (readOnly) return goal;
 
   // A zero streak is a beginning, not a failure. "0D Streak" reads as a scolding.
   const streak = habit.currentStreak > 0 ? `${habit.currentStreak}D Streak` : 'First Day';
@@ -61,7 +76,7 @@ function metadataFor(habit: TodayHabit): string {
  * completion affordance. It is the most distinctive thing in the design language:
  * a list of habits should read as a list of individual rituals, not as rows in a table.
  */
-export function HabitCard({ habit, onPress, onLog }: HabitCardProps) {
+export function HabitCard({ habit, onPress, onLog, readOnly = false }: HabitCardProps) {
   const accent = accentFor(habit.color);
   const { Icon } = iconFor(habit.icon);
   const measure = measureOf(habit);
@@ -88,13 +103,13 @@ export function HabitCard({ habit, onPress, onLog }: HabitCardProps) {
   const plusStyle = useAnimatedStyle(() => ({ opacity: 1 - done.value }));
   const checkStyle = useAnimatedStyle(() => ({ opacity: done.value }));
 
-  const metadata = metadataFor(habit);
+  const metadata = metadataFor(habit, readOnly);
 
   return (
     <Touchable
       accessibilityRole="button"
       accessibilityLabel={`${habit.name}. ${metadata}.`}
-      accessibilityHint="Opens this habit"
+      accessibilityHint={readOnly ? undefined : 'Opens this habit'}
       haptic={false}
       onPress={() => onPress(habit)}
     >
@@ -119,19 +134,21 @@ export function HabitCard({ habit, onPress, onLog }: HabitCardProps) {
           </View>
 
           <Touchable
-            accessibilityRole="checkbox"
+            accessibilityRole={readOnly ? 'text' : 'checkbox'}
             accessibilityLabel={
-              habit.todayComplete
-                ? `${habit.name} is complete for today`
-                : isCounter
-                  ? `Add ${HABIT_MEASURES[measure].step} to ${habit.name}, ${formatHabitProgress(habit, habit.todayCount)}`
-                  : `Complete ${habit.name}`
+              readOnly
+                ? `${habit.name} ${habit.todayComplete ? 'was completed' : 'was not completed'}`
+                : habit.todayComplete
+                  ? `${habit.name} is complete for today`
+                  : isCounter
+                    ? `Add ${HABIT_MEASURES[measure].step} to ${habit.name}, ${formatHabitProgress(habit, habit.todayCount)}`
+                    : `Complete ${habit.name}`
             }
             accessibilityState={{ checked: habit.todayComplete, disabled: habit.todayComplete }}
             // Guarded rather than `disabled`: Touchable dims disabled targets to 45%, and a
             // completed habit's check should read as an achievement, not a greyed-out control.
             onPress={() => {
-              if (!habit.todayComplete) onLog(habit);
+              if (!readOnly && !habit.todayComplete) onLog(habit);
             }}
             style={styles.affordanceTarget}
           >
@@ -147,7 +164,7 @@ export function HabitCard({ habit, onPress, onLog }: HabitCardProps) {
                 ]}
               />
 
-              {isCounter ? (
+              {isCounter && !readOnly ? (
                 <Animated.View style={plusStyle}>
                   <Plus size={20} color={accent.base} strokeWidth={2} />
                 </Animated.View>

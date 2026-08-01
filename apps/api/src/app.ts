@@ -19,6 +19,7 @@ import { registerNutritionRoutes } from './modules/nutrition/routes.js';
 import { registerWaterRoutes } from './modules/water/routes.js';
 import { registerReminderRoutes } from './modules/reminders/routes.js';
 import { registerTodayRoutes } from './modules/today/routes.js';
+import { registerSummaryRoutes } from './modules/summary/routes.js';
 import { registerInsightRoutes } from './modules/insights/routes.js';
 import { registerInferenceRoutes } from './modules/inference/routes.js';
 import { registerSubscriptionRoutes } from './modules/subscriptions/routes.js';
@@ -156,6 +157,7 @@ export async function buildApp(env: Env): Promise<FastifyInstance> {
       await registerWaterRoutes(api);
       await registerReminderRoutes(api);
       await registerTodayRoutes(api);
+      await registerSummaryRoutes(api);
       await registerInsightRoutes(api, env);
       await registerInferenceRoutes(api);
       await registerSubscriptionRoutes(api);

@@ -6,6 +6,8 @@ import {
   netMinor,
   ZERO_MACROS,
   type ConnectableSource,
+  type DayActivityInput,
+  type FlowSummaryInput,
   type LocalDate,
   type Macros,
   type Participant,
@@ -227,4 +229,66 @@ export async function getSummariesBetween(
   })
     .sort({ localDate: 1 })
     .lean<DailySummaryDoc[]>();
+}
+
+/**
+ * The Mixed → typed boundary, in one place.
+ *
+ * `DailySummary`'s sub-documents are declared `Schema.Types.Mixed`, so a lean document
+ * types as `any` and `flowPercentForSummary(doc, tracked)` would type-check against
+ * nothing at all — `FlowSummaryInput` would be decorative at the call site. Reading the
+ * fields out explicitly here means a renamed field in `buildDailySummary` has exactly
+ * one other place to be reflected, and every consumer goes through it. The route's
+ * response schema is the second half of the mitigation: anything that still slips
+ * through arrives as `NaN`/`undefined` and fails loudly at serialisation rather than
+ * silently rendering as the wrong tint.
+ */
+export function flowInputOf(summary: DailySummaryDoc): FlowSummaryInput {
+  return {
+    habits: {
+      scheduled: summary.habits.scheduled,
+      completionRate: summary.habits.completionRate,
+    },
+    water: {
+      totalMl: summary.water.totalMl,
+      targetMl: summary.water.targetMl,
+      entryCount: summary.water.entryCount,
+    },
+    nutrition: {
+      totals: { calories: summary.nutrition.totals.calories },
+      calorieTarget: summary.nutrition.calorieTarget,
+      entryCount: summary.nutrition.entryCount,
+    },
+  };
+}
+
+/** The same boundary, for the "did this day happen at all" predicate. */
+export function activityOf(summary: DailySummaryDoc): DayActivityInput {
+  return {
+    habits: {
+      scheduled: summary.habits.scheduled,
+      completed: summary.habits.completed,
+    },
+    water: { entryCount: summary.water.entryCount },
+    nutrition: { entryCount: summary.nutrition.entryCount },
+    expenses: { count: summary.expenses.count },
+    eventCount: summary.eventCount,
+  };
+}
+
+/**
+ * Drop a day's cached summary so the next read rebuilds it.
+ *
+ * Every write that changes what a day looked like must call this. A summary is a
+ * cache, and a cache nobody invalidates is just a wrong answer with good latency —
+ * the Weekly Analysis chart and the History grid both read it directly.
+ */
+export async function invalidateDailySummary(
+  userId: string,
+  localDate: LocalDate,
+): Promise<void> {
+  await DailySummaryModel.deleteOne({
+    userId: new Types.ObjectId(userId),
+    localDate,
+  });
 }

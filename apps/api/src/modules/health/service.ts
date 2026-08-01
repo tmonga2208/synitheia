@@ -9,6 +9,7 @@ import {
   type CalorieGoal,
   type CalorieTarget,
   type HealthSnapshot,
+  type LocalDate,
   type SyncHealthInput,
 } from '@synitheia/shared';
 import {
@@ -19,6 +20,7 @@ import {
   UserPreferenceModel,
 } from '../../db/models.js';
 import { AppError } from '../../core/errors.js';
+import { invalidateDailySummary } from '../../context/aggregator.js';
 import * as engine from '../../context/engine.js';
 import { recomputeStreak } from '../habits/service.js';
 
@@ -194,6 +196,12 @@ async function applyStepsToHabits(
       },
       { upsert: true },
     );
+
+    // Invalidate right after the log write, before recomputeStreak — a step sync
+    // touches a day's flow percentage exactly like a manual habit log does, and if
+    // recomputeStreak throws for a later habit in this loop, the day already written
+    // must not be left stale behind that exception.
+    await invalidateDailySummary(user.id, day.localDate as LocalDate);
 
     await recomputeStreak(user.id, String(habit._id), user.timezone);
   }

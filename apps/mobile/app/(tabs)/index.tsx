@@ -3,9 +3,18 @@ import { Image, RefreshControl, ScrollView, StyleSheet, View } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, ChevronRight, Info, Leaf, Sparkles, Zap } from 'lucide-react-native';
+import {
+  Bell,
+  CalendarDays,
+  ChevronRight,
+  Info,
+  Leaf,
+  Sparkles,
+  Zap,
+} from 'lucide-react-native';
 import {
   asMinor,
+  formatDayLabel,
   formatMoney,
   type SupportingMetric,
   type TodayResponse,
@@ -33,21 +42,6 @@ import { useAuth } from '../../src/store/auth.js';
 import { MIN_TAP_TARGET, palette, radius, spacing } from '../../src/theme/tokens.js';
 
 const TODAY_KEY = ['today'] as const;
-
-/**
- * A LocalDate is a bare calendar label with no timezone attached. Anchoring it at UTC
- * midnight and formatting it *in UTC* is the only way to render it without some zone
- * silently shifting it a day — which is exactly the class of bug local-date.ts exists
- * to prevent.
- */
-function formatOverline(localDate: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${localDate}T00:00:00Z`));
-}
 
 function formatMetric(metric: SupportingMetric, currency: string): string {
   switch (metric.unit) {
@@ -170,7 +164,7 @@ export default function Today() {
   const { data, error, isPending, isRefetching, refetch } = query;
 
   const overline = useMemo(
-    () => (data ? formatOverline(data.localDate) : ''),
+    () => (data ? formatDayLabel(data.localDate) : ''),
     [data],
   );
 
@@ -235,15 +229,28 @@ export default function Today() {
             )}
           </Touchable>
 
-          <Touchable
-            accessibilityRole="button"
-            accessibilityLabel="Reminders and notifications"
-            haptic={false}
-            onPress={() => router.push('/reminders')}
-            style={styles.iconButton}
-          >
-            <Bell size={22} color={palette.stone} strokeWidth={1.6} />
-          </Touchable>
+          <View style={styles.headerActions}>
+            <Touchable
+              accessibilityRole="button"
+              accessibilityLabel="History"
+              accessibilityHint="Browse past days"
+              haptic={false}
+              onPress={() => router.push('/history')}
+              style={styles.iconButton}
+            >
+              <CalendarDays size={22} color={palette.stone} strokeWidth={1.6} />
+            </Touchable>
+
+            <Touchable
+              accessibilityRole="button"
+              accessibilityLabel="Reminders and notifications"
+              haptic={false}
+              onPress={() => router.push('/reminders')}
+              style={styles.iconButton}
+            >
+              <Bell size={22} color={palette.stone} strokeWidth={1.6} />
+            </Touchable>
+          </View>
         </View>
 
         {/* ─── Greeting ────────────────────────────────────────────────────── */}
@@ -509,6 +516,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: palette.sage,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   iconButton: {
     width: MIN_TAP_TARGET,

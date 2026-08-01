@@ -54,6 +54,35 @@ export function accentFor(color: string) {
   return habitAccents[color as HabitAccent] ?? habitAccents['#7D927D'];
 }
 
+/**
+ * A day's flow percentage as a calendar cell fill.
+ *
+ * Five steps rather than a continuous ramp: a smooth gradient across 31 cells is
+ * impossible to read comparatively, and the eye only needs "was this a strong day"
+ * at a glance.
+ *
+ * Text flips to white only on the solid top step (>= 85%), which is `sageDeep` rather
+ * than the usual `sage`: MonthGrid renders its date numerals at `type.caption` (12px),
+ * which WCAG 1.4.3 counts as NORMAL text and holds to 4.5:1, not the 3:1 large-text
+ * floor. White on sage measures 3.34:1 and fails outright; white on sageDeep measures
+ * 4.31:1 — still short of 4.5:1, but the best of the fills available here, and darker
+ * than sage so the ramp stays monotonic. The three middle steps (65-84%, 40-64%,
+ * 15-39%) use stone; the lowest step (0-14%) uses stoneMuted on its sand fill.
+ *
+ * The lowest step is sand, NOT transparent. A day logged at 0% and a day with
+ * nothing logged at all are different statements; the grid draws the latter as a
+ * hollow outline and must never reuse this fill for it.
+ */
+export function flowTint(percent: number): { background: string; text: string } {
+  const clamped = Math.min(100, Math.max(0, percent));
+
+  if (clamped >= 85) return { background: palette.sageDeep, text: palette.white };
+  if (clamped >= 65) return { background: 'rgba(125, 146, 125, 0.74)', text: palette.stone };
+  if (clamped >= 40) return { background: 'rgba(125, 146, 125, 0.46)', text: palette.stone };
+  if (clamped >= 15) return { background: 'rgba(125, 146, 125, 0.24)', text: palette.stone };
+  return { background: palette.sand, text: palette.stoneMuted };
+}
+
 /** A 4pt base scale. Generous — low cognitive load depends on whitespace. */
 export const spacing = {
   xs: 4,

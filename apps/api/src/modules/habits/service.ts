@@ -21,6 +21,7 @@ import {
   type HabitHydrated,
   type HabitLogDoc,
 } from '../../db/models.js';
+import { invalidateDailySummary } from '../../context/aggregator.js';
 import { dedupeKey, emit } from '../../context/engine.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 
@@ -37,9 +38,9 @@ export async function listHabits(userId: string, includeArchived = false) {
   return HabitModel.find(query).sort({ createdAt: 1 }).lean<HabitLean[]>();
 }
 
-export async function createHabit(userId: string, input: CreateHabitInput) {
-  return HabitModel.create({
-    userId: new Types.ObjectId(userId),
+export async function createHabit(user: AuthedUser, input: CreateHabitInput) {
+  const habit = await HabitModel.create({
+    userId: new Types.ObjectId(user.id),
     ...input,
     category: input.category ?? null,
     unit: input.unit ?? null,
@@ -48,6 +49,19 @@ export async function createHabit(userId: string, input: CreateHabitInput) {
     longestStreak: 0,
     archivedAt: null,
   });
+
+  /**
+   * A new habit is scheduled from today, which moves `habits.scheduled` and therefore
+   * the day's flow percentage without touching a single log. Today's cached rollup is
+   * now wrong: the ring recomputes from live habits and drops to 50%, while the History
+   * cell and the weekly bar keep reading a rollup that never heard about the new habit.
+   *
+   * Only today — `scheduledOn()` excludes a habit from every day before it existed, so
+   * past rollups are still correct.
+   */
+  await invalidateDailySummary(user.id, todayLocalDate(user.timezone));
+
+  return habit;
 }
 
 export async function updateHabit(
@@ -78,13 +92,28 @@ export async function updateHabit(
 }
 
 /** Soft-archive. A habit's logs are the user's history and are never deleted with it. */
-export async function archiveHabit(userId: string, habitId: string) {
+export async function archiveHabit(user: AuthedUser, habitId: string) {
   const result = await HabitModel.updateOne(
-    { _id: new Types.ObjectId(habitId), userId: new Types.ObjectId(userId) },
+    { _id: new Types.ObjectId(habitId), userId: new Types.ObjectId(user.id) },
     { $set: { archivedAt: new Date() } },
   );
 
   if (result.matchedCount === 0) throw AppError.notFound('Habit');
+
+  /**
+   * Archiving moves `scheduledOn()` too, so the same rollup staleness applies — but
+   * only forward, and only ever by one day.
+   *
+   * `scheduledOn()` keeps an archived habit on any day whose midnight precedes
+   * `archivedAt`, which is every day the habit actually existed for. Past rollups are
+   * therefore still correct and deliberately left alone: re-deriving a year of
+   * summaries to change nothing would be pure churn. Days after today have no cached
+   * rollup at all — nothing builds a summary for a day that has not happened.
+   *
+   * That leaves today, which flips for a user whose local date is already ahead of UTC
+   * when they archive. Cheap to invalidate unconditionally, and wrong to skip.
+   */
+  await invalidateDailySummary(user.id, todayLocalDate(user.timezone));
 }
 
 /**
@@ -145,6 +174,8 @@ export async function logHabit(
   );
 
   const updated = await recomputeStreak(user.id, habitId, user.timezone);
+
+  await invalidateDailySummary(user.id, localDate);
 
   if (complete) {
     await emit({

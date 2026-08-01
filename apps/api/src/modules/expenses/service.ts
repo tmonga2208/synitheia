@@ -15,12 +15,12 @@ import {
 } from '@synitheia/shared';
 import { AppError } from '../../core/errors.js';
 import {
-  DailySummaryModel,
   ExpenseCategoryModel,
   ExpenseModel,
   type ExpenseDoc,
   type ExpenseHydrated,
 } from '../../db/models.js';
+import { invalidateDailySummary } from '../../context/aggregator.js';
 import { dedupeKey, emit, retractByRef } from '../../context/engine.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 
@@ -112,6 +112,11 @@ export async function createExpense(
     })),
   });
 
+  // Invalidate before the event emit, not after: emit is a second write that can
+  // throw (or be down) once the expense itself has safely landed, and a stale summary
+  // sitting behind a caught exception is exactly the bug this call exists to prevent.
+  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
+
   await emit({
     userId: user.id,
     source: expense.source as DataSource,
@@ -145,6 +150,8 @@ export async function updateExpense(
 
   if (!expense) throw AppError.notFound('Expense');
 
+  const previousLocalDate = expense.localDate;
+
   if (input.categoryId && input.categoryId !== expense.categoryId.toString()) {
     const category = await resolveCategory(user.id, input.categoryId);
     expense.categoryId = category._id;
@@ -164,6 +171,14 @@ export async function updateExpense(
   }
 
   await expense.save();
+
+  // Invalidate before the re-emit, not after — same reasoning as createExpense: the
+  // expense write has already landed, and an exception from emit must not be able to
+  // suppress the invalidation for either day.
+  if (previousLocalDate !== expense.localDate) {
+    await invalidateDailySummary(user.id, previousLocalDate as LocalDate);
+  }
+  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
 
   // Re-emit: same dedupeKey, so this updates the existing timeline row in place
   // rather than appending a second one.
@@ -189,16 +204,17 @@ export async function updateExpense(
 }
 
 export async function deleteExpense(user: AuthedUser, id: string): Promise<void> {
-  const result = await ExpenseModel.deleteOne({
+  const expense = await ExpenseModel.findOneAndDelete({
     _id: new Types.ObjectId(id),
     userId: new Types.ObjectId(user.id),
-  });
+  }).lean();
 
-  if (result.deletedCount === 0) throw AppError.notFound('Expense');
+  if (!expense) throw AppError.notFound('Expense');
 
   // The timeline is a projection, not an immutable ledger. A deleted expense must
   // vanish from Today, or the app is visibly lying to the user.
   await retractByRef(user.id, id);
+  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
 }
 
 export interface ExpenseDetail extends Omit<ExpenseLean, 'participants'> {
@@ -332,10 +348,7 @@ export async function settleParticipant(
   participant.settledAt = settled ? new Date() : null;
   await expense.save();
 
-  await DailySummaryModel.deleteOne({
-    userId: new Types.ObjectId(user.id),
-    localDate: expense.localDate,
-  });
+  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
 
   return expense;
 }
