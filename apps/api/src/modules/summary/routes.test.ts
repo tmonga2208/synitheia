@@ -1,8 +1,19 @@
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose, { Types } from 'mongoose';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { monthSummaryResponseSchema } from '@synitheia/shared';
-import { DailySummaryModel, UserModel, UserPreferenceModel } from '../../db/models.js';
+import { serializerCompiler } from 'fastify-type-provider-zod';
+import { asLocalDate, monthSummaryResponseSchema } from '@synitheia/shared';
+import {
+  DailySummaryModel,
+  HabitLogModel,
+  HabitModel,
+  PersonalEventModel,
+  UserModel,
+  UserPreferenceModel,
+  WaterEntryModel,
+} from '../../db/models.js';
+import { logHabit } from '../habits/service.js';
+import { createEntry } from '../water/routes.js';
 import { monthSummaryFor } from './routes.js';
 
 let mongo: MongoMemoryReplSet;
@@ -14,6 +25,8 @@ beforeAll(async () => {
     DailySummaryModel.syncIndexes(),
     UserModel.syncIndexes(),
     UserPreferenceModel.syncIndexes(),
+    HabitLogModel.syncIndexes(),
+    PersonalEventModel.syncIndexes(),
   ]);
 }, 120_000);
 
@@ -27,6 +40,10 @@ afterEach(async () => {
     DailySummaryModel.deleteMany({}),
     UserModel.deleteMany({}),
     UserPreferenceModel.deleteMany({}),
+    HabitModel.deleteMany({}),
+    HabitLogModel.deleteMany({}),
+    PersonalEventModel.deleteMany({}),
+    WaterEntryModel.deleteMany({}),
   ]);
 });
 
@@ -97,6 +114,48 @@ async function seedDay(
     generatedAt: new Date(),
   });
 }
+
+/**
+ * The route attaches `monthSummaryResponseSchema` as its response schema — the only
+ * route in this API that does — so this proves the app's serializer actually accepts it
+ * and enforces it. Without this, "the contract is checked" would rest on a type
+ * annotation over `Schema.Types.Mixed`, which checks nothing.
+ */
+describe('the response schema is enforced at serialisation', () => {
+  const serialize = serializerCompiler({
+    // The compiler only reads `schema` and `method`/`url` for error messages.
+    schema: monthSummaryResponseSchema,
+    method: 'GET',
+    url: '/summary/month',
+    httpStatus: '200',
+  } as Parameters<typeof serializerCompiler>[0]);
+
+  it('serialises a well-formed payload', () => {
+    const body = JSON.parse(
+      serialize({
+        month: '2026-07',
+        earliestLocalDate: '2026-03-14',
+        days: [{ localDate: '2026-07-18', percent: 82, eventCount: 7 }],
+        stats: { avgPercent: 82, daysLogged: 1, bestFlowRun: 1 },
+      }),
+    ) as { days: { percent: number }[] };
+
+    expect(body.days[0]?.percent).toBe(82);
+  });
+
+  it('throws rather than shipping a NaN percent as null', () => {
+    expect(() =>
+      serialize({
+        month: '2026-07',
+        earliestLocalDate: '2026-03-14',
+        // What a renamed aggregator field produces: NaN out of the arithmetic, which
+        // JSON.stringify turns into null and the grid renders as the wrong tint.
+        days: [{ localDate: '2026-07-18', percent: Number.NaN, eventCount: 7 }],
+        stats: { avgPercent: 82, daysLogged: 1, bestFlowRun: 1 },
+      }),
+    ).toThrow();
+  });
+});
 
 describe('monthSummaryFor', () => {
   it('returns a payload matching the wire contract', async () => {
@@ -188,6 +247,136 @@ describe('monthSummaryFor', () => {
     const result = await monthSummaryFor(mine, '2026-07', '2026-08-01');
 
     expect(result.days).toEqual([]);
+  });
+
+  /**
+   * Every test above seeds DailySummaryModel by hand, which is exactly why the endpoint
+   * shipped treating a cache MISS as "nothing logged". `getSummariesBetween` is a plain
+   * find() — it never builds — so `days` was "days that happen to have a cached rollup",
+   * not "days with data". Aggressive invalidation (a 7-day health sync, an edited expense
+   * on an old date) then deleted rollups the Today route only rebuilds for the current
+   * week, and a fully-logged past week rendered hollow.
+   *
+   * These tests drive real services and seed NOTHING into DailySummaryModel.
+   */
+  describe('without a cached rollup', () => {
+    const authed = (user: { id: string; timezone: string }) => ({
+      ...user,
+      currency: 'INR',
+    });
+
+    async function makeHabit(userId: string, createdAt: Date) {
+      const habit = await HabitModel.create({
+        userId: new Types.ObjectId(userId),
+        name: 'Push-ups',
+        icon: 'dumbbell',
+        color: '#7D927D',
+        frequency: 'daily',
+        measure: 'count',
+        targetCount: 20,
+      });
+      // scheduledOn() excludes a habit created after the day, so a habit created "now"
+      // would not be scheduled on a July date and the day would score 0 for the wrong
+      // reason. Same overwriteImmutable dance as makeUser.
+      await HabitModel.updateOne(
+        { _id: habit._id },
+        { $set: { createdAt } },
+        { overwriteImmutable: true },
+      );
+      return habit._id.toString();
+    }
+
+    it('builds a missing rollup for a day the user really logged a habit on', async () => {
+      const user = await makeUser();
+      const habitId = await makeHabit(user.id, new Date('2026-07-01T00:00:00Z'));
+
+      await logHabit(authed(user), habitId, {
+        localDate: asLocalDate('2026-07-18'),
+        count: 20,
+      });
+
+      // Nothing seeded the cache, and logHabit invalidates rather than rebuilds.
+      expect(await DailySummaryModel.countDocuments({})).toBe(0);
+
+      const result = await monthSummaryFor(user, '2026-07', '2026-08-01');
+
+      // Habits are the only active component: 1 of 1 completed. eventCount is 0 —
+      // logHabit stamps its timeline event with `new Date()`, so a BACKDATED log's
+      // event lands on the real today, not on 2026-07-18. Which is the point: this
+      // day is found by the HabitLog scan, not the PersonalEvent one.
+      expect(result.days).toEqual([
+        { localDate: '2026-07-18', percent: 100, eventCount: 0 },
+      ]);
+      expect(result.stats.daysLogged).toBe(1);
+    });
+
+    it('builds a missing rollup for a day whose only record is a water entry', async () => {
+      const user = await makeUser();
+
+      // +05:30 keeps this inside 2026-07-18 in IST.
+      await createEntry(authed(user), {
+        amountMl: 1250,
+        loggedAt: new Date('2026-07-18T09:00:00.000Z'),
+      });
+      await DailySummaryModel.deleteMany({});
+
+      const result = await monthSummaryFor(user, '2026-07', '2026-08-01');
+
+      // Water alone: 1250 / 2500 = 50.
+      expect(result.days.map((d) => [d.localDate, d.percent])).toEqual([
+        ['2026-07-18', 50],
+      ]);
+    });
+
+    it('builds a day whose habit log is INCOMPLETE — no timeline event is emitted for one', async () => {
+      const user = await makeUser();
+      const habitId = await makeHabit(user.id, new Date('2026-07-01T00:00:00Z'));
+
+      await logHabit(authed(user), habitId, {
+        localDate: asLocalDate('2026-07-18'),
+        count: 5, // target is 20
+      });
+
+      // The PersonalEvent scan alone would miss this day entirely.
+      expect(await PersonalEventModel.countDocuments({})).toBe(0);
+
+      const result = await monthSummaryFor(user, '2026-07', '2026-08-01');
+
+      expect(result.days).toEqual([
+        { localDate: '2026-07-18', percent: 0, eventCount: 0 },
+      ]);
+    });
+
+    it('does not build days the user logged nothing on', async () => {
+      const user = await makeUser();
+      const habitId = await makeHabit(user.id, new Date('2026-07-01T00:00:00Z'));
+
+      await logHabit(authed(user), habitId, {
+        localDate: asLocalDate('2026-07-18'),
+        count: 20,
+      });
+
+      const result = await monthSummaryFor(user, '2026-07', '2026-08-01');
+
+      expect(result.days).toHaveLength(1);
+      expect(await DailySummaryModel.countDocuments({})).toBe(1);
+    });
+  });
+
+  it('omits a cached all-zero day — opening the app is not logging a zero', async () => {
+    const user = await makeUser();
+    // Exactly what buildDailySummary writes for a day the user never touched: the
+    // Today route rebuilds the whole current week on every load, so these exist in
+    // the cache for anybody who has opened the app this week.
+    await seedDay(user.id, '2026-07-18', { scheduled: 0, completionRate: 0, eventCount: 0 });
+    await seedDay(user.id, '2026-07-19', { scheduled: 2, completionRate: 0, eventCount: 0 });
+
+    const result = await monthSummaryFor(user, '2026-07', '2026-08-01');
+
+    // 07-18: nothing at all -> absent. 07-19: habits were scheduled and missed, which
+    // is a zero the user earned -> present.
+    expect(result.days.map((d) => d.localDate)).toEqual(['2026-07-19']);
+    expect(result.stats.daysLogged).toBe(1);
   });
 
   it('computes stats over the returned days', async () => {
