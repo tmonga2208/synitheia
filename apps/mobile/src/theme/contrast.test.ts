@@ -11,6 +11,14 @@ describe('relativeLuminance', () => {
     expect(relativeLuminance('#fff')).toBeCloseTo(1, 5);
     expect(relativeLuminance('#ffffff')).toBeCloseTo(1, 5);
   });
+
+  it('pins the red and blue luminance coefficients', () => {
+    // Saturated orange #FF8000 has R != B, so it catches transposed coefficients.
+    // Correct (0.2126*R + 0.7152*G + 0.0722*B): 0.36698342968146075
+    // If R/B transposed (0.0722*R + 0.7152*G + 0.2126*B): 0.22658342968146072
+    // This 0.14 margin means the test fails if coefficients are swapped.
+    expect(relativeLuminance('#FF8000')).toBeCloseTo(0.36698342968146075, 4);
+  });
 });
 
 describe('contrastRatio', () => {
