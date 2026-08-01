@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  DEFAULT_TRACKED_DOMAINS,
   addLocalDays,
   computeDailyFlow,
   greetingFor,
@@ -180,12 +181,7 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
        * telling you that you failed at something you never signed up for.
        */
       const tracked = new Set(
-        (prefs?.trackedDomains as string[] | undefined) ?? [
-          'habits',
-          'expenses',
-          'nutrition',
-          'water',
-        ],
+        (prefs?.trackedDomains as string[] | undefined) ?? DEFAULT_TRACKED_DOMAINS,
       );
 
       const components: FlowComponent[] = [
