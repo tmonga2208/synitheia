@@ -42,8 +42,15 @@ interface HabitCardProps {
  * A habit that measures something shows where you are NOW, not just where you are going —
  * a bare goal on a half-finished habit is a worse affordance than a progress fraction. A
  * plain check has nothing to count, so it shows only the period and the streak.
+ *
+ * On a past day the streak segment is DROPPED, not recomputed. `/today` returns
+ * `currentStreak` from the habit's live state regardless of the `localDate` it was asked
+ * for — the same reason the day screen has no streak or XP chips — so "14D Streak" on a
+ * July row asserts something about today, printed under a July date. The alternative,
+ * showing that day's own count instead, is already in `goal` for anything countable and
+ * has nothing to say about a check habit. Silence is the honest option.
  */
-function metadataFor(habit: TodayHabit): string {
+function metadataFor(habit: TodayHabit, readOnly: boolean): string {
   const period = habit.frequency === 'daily' ? 'Daily' : 'Weekly';
   const measure = measureOf(habit);
 
@@ -53,6 +60,8 @@ function metadataFor(habit: TodayHabit): string {
       : habit.todayComplete || habit.todayCount === 0
         ? `${formatHabitTarget(habit)} ${period.toLowerCase()}`
         : formatHabitProgress(habit, habit.todayCount);
+
+  if (readOnly) return goal;
 
   // A zero streak is a beginning, not a failure. "0D Streak" reads as a scolding.
   const streak = habit.currentStreak > 0 ? `${habit.currentStreak}D Streak` : 'First Day';
@@ -94,7 +103,7 @@ export function HabitCard({ habit, onPress, onLog, readOnly = false }: HabitCard
   const plusStyle = useAnimatedStyle(() => ({ opacity: 1 - done.value }));
   const checkStyle = useAnimatedStyle(() => ({ opacity: done.value }));
 
-  const metadata = metadataFor(habit);
+  const metadata = metadataFor(habit, readOnly);
 
   return (
     <Touchable
