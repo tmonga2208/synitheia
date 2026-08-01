@@ -18,6 +18,7 @@ export * from './domain/reminder.js';
 export * from './domain/inference.js';
 export * from './domain/insight.js';
 export * from './domain/summary.js';
+export * from './domain/month-summary.js';
 export * from './domain/today.js';
 export * from './domain/subscription.js';
 export * from './domain/health.js';

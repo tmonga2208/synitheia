@@ -12,6 +12,10 @@ export const localDateSchema = z
   .string()
   .refine(isLocalDate, 'Expected a calendar date as YYYY-MM-DD');
 
+export const monthKeySchema = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Expected YYYY-MM');
+
 export const timeZoneSchema = z
   .string()
   .refine(isValidTimeZone, 'Expected an IANA timezone identifier, e.g. Asia/Kolkata');
