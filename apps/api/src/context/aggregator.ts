@@ -228,3 +228,20 @@ export async function getSummariesBetween(
     .sort({ localDate: 1 })
     .lean<DailySummaryDoc[]>();
 }
+
+/**
+ * Drop a day's cached summary so the next read rebuilds it.
+ *
+ * Every write that changes what a day looked like must call this. A summary is a
+ * cache, and a cache nobody invalidates is just a wrong answer with good latency —
+ * the Weekly Analysis chart and the History grid both read it directly.
+ */
+export async function invalidateDailySummary(
+  userId: string,
+  localDate: LocalDate,
+): Promise<void> {
+  await DailySummaryModel.deleteOne({
+    userId: new Types.ObjectId(userId),
+    localDate,
+  });
+}

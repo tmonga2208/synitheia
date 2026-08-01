@@ -15,12 +15,12 @@ import {
 } from '@synitheia/shared';
 import { AppError } from '../../core/errors.js';
 import {
-  DailySummaryModel,
   ExpenseCategoryModel,
   ExpenseModel,
   type ExpenseDoc,
   type ExpenseHydrated,
 } from '../../db/models.js';
+import { invalidateDailySummary } from '../../context/aggregator.js';
 import { dedupeKey, emit, retractByRef } from '../../context/engine.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 
@@ -130,6 +130,8 @@ export async function createExpense(
     },
   });
 
+  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
+
   return expense;
 }
 
@@ -144,6 +146,8 @@ export async function updateExpense(
   });
 
   if (!expense) throw AppError.notFound('Expense');
+
+  const previousLocalDate = expense.localDate;
 
   if (input.categoryId && input.categoryId !== expense.categoryId.toString()) {
     const category = await resolveCategory(user.id, input.categoryId);
@@ -185,20 +189,26 @@ export async function updateExpense(
     },
   });
 
+  if (previousLocalDate !== expense.localDate) {
+    await invalidateDailySummary(user.id, previousLocalDate as LocalDate);
+  }
+  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
+
   return expense;
 }
 
 export async function deleteExpense(user: AuthedUser, id: string): Promise<void> {
-  const result = await ExpenseModel.deleteOne({
+  const expense = await ExpenseModel.findOneAndDelete({
     _id: new Types.ObjectId(id),
     userId: new Types.ObjectId(user.id),
-  });
+  }).lean();
 
-  if (result.deletedCount === 0) throw AppError.notFound('Expense');
+  if (!expense) throw AppError.notFound('Expense');
 
   // The timeline is a projection, not an immutable ledger. A deleted expense must
   // vanish from Today, or the app is visibly lying to the user.
   await retractByRef(user.id, id);
+  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
 }
 
 export interface ExpenseDetail extends Omit<ExpenseLean, 'participants'> {
@@ -332,10 +342,7 @@ export async function settleParticipant(
   participant.settledAt = settled ? new Date() : null;
   await expense.save();
 
-  await DailySummaryModel.deleteOne({
-    userId: new Types.ObjectId(user.id),
-    localDate: expense.localDate,
-  });
+  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
 
   return expense;
 }

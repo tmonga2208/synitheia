@@ -13,6 +13,7 @@ import {
 } from '@synitheia/shared';
 import { AppError } from '../../core/errors.js';
 import { UserPreferenceModel, WaterEntryModel, type WaterEntryDoc } from '../../db/models.js';
+import { invalidateDailySummary } from '../../context/aggregator.js';
 import { dedupeKey, emit, retractByRef } from '../../context/engine.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 
@@ -112,6 +113,8 @@ async function createEntry(
     },
   });
 
+  await invalidateDailySummary(user.id, entry.localDate as LocalDate);
+
   return { entry, totalMl, targetMl };
 }
 
@@ -156,15 +159,16 @@ export async function registerWaterRoutes(app: FastifyInstance): Promise<void> {
       schema: { params: z.object({ id: objectIdSchema }) },
     },
     async (req, reply) => {
-      const result = await WaterEntryModel.deleteOne({
+      const removed = await WaterEntryModel.findOneAndDelete({
         _id: new Types.ObjectId(req.params.id),
         userId: new Types.ObjectId(req.user.id),
       });
 
-      if (result.deletedCount === 0) throw AppError.notFound('Water entry');
+      if (!removed) throw AppError.notFound('Water entry');
 
       // The timeline is a projection — a mis-tapped glass must vanish from Today too.
       await retractByRef(req.user.id, req.params.id);
+      await invalidateDailySummary(req.user.id, removed.localDate as LocalDate);
 
       return reply.status(204).send();
     },

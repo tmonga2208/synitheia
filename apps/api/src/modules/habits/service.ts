@@ -21,6 +21,7 @@ import {
   type HabitHydrated,
   type HabitLogDoc,
 } from '../../db/models.js';
+import { invalidateDailySummary } from '../../context/aggregator.js';
 import { dedupeKey, emit } from '../../context/engine.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 
@@ -145,6 +146,8 @@ export async function logHabit(
   );
 
   const updated = await recomputeStreak(user.id, habitId, user.timezone);
+
+  await invalidateDailySummary(user.id, localDate);
 
   if (complete) {
     await emit({
