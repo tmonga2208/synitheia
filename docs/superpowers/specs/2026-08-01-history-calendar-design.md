@@ -76,7 +76,8 @@ native container entirely, so secondary screens live in the Stack (see the comme
   navigation need and sidesteps gesture-handler complexity with no test surface.
 - Reuses `ProgressRing`, `HabitCard`, `Timeline`, and the primitives unchanged, except:
   `HabitCard` gains a `readOnly?: boolean` prop. In read-only mode, the Plus icon is hidden, the
-  affordance stays visible but non-interactive, and tapping does nothing.
+  affordance stays interactive (scale animation runs on tap), the `onLog` callback is guarded so
+  a tap has no effect on data, and the accessibility role changes to 'text' with a past-tense label.
 
 ---
 
@@ -151,7 +152,7 @@ It repairs the weekly chart at the same time.
 | `shared/time/format.ts` | `formatDayLabel(localDate)` — moved out of `app/(tabs)/index.tsx` | — |
 | `shared/domain/summary.ts` | `monthSummaryResponseSchema` — the wire contract both sides compile against | existing |
 | `src/components/MonthGrid.tsx` | Renders cells, handles press. Props: `days`, `month`, `today`, `onSelect`. Fetches nothing. | tokens, `month-grid` |
-| `src/theme/tokens.ts` | `flowTint(percent)` — sage across 5 opacity steps; text flips to white only on the solid top step (≥85%) where button convention pairs white text with sage; other steps use stone text for contrast | — |
+| `src/theme/tokens.ts` | `flowTint(percent)` — sage across 5 opacity steps; text flips to white only on the solid top step (≥85%); the three middle steps (65–84%, 40–64%, 15–39%) use stone text; the lowest step (0–14%, sand background) uses stoneMuted | — |
 | `app/history.tsx` | Fetching, month paging, stats, empty/error/loading states | `MonthGrid` |
 | `app/day/[date].tsx` | One day, read-only | `ProgressRing`, `HabitCard`, `Timeline` |
 
