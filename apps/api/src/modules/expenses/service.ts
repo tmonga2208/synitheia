@@ -112,6 +112,11 @@ export async function createExpense(
     })),
   });
 
+  // Invalidate before the event emit, not after: emit is a second write that can
+  // throw (or be down) once the expense itself has safely landed, and a stale summary
+  // sitting behind a caught exception is exactly the bug this call exists to prevent.
+  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
+
   await emit({
     userId: user.id,
     source: expense.source as DataSource,
@@ -129,8 +134,6 @@ export async function createExpense(
       note: expense.note ?? null,
     },
   });
-
-  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
 
   return expense;
 }
@@ -169,6 +172,14 @@ export async function updateExpense(
 
   await expense.save();
 
+  // Invalidate before the re-emit, not after — same reasoning as createExpense: the
+  // expense write has already landed, and an exception from emit must not be able to
+  // suppress the invalidation for either day.
+  if (previousLocalDate !== expense.localDate) {
+    await invalidateDailySummary(user.id, previousLocalDate as LocalDate);
+  }
+  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
+
   // Re-emit: same dedupeKey, so this updates the existing timeline row in place
   // rather than appending a second one.
   await emit({
@@ -188,11 +199,6 @@ export async function updateExpense(
       note: expense.note ?? null,
     },
   });
-
-  if (previousLocalDate !== expense.localDate) {
-    await invalidateDailySummary(user.id, previousLocalDate as LocalDate);
-  }
-  await invalidateDailySummary(user.id, expense.localDate as LocalDate);
 
   return expense;
 }

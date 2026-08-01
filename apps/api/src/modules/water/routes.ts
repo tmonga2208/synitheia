@@ -59,7 +59,8 @@ async function totalMlOn(userId: string, localDate: LocalDate): Promise<number> 
   return sumMl(entries);
 }
 
-async function createEntry(
+/** Exported so it is reachable from a test without standing up a Fastify instance. */
+export async function createEntry(
   user: AuthedUser,
   input: CreateWaterEntryInput,
 ): Promise<{ entry: WaterEntryWithId; totalMl: number; targetMl: number }> {
@@ -98,6 +99,10 @@ async function createEntry(
   const totalMl = await totalMlOn(user.id, entry.localDate as LocalDate);
   const targetMl = await targetMlFor(user.id);
 
+  // Invalidate before the emit, not after: the water row has already landed, and an
+  // exception out of emit must not be able to suppress the invalidation.
+  await invalidateDailySummary(user.id, entry.localDate as LocalDate);
+
   await emit({
     userId: user.id,
     source: 'manual',
@@ -113,9 +118,21 @@ async function createEntry(
     },
   });
 
-  await invalidateDailySummary(user.id, entry.localDate as LocalDate);
-
   return { entry, totalMl, targetMl };
+}
+
+/** Exported for the same reason as `createEntry` — a test can drive real behaviour. */
+export async function deleteEntry(user: AuthedUser, id: string): Promise<void> {
+  const removed = await WaterEntryModel.findOneAndDelete({
+    _id: new Types.ObjectId(id),
+    userId: new Types.ObjectId(user.id),
+  });
+
+  if (!removed) throw AppError.notFound('Water entry');
+
+  // The timeline is a projection — a mis-tapped glass must vanish from Today too.
+  await retractByRef(user.id, id);
+  await invalidateDailySummary(user.id, removed.localDate as LocalDate);
 }
 
 export async function registerWaterRoutes(app: FastifyInstance): Promise<void> {
@@ -159,17 +176,7 @@ export async function registerWaterRoutes(app: FastifyInstance): Promise<void> {
       schema: { params: z.object({ id: objectIdSchema }) },
     },
     async (req, reply) => {
-      const removed = await WaterEntryModel.findOneAndDelete({
-        _id: new Types.ObjectId(req.params.id),
-        userId: new Types.ObjectId(req.user.id),
-      });
-
-      if (!removed) throw AppError.notFound('Water entry');
-
-      // The timeline is a projection — a mis-tapped glass must vanish from Today too.
-      await retractByRef(req.user.id, req.params.id);
-      await invalidateDailySummary(req.user.id, removed.localDate as LocalDate);
-
+      await deleteEntry(req.user, req.params.id);
       return reply.status(204).send();
     },
   );
