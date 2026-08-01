@@ -17,11 +17,11 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  LoadingState,
   SectionHeader,
   Text,
   Touchable,
 } from '../src/components/primitives.js';
-import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { MonthGrid } from '../src/components/MonthGrid.js';
 import { api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
@@ -55,14 +55,28 @@ export default function History() {
   }, [month, queryClient]);
 
   /**
-   * Before the first response lands, `data` is undefined and we have no
-   * `earliestLocalDate` to compare against — so the earliest bound is simply not
-   * enforced yet. That is intentional, not a gap: the account's earliest month is
-   * never AFTER the current one, so the only bound that matters before data arrives
-   * is `atLatest`, which needs nothing from the server at all.
+   * Before the first response for THIS month lands, `data` is undefined and we have
+   * no `earliestLocalDate` to compare against, so this alone would leave the bound
+   * unenforced. `earliestDisabled` below closes that window by also disabling on
+   * `query.isPending`, without needing any new state.
    */
   const atEarliest =
     data != null && month <= monthKeyOf(data.earliestLocalDate as LocalDate);
+
+  /**
+   * Tapping `‹` faster than a round trip would otherwise walk past the account's
+   * earliest month: `atEarliest` can only be `true` once a response for the CURRENT
+   * month has told us where that boundary is. Disabling while `query.isPending` too
+   * means the control goes inert the instant a request is in flight, rather than
+   * staying live for the gap between the tap and the bound catching up.
+   */
+  const earliestDisabled = atEarliest || query.isPending;
+
+  /**
+   * `atLatest` needs nothing from the server — `today` comes from the device/user
+   * timezone alone — so it is correct on the very first render, before any request
+   * has even started. No pending-query guard is needed here.
+   */
   const atLatest = month >= monthKeyOf(today);
 
   return (
@@ -80,98 +94,114 @@ export default function History() {
         <Text variant="heading">History</Text>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.monthBar}>
-          <Touchable
-            accessibilityRole="button"
-            accessibilityLabel="Previous month"
-            accessibilityState={{ disabled: atEarliest }}
-            disabled={atEarliest}
-            haptic={false}
-            onPress={() => setMonth(addMonths(month, -1))}
-            style={styles.iconButton}
-          >
-            <ChevronLeft
-              size={20}
-              color={atEarliest ? palette.surfaceDim : palette.stoneMuted}
-              strokeWidth={1.8}
-            />
-          </Touchable>
+      {/*
+        The month bar lives OUTSIDE the loading/error/data switch below, rather than
+        as one more branch inside it. Paging back is the whole point of this screen —
+        keeping the label and the steppers on screen while a month loads means the
+        user keeps their place instead of the entire body vanishing and reappearing
+        under them on every tap.
+      */}
+      <View style={styles.monthBar}>
+        <Touchable
+          accessibilityRole="button"
+          accessibilityLabel="Previous month"
+          accessibilityState={{ disabled: earliestDisabled }}
+          disabled={earliestDisabled}
+          haptic={false}
+          onPress={() => setMonth(addMonths(month, -1))}
+          style={styles.iconButton}
+        >
+          <ChevronLeft
+            size={20}
+            color={earliestDisabled ? palette.surfaceDim : palette.stoneMuted}
+            strokeWidth={1.8}
+          />
+        </Touchable>
 
-          <Text variant="section">{formatMonthLabel(month)}</Text>
+        <Text variant="section">{formatMonthLabel(month)}</Text>
 
-          <Touchable
-            accessibilityRole="button"
-            accessibilityLabel="Next month"
-            accessibilityState={{ disabled: atLatest }}
-            disabled={atLatest}
-            haptic={false}
-            onPress={() => setMonth(addMonths(month, 1))}
-            style={styles.iconButton}
-          >
-            <ChevronRight
-              size={20}
-              color={atLatest ? palette.surfaceDim : palette.stoneMuted}
-              strokeWidth={1.8}
-            />
-          </Touchable>
-        </View>
+        <Touchable
+          accessibilityRole="button"
+          accessibilityLabel="Next month"
+          accessibilityState={{ disabled: atLatest }}
+          disabled={atLatest}
+          haptic={false}
+          onPress={() => setMonth(addMonths(month, 1))}
+          style={styles.iconButton}
+        >
+          <ChevronRight
+            size={20}
+            color={atLatest ? palette.surfaceDim : palette.stoneMuted}
+            strokeWidth={1.8}
+          />
+        </Touchable>
+      </View>
 
-        {query.isPending ? (
-          <SkeletonScreen rows={5} showLeading={false} />
-        ) : query.isError ? (
+      {/*
+        `LoadingState` rather than `SkeletonScreen`: this screen already owns a
+        SafeAreaView, and SkeletonScreen brings its own — nesting the two doubles the
+        top inset. LoadingState has neither a SafeAreaView nor a fixed horizontal
+        padding of its own, so it drops in under the month bar without stacking
+        insets or padding, and a plain "loading" read is honest here — a card-shaped
+        skeleton would only be pretending to preview a calendar grid, not actually
+        resembling one.
+      */}
+      {query.isPending ? (
+        <LoadingState label={`Loading ${formatMonthLabel(month)}…`} />
+      ) : query.isError ? (
+        <View style={styles.state}>
           <ErrorState
             message="Couldn't load this month."
             onRetry={() => void query.refetch()}
           />
-        ) : !data ? null : (
-          <>
-            <MonthGrid
-              month={month}
-              days={data.days}
-              today={today}
-              onSelect={(localDate) => router.push(`/day/${localDate}`)}
-            />
+        </View>
+      ) : !data ? null : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <MonthGrid
+            month={month}
+            days={data.days}
+            today={today}
+            onSelect={(localDate) => router.push(`/day/${localDate}`)}
+          />
 
-            <View style={styles.legend}>
-              <Text variant="caption" color={palette.stoneFaint}>
-                less
-              </Text>
-              {[10, 45, 70, 100].map((percent) => (
-                <View
-                  key={percent}
-                  style={[
-                    styles.swatch,
-                    { backgroundColor: flowTint(percent).background },
-                  ]}
-                />
-              ))}
-              <Text variant="caption" color={palette.stoneFaint}>
-                more
-              </Text>
-            </View>
-
-            {data.days.length === 0 ? (
-              <EmptyState
-                title={`Nothing logged in ${formatMonthLabel(month)}`}
-                body="Days you track will show up here."
+          <View style={styles.legend}>
+            <Text variant="caption" color={palette.stoneFaint}>
+              less
+            </Text>
+            {[10, 45, 70, 100].map((percent) => (
+              <View
+                key={percent}
+                style={[
+                  styles.swatch,
+                  { backgroundColor: flowTint(percent).background },
+                ]}
               />
-            ) : (
-              <>
-                <SectionHeader title={`${formatMonthLabel(month)} at a glance`} />
-                <View style={styles.stats}>
-                  <Stat value={`${data.stats.avgPercent}%`} label="avg flow" />
-                  <Stat value={String(data.stats.daysLogged)} label="days logged" />
-                  <Stat value={String(data.stats.bestFlowRun)} label="best run" />
-                </View>
-              </>
-            )}
-          </>
-        )}
-      </ScrollView>
+            ))}
+            <Text variant="caption" color={palette.stoneFaint}>
+              more
+            </Text>
+          </View>
+
+          {data.days.length === 0 ? (
+            <EmptyState
+              title={`Nothing logged in ${formatMonthLabel(month)}`}
+              body="Days you track will show up here."
+            />
+          ) : (
+            <>
+              <SectionHeader title={`${formatMonthLabel(month)} at a glance`} />
+              <View style={styles.stats}>
+                <Stat value={`${data.stats.avgPercent}%`} label="avg flow" />
+                <Stat value={String(data.stats.daysLogged)} label="days logged" />
+                <Stat value={String(data.stats.bestFlowRun)} label="best run" />
+              </View>
+            </>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -203,11 +233,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing['4xl'],
   },
+  /**
+   * The month bar now sits outside the ScrollView (see the render method), so it
+   * carries its own horizontal padding instead of inheriting `content`'s.
+   */
   monthBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
     marginBottom: spacing.base,
+  },
+  /** Wraps the error card with the same horizontal margin `content` gives the loaded state. */
+  state: {
+    paddingHorizontal: spacing.lg,
   },
   iconButton: {
     minWidth: MIN_TAP_TARGET,
@@ -223,8 +262,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   swatch: {
-    width: 14,
-    height: 14,
+    width: spacing.md,
+    height: spacing.md,
     borderRadius: radius.sm / 2,
   },
   stats: {

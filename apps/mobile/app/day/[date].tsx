@@ -20,7 +20,7 @@ import {
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
-import { SkeletonScreen } from '../../src/components/Skeleton.js';
+import { SkeletonList } from '../../src/components/Skeleton.js';
 import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { HabitCard } from '../../src/components/HabitCard.js';
 import { Timeline } from '../../src/components/Timeline.js';
@@ -88,7 +88,12 @@ export default function Day() {
       {!valid ? (
         <ErrorState message="That isn't a real date." onRetry={() => router.back()} />
       ) : query.isPending ? (
-        <SkeletonScreen rows={4} />
+        // SkeletonList, not SkeletonScreen: this screen already has its own
+        // SafeAreaView above, and SkeletonScreen wraps another one around its
+        // content — nesting them doubles the top inset. SkeletonList is the same
+        // card-row skeleton without that wrapper, which also happens to match this
+        // screen's actual shape (a ring, then a stack of habit/timeline cards).
+        <SkeletonList rows={4} />
       ) : query.isError ? (
         <ErrorState
           message="Couldn't load this day."
