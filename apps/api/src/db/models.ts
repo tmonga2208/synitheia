@@ -64,6 +64,30 @@ userSchema.index(
 export type UserDoc = InferSchemaType<typeof userSchema>;
 export const UserModel = model('User', userSchema);
 
+// ─── XP ─────────────────────────────────────────────────────────────────────
+
+const xpAwardSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    /**
+     * What was earned, as a stable string — `habit:<id>:<localDate>`, `day:<localDate>`,
+     * `streak:<id>:<milestone>`, `budget:<YYYY-MM>`. Unique per user, and that uniqueness
+     * IS the idempotence: a replayed tap, an optimistic retry or an offline sync collides
+     * here and becomes a no-op. Nothing in the award path checks-then-inserts, because
+     * that races.
+     */
+    key: { type: String, required: true },
+    amount: { type: Number, required: true, min: 1 },
+    awardedAt: { type: Date, required: true, default: () => new Date() },
+  },
+  opts,
+);
+
+xpAwardSchema.index({ userId: 1, key: 1 }, { unique: true });
+
+export type XpAwardDoc = InferSchemaType<typeof xpAwardSchema>;
+export const XpAwardModel = model('XpAward', xpAwardSchema);
+
 // ─── Refresh tokens ─────────────────────────────────────────────────────────
 
 const refreshTokenSchema = new Schema(
