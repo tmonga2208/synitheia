@@ -9,7 +9,7 @@
       "synitheia",
       "com.googleusercontent.apps.491586558032-vfm2c1bb95gloce2bkbhkluu79ren83c"
     ],
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",

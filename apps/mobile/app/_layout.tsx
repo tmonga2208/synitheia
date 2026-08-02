@@ -14,7 +14,7 @@ import {
 } from '@expo-google-fonts/manrope';
 import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
 import { useAuth } from '../src/store/auth.js';
-import { palette } from '../src/theme/tokens.js';
+import { ThemeProvider, useTheme, useThemeHydrated } from '../src/theme/ThemeProvider.js';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -90,6 +90,58 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * The status bar and the stack, split out from `RootLayout` for one reason: both need
+ * `useTheme()`, which throws outside `<ThemeProvider>`, and this component only ever
+ * renders inside it (see the provider order below).
+ */
+function ThemedShell() {
+  const t = useTheme();
+
+  return (
+    <>
+      {/* Dark CONTENT (glyphs) on a light bar, light content on a dark one — the opposite
+          of the theme name, which is why this isn't just `t.name`. */}
+      <StatusBar style={t.name === 'dark' ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: t.bg },
+          animation: 'fade',
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen
+          name="habit/new"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="food/photo"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="food/new"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen name="water" />
+        <Stack.Screen name="expenses/owed" />
+        <Stack.Screen name="subscriptions" />
+        <Stack.Screen name="expenses/[id]" />
+        <Stack.Screen name="nutrition" />
+        <Stack.Screen name="targets" />
+        {/* Secondary screens navigated to but never tabbed to — see (tabs)/_layout. */}
+        <Stack.Screen name="habits" />
+        <Stack.Screen name="reminders" />
+        <Stack.Screen name="insights" />
+        <Stack.Screen name="day/[date]" />
+        <Stack.Screen name="history" />
+      </Stack>
+    </>
+  );
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Manrope_400Regular,
@@ -98,58 +150,35 @@ export default function RootLayout() {
     Manrope_700Bold,
   });
 
-  useEffect(() => {
-    // Hide the splash on font error too — shipping a permanently-stuck splash screen
-    // because a font 404'd is worse than shipping a fallback font.
-    if (fontsLoaded || fontError) void SplashScreen.hideAsync();
-  }, [fontsLoaded, fontError]);
+  // Called here, ahead of the render gate below, rather than only once `<ThemeProvider>`
+  // mounts — the AsyncStorage read this triggers needs to start at the same time font
+  // loading does, not one render later, or the gate would open on fonts alone and paint
+  // one frame before a stored theme override was known. See the doc on `useThemeHydrated`.
+  const themeHydrated = useThemeHydrated();
 
-  if (!fontsLoaded && !fontError) return null;
+  useEffect(() => {
+    // Hide the splash once EVERYTHING the first paint depends on is ready — fonts (or a
+    // font error, so a 404'd font can't wedge the splash forever) AND the theme
+    // preference. Hiding on fonts alone would reveal a render that might still flip
+    // themes a moment later.
+    if ((fontsLoaded || fontError) && themeHydrated) void SplashScreen.hideAsync();
+  }, [fontsLoaded, fontError, themeHydrated]);
+
+  if ((!fontsLoaded && !fontError) || !themeHydrated) return null;
 
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <QueryClientProvider client={queryClient}>
-            <AuthGate>
-              <StatusBar style="dark" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: palette.bone },
-                  animation: 'fade',
-                }}
-              >
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="onboarding" />
-                <Stack.Screen
-                  name="habit/new"
-                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                />
-                <Stack.Screen
-                  name="food/photo"
-                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                />
-                <Stack.Screen
-                  name="food/new"
-                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                />
-                <Stack.Screen name="water" />
-                <Stack.Screen name="expenses/owed" />
-                <Stack.Screen name="subscriptions" />
-                <Stack.Screen name="expenses/[id]" />
-                <Stack.Screen name="nutrition" />
-                <Stack.Screen name="targets" />
-                {/* Secondary screens navigated to but never tabbed to — see (tabs)/_layout. */}
-                <Stack.Screen name="habits" />
-                <Stack.Screen name="reminders" />
-                <Stack.Screen name="insights" />
-                <Stack.Screen name="day/[date]" />
-                <Stack.Screen name="history" />
-              </Stack>
-            </AuthGate>
-          </QueryClientProvider>
+          {/* Outside QueryClientProvider so every consumer below — including AuthGate's
+              screens — can call useTheme(). */}
+          <ThemeProvider>
+            <QueryClientProvider client={queryClient}>
+              <AuthGate>
+                <ThemedShell />
+              </AuthGate>
+            </QueryClientProvider>
+          </ThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
