@@ -84,9 +84,16 @@ function formatSynced(iso: string | null): string {
  *  1. Collecting a source and letting a model reason about it are SEPARATE consents,
  *     shown as separate switches. Bundling them behind one toggle would be the exact
  *     dark pattern this product refuses.
- *  2. The unavailable source (notifications) stays visible, with its explanation intact.
- *     Hiding what we cannot do is how a privacy screen becomes a receipt instead of a
- *     control panel.
+ *  2. Only sources we can actually act on are listed. An `unavailable` source is
+ *     filtered out rather than shown as a card of dead switches and four restatements
+ *     of "not available" — a control that can never move implies a choice the user
+ *     does not have.
+ *
+ *     This reverses an earlier decision that kept it visible, on the grounds that
+ *     hiding what we cannot do turns a privacy screen into a receipt. That argument
+ *     still has force, and the line to hold is this: notifications were never a source
+ *     we offered, so their absence conceals nothing — but a source we once collected
+ *     and have stopped must still appear, disabled and switchable, never vanish.
  */
 export default function Privacy() {
   const t = useTheme();
@@ -389,7 +396,9 @@ export default function Privacy() {
 
         {/* ─── The sources ─────────────────────────────────────────────────── */}
         <View style={styles.sources}>
-          {sources.data.items.map((item) => (
+          {sources.data.items
+            .filter((item) => item.status !== 'unavailable')
+            .map((item) => (
             <SourceCard
               key={item.source}
               item={item}

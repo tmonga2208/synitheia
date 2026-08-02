@@ -42,6 +42,25 @@ export function MonthGrid({ month, days, today, onSelect }: MonthGridProps) {
     [days],
   );
 
+  /**
+   * Explicit rows of seven, rather than one wrapping container.
+   *
+   * A single `flexWrap` row of cells at `width: 100/7%` does NOT reliably fit seven
+   * across: the percentage resolves to a fractional point value, Yoga rounds each cell
+   * up to the pixel grid, and the row overflows by a fraction — so the seventh cell
+   * wraps and every date lands one column to the left of its real weekday. The header
+   * never showed it, because that row does not wrap and simply squeezed its seven labels.
+   *
+   * `monthGridCells` guarantees a multiple of seven, so chunking is total. Each cell is
+   * `flex: 1` inside its row, which is exactly what the header does — one mechanism for
+   * both, so they cannot drift apart again.
+   */
+  const rows = useMemo(() => {
+    const out: (typeof cells)[] = [];
+    for (let i = 0; i < cells.length; i += 7) out.push(cells.slice(i, i + 7));
+    return out;
+  }, [cells]);
+
   return (
     <View>
       <View style={styles.row}>
@@ -54,8 +73,9 @@ export function MonthGrid({ month, days, today, onSelect }: MonthGridProps) {
         ))}
       </View>
 
-      <View style={styles.grid}>
-        {cells.map((localDate, i) => {
+      {rows.map((week, w) => (
+        <View key={`week-${w}`} style={styles.row}>
+          {week.map((localDate, i) => {
           if (localDate === null) {
             return <View key={`blank-${i}`} style={styles.cell} />;
           }
@@ -112,8 +132,9 @@ export function MonthGrid({ month, days, today, onSelect }: MonthGridProps) {
               </View>
             </Touchable>
           );
-        })}
-      </View>
+          })}
+        </View>
+      ))}
     </View>
   );
 }
@@ -123,13 +144,11 @@ const makeStyles = (t: Theme) =>
     row: {
       flexDirection: 'row',
     },
-    grid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-    },
     cell: {
-      // Seven per row, and the aspect ratio keeps every cell square at any width.
-      width: `${100 / 7}%`,
+      // One seventh of its row, by flex rather than by percentage. A percentage width
+      // resolves to a fractional point value that Yoga rounds up per cell, which
+      // overflows the row and wraps the seventh day onto the next line.
+      flex: 1,
       aspectRatio: 1,
       alignItems: 'center',
       justifyContent: 'center',
