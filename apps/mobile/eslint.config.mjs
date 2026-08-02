@@ -32,12 +32,17 @@ export default [
       // this rule exists to close.
       //
       // Each construct needs TWO selectors: a string-literal argument has its text on
-      // `.value`, but a template literal with no interpolation (`` `../theme/palette.js` ``)
-      // is a different node shape — its text lives on `quasis[0].value.raw`, and `.value`
-      // is simply absent, so the string-literal selector silently never matches it.
-      // `quasis.length=1` (equivalently, zero expressions) is what confines this to a
-      // *statically analysable* template literal; one with a real `${...}` interpolation
-      // has more than one quasi and cannot be matched here at all — see the blind-spot note.
+      // `.value`, but a template literal is a different node shape entirely — there is no
+      // `.value` on the literal as a whole, only on each `quasis[n]` chunk between the
+      // `${...}` interpolations. The identifying substring only has to sit fully inside ONE
+      // chunk to be provable statically — `` `../theme/palette${''}.js` `` has an
+      // interpolation, but "theme/palette" is intact in `quasis[0]`, so this matches on
+      // *any* quasi containing it rather than requiring the whole literal to be
+      // interpolation-free. That is deliberately looser than "no interpolation anywhere" and
+      // deliberately narrower than "any template literal": `` `../theme/${dir}/palette.js` ``
+      // splits the substring itself across the interpolation, so no single quasi contains
+      // it and neither selector fires — that case is genuinely unknowable, not a gap in the
+      // selector. See the blind-spot note for what remains out of reach on principle.
       'no-restricted-syntax': [
         'error',
         {
@@ -46,8 +51,7 @@ export default [
             'Import semantic tokens via useTheme() from theme/ThemeProvider instead of raw palette values.',
         },
         {
-          selector:
-            "ImportExpression[source.type='TemplateLiteral'][source.quasis.length=1][source.quasis.0.value.raw=/theme\\/palette/]",
+          selector: "ImportExpression > TemplateLiteral > TemplateElement[value.raw=/theme\\/palette/]",
           message:
             'Import semantic tokens via useTheme() from theme/ThemeProvider instead of raw palette values.',
         },
@@ -59,7 +63,7 @@ export default [
         },
         {
           selector:
-            "CallExpression[callee.name='require'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.length=1][arguments.0.quasis.0.value.raw=/theme\\/palette/]",
+            "CallExpression[callee.name='require'] > TemplateLiteral > TemplateElement[value.raw=/theme\\/palette/]",
           message:
             'Import semantic tokens via useTheme() from theme/ThemeProvider instead of raw palette values.',
         },
