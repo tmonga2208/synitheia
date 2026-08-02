@@ -1,7 +1,20 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { SafeAreaView, View } from 'react-native';
-import { Button, Text } from './primitives.js';
-import { palette, spacing } from '../theme/tokens.js';
+import { SafeAreaView, Text as RNText, View } from 'react-native';
+// Touchable, deliberately, NOT Button: Button (like every other primitive except
+// Touchable) calls useTheme() internally, even when every colour it needs is passed in as
+// a prop — the hook still runs and still throws outside a provider. Touchable has no
+// colour reference of its own, so it is the one shared primitive safe to use here.
+import { Touchable } from './primitives.js';
+import { radius, spacing, type } from '../theme/tokens.js';
+// This is the ONE legitimate exception to "no raw palette outside src/theme/" (enforced by
+// lint from Task 9 on). ErrorBoundary renders OUTSIDE <ThemeProvider> by design: if the
+// provider itself throws during render, useTheme() would throw again inside this very error
+// UI and the original error would be lost. Static light colours, imported directly, are the
+// only way this component can render unconditionally. For the same reason it cannot use the
+// shared `Text`/`Button` primitives either (see the Touchable comment above) — every element
+// below is built from plain React Native components and this file's own static colours.
+// eslint-disable-next-line no-restricted-imports -- see comment above; this file is exempt
+import { lightPalette } from '../theme/palette.js';
 
 interface Props {
   children: ReactNode;
@@ -36,7 +49,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children;
 
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bone }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: lightPalette.bone }}>
         <View
           style={{
             flex: 1,
@@ -46,18 +59,37 @@ export class ErrorBoundary extends Component<Props, State> {
             gap: spacing.md,
           }}
         >
-          <Text variant="title" center>
+          <RNText style={[type.title, { color: lightPalette.stone, textAlign: 'center' }]}>
             Something broke
-          </Text>
-          <Text variant="body" color={palette.stoneMuted} center style={{ maxWidth: 300 }}>
+          </RNText>
+          <RNText
+            style={[
+              type.body,
+              { color: lightPalette.stoneMuted, textAlign: 'center', maxWidth: 300 },
+            ]}
+          >
             This isn&apos;t your fault. Your data is safe — nothing was lost.
-          </Text>
-          <Button
-            label="Reload"
+          </RNText>
+          <Touchable
+            accessibilityRole="button"
+            accessibilityLabel="Reload"
             onPress={() => this.setState({ error: null })}
-            style={{ marginTop: spacing.lg }}
-            fullWidth={false}
-          />
+            style={{
+              marginTop: spacing.lg,
+              minHeight: 56,
+              borderRadius: radius.md,
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: spacing.xl,
+              backgroundColor: lightPalette.sage,
+            }}
+          >
+            <RNText
+              style={[type.cardTitle, { color: lightPalette.white, textAlign: 'center' }]}
+            >
+              Reload
+            </RNText>
+          </Touchable>
         </View>
       </SafeAreaView>
     );

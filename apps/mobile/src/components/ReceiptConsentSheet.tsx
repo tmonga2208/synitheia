@@ -4,7 +4,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ImageIcon } from 'lucide-react-native';
 import { Button, Text } from './primitives.js';
 import { api } from '../api/client.js';
-import { palette, radius, spacing } from '../theme/tokens.js';
+import { radius, spacing } from '../theme/tokens.js';
+import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
+import type { Theme } from '../theme/theme.js';
 
 /**
  * Asked before the first receipt image is ever stored — never after.
@@ -23,6 +25,8 @@ export function ReceiptConsentSheet({
   onClose: () => void;
   onAllowed: () => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const queryClient = useQueryClient();
 
   const allow = useMutation({
@@ -41,19 +45,19 @@ export function ReceiptConsentSheet({
             <View style={styles.handle} />
 
             <View style={styles.icon}>
-              <ImageIcon size={24} color={palette.sage} strokeWidth={1.6} />
+              <ImageIcon size={24} color={t.accent} strokeWidth={1.6} />
             </View>
 
             <Text variant="heading" center style={styles.title}>
               Keep a copy of receipts?
             </Text>
 
-            <Text variant="body" color={palette.stoneMuted} center style={styles.body}>
+            <Text variant="body" color={t.textMuted} center style={styles.body}>
               Receipt images will be saved to your account, so you can look one up later
               when you can&apos;t remember what a charge was.
             </Text>
 
-            <Text variant="caption" color={palette.stoneFaint} center style={styles.body}>
+            <Text variant="caption" color={t.textFaint} center style={styles.body}>
               They&apos;re stored on our server, not just on this phone. You can turn this
               off at any time in Connected Context — and turning it off deletes every image
               we&apos;ve kept.
@@ -72,7 +76,7 @@ export function ReceiptConsentSheet({
             */}
             <Button label="Not now" variant="ghost" onPress={onClose} />
 
-            <Text variant="caption" color={palette.stoneFaint} center>
+            <Text variant="caption" color={t.textFaint} center>
               Scanning a screenshot still works either way.
             </Text>
           </SafeAreaView>
@@ -82,32 +86,34 @@ export function ReceiptConsentSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: palette.scrim, justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: palette.bone,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-    alignItems: 'center',
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: radius.full,
-    backgroundColor: palette.surfaceDim,
-    marginBottom: spacing.xl,
-  },
-  icon: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.full,
-    backgroundColor: palette.sageWash,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: { marginTop: spacing.lg },
-  body: { marginTop: spacing.md, maxWidth: 320 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    scrim: { flex: 1, backgroundColor: t.scrim, justifyContent: 'flex-end' },
+    // A bottom sheet: t.surface, never t.surfaceRaised — ruled explicitly for this file.
+    sheet: {
+      backgroundColor: t.surface,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.lg,
+      alignItems: 'center',
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: radius.full,
+      backgroundColor: t.border,
+      marginBottom: spacing.xl,
+    },
+    icon: {
+      width: 56,
+      height: 56,
+      borderRadius: radius.full,
+      backgroundColor: t.accentWash,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    title: { marginTop: spacing.lg },
+    body: { marginTop: spacing.md, maxWidth: 320 },
+  });

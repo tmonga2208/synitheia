@@ -9,7 +9,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { asLocalDate, localWeekdayIndex, type TodayResponse } from '@synitheia/shared';
 import { Card, Text } from './primitives.js';
-import { motion, palette, radius, shadow, spacing } from '../theme/tokens.js';
+import { motion, radius, spacing } from '../theme/tokens.js';
+import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
+import type { Theme } from '../theme/theme.js';
 
 export type WeeklyDay = TodayResponse['weeklyFlow'][number];
 
@@ -42,12 +44,15 @@ const MIN_BAR_HEIGHT = 24;
  * same reanimated primitives as everything else in the app.
  */
 export function WeeklyChart({ days }: WeeklyChartProps) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <Card style={styles.card} elevated={false}>
       <View style={styles.plot}>
         <View style={styles.goalLine} pointerEvents="none">
           <View style={styles.dash} />
-          <Text variant="caption" color={palette.stoneFaint}>
+          <Text variant="caption" color={t.textFaint}>
             Goal
           </Text>
         </View>
@@ -64,7 +69,7 @@ export function WeeklyChart({ days }: WeeklyChartProps) {
             <View key={day.localDate} style={styles.axisCell}>
               <Text
                 variant="caption"
-                color={day.isToday ? palette.stone : palette.stoneFaint}
+                color={day.isToday ? t.textPrimary : t.textFaint}
               >
                 {WEEKDAY_INITIAL[weekday]}
               </Text>
@@ -77,6 +82,8 @@ export function WeeklyChart({ days }: WeeklyChartProps) {
 }
 
 function Bar({ day, index }: { day: WeeklyDay; index: number }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const target = Math.max(MIN_BAR_HEIGHT, (day.percent / 100) * PLOT_HEIGHT);
 
   const height = useSharedValue(MIN_BAR_HEIGHT);
@@ -104,8 +111,8 @@ function Bar({ day, index }: { day: WeeklyDay; index: number }) {
         style={[
           styles.bar,
           day.isToday
-            ? { backgroundColor: palette.sage, ...shadow.card }
-            : { backgroundColor: palette.surfaceDim },
+            ? { backgroundColor: t.accent, ...t.shadow.card }
+            : { backgroundColor: t.border },
           animatedStyle,
         ]}
       />
@@ -113,50 +120,51 @@ function Bar({ day, index }: { day: WeeklyDay; index: number }) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    // The chart panel sits on the sage wash rather than bone — it is a plotted surface,
-    // not another card of content, and the tint keeps it from competing with the habits.
-    backgroundColor: palette.sageWash,
-    borderColor: palette.sageWash,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.base,
-  },
-  plot: {
-    height: PLOT_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  goalLine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  dash: {
-    flex: 1,
-    borderTopWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: palette.sageSoft,
-  },
-  column: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  bar: {
-    width: 22,
-    borderRadius: radius.full,
-  },
-  axis: {
-    flexDirection: 'row',
-    marginTop: spacing.md,
-  },
-  axisCell: {
-    flex: 1,
-    alignItems: 'center',
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    card: {
+      // The chart panel sits on the sage wash rather than bone — it is a plotted surface,
+      // not another card of content, and the tint keeps it from competing with the habits.
+      backgroundColor: t.accentWash,
+      borderColor: t.accentWash,
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.base,
+    },
+    plot: {
+      height: PLOT_HEIGHT,
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+    },
+    goalLine: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    dash: {
+      flex: 1,
+      borderTopWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: t.accentSoft,
+    },
+    column: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+    },
+    bar: {
+      width: 22,
+      borderRadius: radius.full,
+    },
+    axis: {
+      flexDirection: 'row',
+      marginTop: spacing.md,
+    },
+    axisCell: {
+      flex: 1,
+      alignItems: 'center',
+    },
+  });

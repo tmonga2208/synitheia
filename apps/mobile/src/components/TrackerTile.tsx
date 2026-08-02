@@ -8,7 +8,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ChevronRight } from 'lucide-react-native';
 import { Text, Touchable } from './primitives.js';
-import { motion, palette, radius, shadow, spacing } from '../theme/tokens.js';
+import { motion, radius, spacing } from '../theme/tokens.js';
+import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
+import type { Theme } from '../theme/theme.js';
 
 /**
  * One domain, at a glance.
@@ -50,6 +52,8 @@ export function TrackerTile({
   progress,
   onPress,
 }: TrackerTileProps) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const fill = useSharedValue(0);
 
   useEffect(() => {
@@ -72,7 +76,7 @@ export function TrackerTile({
     >
       <View style={styles.header}>
         <View style={[styles.iconChip, { backgroundColor: accent.wash }]}>{icon}</View>
-        <ChevronRight size={18} color={palette.stoneFaint} strokeWidth={1.8} />
+        <ChevronRight size={18} color={t.textFaint} strokeWidth={1.8} />
       </View>
 
       <Text variant="overline" color={accent.text} style={styles.label}>
@@ -82,7 +86,7 @@ export function TrackerTile({
       <Text variant="heading" numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
-      <Text variant="caption" color={palette.stoneMuted} numberOfLines={1}>
+      <Text variant="caption" color={t.textMuted} numberOfLines={1}>
         {caption}
       </Text>
 
@@ -100,39 +104,40 @@ export function TrackerTile({
   );
 }
 
-const styles = StyleSheet.create({
-  tile: {
-    flex: 1,
-    minHeight: 158,
-    backgroundColor: palette.bone,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    padding: spacing.base,
-    justifyContent: 'flex-start',
-    ...shadow.card,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  iconChip: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  label: { marginTop: spacing.md, marginBottom: spacing.xs },
-  railTrack: {
-    height: 3,
-    borderRadius: radius.full,
-    backgroundColor: palette.surfaceDim,
-    marginTop: 'auto',
-    overflow: 'hidden',
-  },
-  // Keeps the four tiles the same height whether or not they have a target.
-  railSpacer: { height: 3, marginTop: 'auto' },
-  railFill: { height: 3, borderRadius: radius.full },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    tile: {
+      flex: 1,
+      minHeight: 158,
+      backgroundColor: t.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: t.border,
+      padding: spacing.base,
+      justifyContent: 'flex-start',
+      ...t.shadow.card,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    iconChip: {
+      width: 38,
+      height: 38,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    label: { marginTop: spacing.md, marginBottom: spacing.xs },
+    railTrack: {
+      height: 3,
+      borderRadius: radius.full,
+      backgroundColor: t.border,
+      marginTop: 'auto',
+      overflow: 'hidden',
+    },
+    // Keeps the four tiles the same height whether or not they have a target.
+    railSpacer: { height: 3, marginTop: 'auto' },
+    railFill: { height: 3, borderRadius: radius.full },
+  });

@@ -11,9 +11,12 @@ import {
   type Minor,
 } from '@synitheia/shared';
 import { Button, Card, Chip, Input, Text, Touchable } from './primitives.js';
-import { accentFor, palette, radius, spacing } from '../theme/tokens.js';
+import { radius, spacing } from '../theme/tokens.js';
+import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../theme/theme.js';
 
-const ACCENT = accentFor('#C08A7D');
+/** Every split in this file is tinted with the same clay accent, regardless of habit. */
+const SPLIT_ACCENT_COLOR = '#C08A7D';
 
 export interface SplitPerson {
   name: string;
@@ -80,6 +83,9 @@ export function resolveExpense(
  */
 export function SplitWith({ billMinor, currency, value, onChange }: Props) {
   const { people, payer } = value;
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const accent = accentFor(SPLIT_ACCENT_COLOR, t);
 
   const [picking, setPicking] = useState(false);
   // expo-contacts (SDK 54) splits the base Contact — which no longer carries an id — from
@@ -163,14 +169,14 @@ export function SplitWith({ billMinor, currency, value, onChange }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Split this expense with people"
         >
-          <UserPlus size={18} color={palette.stoneMuted} strokeWidth={1.8} />
-          <Text variant="bodyMedium" color={palette.stoneMuted}>
+          <UserPlus size={18} color={t.textMuted} strokeWidth={1.8} />
+          <Text variant="bodyMedium" color={t.textMuted}>
             Split with people
           </Text>
         </Touchable>
       ) : (
         <>
-          <Text variant="label" color={palette.stoneMuted}>
+          <Text variant="label" color={t.textMuted}>
             Split with
           </Text>
 
@@ -183,19 +189,19 @@ export function SplitWith({ billMinor, currency, value, onChange }: Props) {
                 accessibilityRole="button"
                 accessibilityLabel={`Remove ${person.name} from this split`}
               >
-                <Text variant="caption" color={ACCENT.text}>
+                <Text variant="caption" color={accent.text}>
                   {person.name}
                 </Text>
-                <Text variant="caption" color={palette.stoneFaint}>
+                <Text variant="caption" color={t.textFaint}>
                   {formatMoney(asMinor(person.shareMinor), currency)}
                 </Text>
-                <X size={13} color={palette.stoneFaint} strokeWidth={2} />
+                <X size={13} color={t.textFaint} strokeWidth={2} />
               </Touchable>
             ))}
 
             <Chip
               label="+ Add"
-              accent={ACCENT.text}
+              accent={accent.text}
               onPress={() => void openPicker()}
               accessibilityLabel="Add another person"
             />
@@ -209,7 +215,7 @@ export function SplitWith({ billMinor, currency, value, onChange }: Props) {
             ₹1,000, and logging it would quadruple your Friday spending on a meal someone
             else bought.
           */}
-          <Text variant="label" color={palette.stoneMuted} style={{ marginTop: spacing.md }}>
+          <Text variant="label" color={t.textMuted} style={{ marginTop: spacing.md }}>
             Who paid?
           </Text>
 
@@ -247,7 +253,7 @@ export function SplitWith({ billMinor, currency, value, onChange }: Props) {
               {payer === null ? (
                 <>
                   <View style={styles.summaryRow}>
-                    <Text variant="caption" color={palette.stoneMuted}>
+                    <Text variant="caption" color={t.textMuted}>
                       Your share
                     </Text>
                     <Text variant="bodyMedium">
@@ -255,10 +261,10 @@ export function SplitWith({ billMinor, currency, value, onChange }: Props) {
                     </Text>
                   </View>
                   <View style={styles.summaryRow}>
-                    <Text variant="caption" color={palette.stoneMuted}>
+                    <Text variant="caption" color={t.textMuted}>
                       Owed to you
                     </Text>
-                    <Text variant="bodyMedium" color={ACCENT.text}>
+                    <Text variant="bodyMedium" color={accent.text}>
                       {formatMoney(asMinor(owed), currency)}
                     </Text>
                   </View>
@@ -266,17 +272,17 @@ export function SplitWith({ billMinor, currency, value, onChange }: Props) {
               ) : (
                 <>
                   <View style={styles.summaryRow}>
-                    <Text variant="caption" color={palette.stoneMuted}>
+                    <Text variant="caption" color={t.textMuted}>
                       {payer.name} paid
                     </Text>
-                    <Text variant="bodyMedium" color={palette.stoneMuted}>
+                    <Text variant="bodyMedium" color={t.textMuted}>
                       {formatMoney(asMinor(billMinor), currency)}
                     </Text>
                   </View>
 
                   {/* The only number that becomes an expense. */}
                   <View style={[styles.summaryRow, styles.summaryTotal]}>
-                    <Text variant="caption" color={palette.stoneMuted}>
+                    <Text variant="caption" color={t.textMuted}>
                       Logged as your expense
                     </Text>
                     <Text variant="cardTitle">
@@ -327,6 +333,8 @@ function ContactPicker({
   onClose: () => void;
 }) {
   const [manual, setManual] = useState('');
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -349,7 +357,7 @@ function ContactPicker({
               accessibilityRole="button"
               accessibilityLabel="Done"
             >
-              <X size={22} color={palette.stone} strokeWidth={1.8} />
+              <X size={22} color={t.textPrimary} strokeWidth={1.8} />
             </Touchable>
           </View>
 
@@ -382,12 +390,12 @@ function ContactPicker({
           </View>
 
           {permissionError ? (
-            <Text variant="caption" color={palette.stoneMuted} style={styles.permission}>
+            <Text variant="caption" color={t.textMuted} style={styles.permission}>
               {permissionError}
             </Text>
           ) : (
             <>
-              <Text variant="label" color={palette.stoneMuted} style={styles.divider}>
+              <Text variant="label" color={t.textMuted} style={styles.divider}>
                 From your contacts
               </Text>
 
@@ -406,7 +414,7 @@ function ContactPicker({
                 keyboardShouldPersistTaps="handled"
                 style={styles.list}
                 ListEmptyComponent={
-                  <Text variant="caption" color={palette.stoneFaint} style={styles.empty}>
+                  <Text variant="caption" color={t.textFaint} style={styles.empty}>
                     No matching contacts.
                   </Text>
                 }
@@ -423,13 +431,13 @@ function ContactPicker({
                     >
                       <Text
                         variant="bodyMedium"
-                        color={chosen ? palette.stoneFaint : palette.stone}
+                        color={chosen ? t.textFaint : t.textPrimary}
                         style={{ flex: 1 }}
                       >
                         {item.name}
                       </Text>
                       {chosen ? (
-                        <Check size={18} color={palette.sage} strokeWidth={2.2} />
+                        <Check size={18} color={t.accent} strokeWidth={2.2} />
                       ) : null}
                     </Touchable>
                   );
@@ -443,74 +451,80 @@ function ContactPicker({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { gap: spacing.sm },
-  addRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 44,
-  },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  person: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 36,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: ACCENT.base,
-    backgroundColor: ACCENT.wash,
-  },
-  summary: {
-    gap: spacing.xs,
-    backgroundColor: palette.sand,
-    borderRadius: radius.md,
-    marginTop: spacing.md,
-  },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  summaryTotal: {
-    borderTopWidth: 1,
-    borderTopColor: palette.surfaceDim,
-    paddingTop: spacing.sm,
-    marginTop: spacing.xs,
-  },
+const makeStyles = (t: Theme) => {
+  const accent = accentFor(SPLIT_ACCENT_COLOR, t);
 
-  sheet: { flex: 1, backgroundColor: palette.bone, paddingHorizontal: spacing.lg },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 56,
-    marginBottom: spacing.lg,
-  },
-  close: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: -spacing.md,
-  },
-  permission: { marginTop: spacing.lg },
-  manual: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  divider: { marginBottom: spacing.sm },
-  list: { marginTop: spacing.sm },
-  empty: { paddingVertical: spacing.xl, textAlign: 'center' },
-  contact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 56,
-    paddingHorizontal: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.surfaceDim,
-  },
-});
+  return StyleSheet.create({
+    wrap: { gap: spacing.sm },
+    addRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minHeight: 44,
+    },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    person: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minHeight: 36,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: accent.base,
+      backgroundColor: accent.wash,
+    },
+    summary: {
+      gap: spacing.xs,
+      backgroundColor: t.surfaceRaised,
+      borderRadius: radius.md,
+      marginTop: spacing.md,
+    },
+    summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    summaryTotal: {
+      borderTopWidth: 1,
+      borderTopColor: t.border,
+      paddingTop: spacing.sm,
+      marginTop: spacing.xs,
+    },
+
+    // A full-screen replacement (Modal, not transparent, no scrim) — this is the screen
+    // background, not a sheet floating over one.
+    sheet: { flex: 1, backgroundColor: t.bg, paddingHorizontal: spacing.lg },
+    sheetHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: 56,
+      marginBottom: spacing.lg,
+    },
+    close: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: -spacing.md,
+    },
+    permission: { marginTop: spacing.lg },
+    manual: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginBottom: spacing.xl,
+    },
+    divider: { marginBottom: spacing.sm },
+    list: { marginTop: spacing.sm },
+    empty: { paddingVertical: spacing.xl, textAlign: 'center' },
+    contact: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 56,
+      paddingHorizontal: spacing.xs,
+      borderBottomWidth: 1,
+      borderBottomColor: t.border,
+    },
+  });
+};
 
 /** Re-derive the shares when the bill changes after people were already added. */
 export function resplit(

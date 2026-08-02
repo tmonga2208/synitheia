@@ -17,7 +17,9 @@ import {
 } from '@synitheia/shared';
 import { Card, Text, Touchable } from './primitives.js';
 import { iconFor } from './IconPicker.js';
-import { MIN_TAP_TARGET, accentFor, motion, palette, radius, spacing } from '../theme/tokens.js';
+import { MIN_TAP_TARGET, motion, radius, spacing } from '../theme/tokens.js';
+import { useTheme } from '../theme/ThemeProvider.js';
+import { accentFor } from '../theme/theme.js';
 
 /** A habit as Today sees it: the domain record plus this local day's progress. */
 export type TodayHabit = TodayResponse['habits'][number];
@@ -77,7 +79,8 @@ function metadataFor(habit: TodayHabit, readOnly: boolean): string {
  * a list of habits should read as a list of individual rituals, not as rows in a table.
  */
 export function HabitCard({ habit, onPress, onLog, readOnly = false }: HabitCardProps) {
-  const accent = accentFor(habit.color);
+  const t = useTheme();
+  const accent = accentFor(habit.color, t);
   const { Icon } = iconFor(habit.icon);
   const measure = measureOf(habit);
   const isCounter = measure !== 'check';
@@ -171,7 +174,11 @@ export function HabitCard({ habit, onPress, onLog, readOnly = false }: HabitCard
               ) : null}
 
               <Animated.View style={[styles.check, checkStyle]}>
-                <Check size={20} color={palette.white} strokeWidth={2.5} />
+                {/* On the filled per-habit accent.base — t.onAccent's documented job is
+                    exactly "glyphs, check marks... on a filled accent control". Measured
+                    against all eight dark habit bases: 3.35-3.38:1, clearing the 3:1 WCAG
+                    floor for non-text graphical objects (a checkmark icon, not body text). */}
+                <Check size={20} color={t.onAccent} strokeWidth={2.5} />
               </Animated.View>
             </Animated.View>
           </Touchable>

@@ -16,7 +16,8 @@ import {
   type PersonalEvent,
 } from '@synitheia/shared';
 import { Card, Text, Touchable } from './primitives.js';
-import { motion, palette, radius, spacing } from '../theme/tokens.js';
+import { motion, radius, spacing } from '../theme/tokens.js';
+import { useTheme } from '../theme/ThemeProvider.js';
 
 interface TimelineProps {
   events: PersonalEvent[];
@@ -186,6 +187,7 @@ function summarize(bucket: Bucket, numbers: Intl.NumberFormat): string {
 }
 
 export function Timeline({ events, timezone }: TimelineProps) {
+  const t = useTheme();
   const time = useMemo(
     () =>
       new Intl.DateTimeFormat('en-US', {
@@ -261,7 +263,7 @@ export function Timeline({ events, timezone }: TimelineProps) {
         <Text variant="cardTitle" center>
           A quiet day so far
         </Text>
-        <Text variant="body" color={palette.stoneMuted} center style={styles.emptyBody}>
+        <Text variant="body" color={t.textMuted} center style={styles.emptyBody}>
           Log a habit, a glass of water, or an expense and your day will start filling in
           here.
         </Text>
@@ -300,6 +302,7 @@ function PartBlock({
   time: Intl.DateTimeFormat;
   numbers: Intl.NumberFormat;
 }) {
+  const t = useTheme();
   const chevron = useSharedValue(open ? 1 : 0);
 
   const chevronStyle = useAnimatedStyle(() => ({
@@ -340,14 +343,14 @@ function PartBlock({
         </View>
 
         <View style={styles.headCopy}>
-          <Text variant="overline" color={palette.stoneMuted}>
+          <Text variant="overline" color={t.textMuted}>
             {bucket.part.label}
           </Text>
           <Text variant="bodyMedium">{summary}</Text>
         </View>
 
         <Animated.View style={chevronStyle}>
-          <ChevronDown size={20} color={palette.stoneFaint} strokeWidth={1.6} />
+          <ChevronDown size={20} color={t.textFaint} strokeWidth={1.6} />
         </Animated.View>
       </Touchable>
 
@@ -371,7 +374,7 @@ function PartBlock({
                     inferred ? ' Detected automatically.' : ''
                   }`}
                 >
-                  <Text variant="caption" color={palette.stoneFaint} style={styles.time}>
+                  <Text variant="caption" color={t.textFaint} style={styles.time}>
                     {time.format(toInstant(event.timestamp))}
                   </Text>
 
@@ -379,14 +382,16 @@ function PartBlock({
                     style={[
                       styles.rowDot,
                       inferred
-                        ? { borderColor: color, backgroundColor: palette.bone }
+                        // Hollow against the Card it sits in (t.surface, not t.bg) — the ring
+                        // reads "empty" by matching its surroundings.
+                        ? { borderColor: color, backgroundColor: t.surface }
                         : { backgroundColor: color },
                     ]}
                   />
 
                   <Text
                     variant="body"
-                    color={inferred ? palette.stoneMuted : palette.stone}
+                    color={inferred ? t.textMuted : t.textPrimary}
                     style={styles.sentence}
                   >
                     {sentence}
@@ -397,11 +402,11 @@ function PartBlock({
 
             {bucket.waterLogs > 0 ? (
               <View style={styles.row} accessible accessibilityRole="text">
-                <Text variant="caption" color={palette.stoneFaint} style={styles.time}>
+                <Text variant="caption" color={t.textFaint} style={styles.time}>
                   —
                 </Text>
                 <View style={[styles.rowDot, { backgroundColor: DOMAIN_COLOR.water }]} />
-                <Text variant="body" color={palette.stone} style={styles.sentence}>
+                <Text variant="body" color={t.textPrimary} style={styles.sentence}>
                   {numbers.format(bucket.waterMl)} ml water · {bucket.waterLogs} glass
                   {bucket.waterLogs === 1 ? '' : 'es'}
                 </Text>

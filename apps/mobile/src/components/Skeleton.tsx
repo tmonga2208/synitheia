@@ -9,7 +9,9 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { palette, radius, spacing } from '../theme/tokens.js';
+import { radius, spacing } from '../theme/tokens.js';
+import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
+import type { Theme } from '../theme/theme.js';
 
 /**
  * Skeleton placeholders — the shape of the content, shown while it loads.
@@ -32,6 +34,7 @@ interface SkeletonProps {
 }
 
 export function Skeleton({ width = '100%', height = 14, round, style }: SkeletonProps) {
+  const t = useTheme();
   const reduceMotion = useReducedMotion();
   const pulse = useSharedValue(0.6);
 
@@ -54,7 +57,7 @@ export function Skeleton({ width = '100%', height = 14, round, style }: Skeleton
           width,
           height,
           borderRadius: round ?? radius.sm,
-          backgroundColor: palette.sand,
+          backgroundColor: t.surfaceRaised,
         },
         animated,
         style,
@@ -81,6 +84,8 @@ export function SkeletonCard({
   showLeading?: boolean;
   style?: ViewStyle;
 }) {
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={[styles.card, style]}>
       {showLeading ? <SkeletonCircle size={40} /> : null}
@@ -98,6 +103,8 @@ export function SkeletonCard({
  * the places that used a centred spinner and want no more than "a list is loading".
  */
 export function SkeletonList({ rows = 4, showLeading = true }: { rows?: number; showLeading?: boolean }) {
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.screen}>
       <Skeleton width="45%" height={22} style={{ marginBottom: spacing.lg }} />
@@ -115,6 +122,8 @@ export function SkeletonList({ rows = 4, showLeading = true }: { rows?: number; 
  * bare centred spinner and just want "this screen is loading" in the right shape.
  */
 export function SkeletonScreen({ rows = 4, showLeading = true }: { rows?: number; showLeading?: boolean }) {
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <SafeAreaView style={styles.full} edges={['top']}>
       <SkeletonList rows={rows} showLeading={showLeading} />
@@ -128,6 +137,8 @@ export function SkeletonScreen({ rows = 4, showLeading = true }: { rows?: number
  * rather than popping in over a spinner.
  */
 export function SkeletonToday() {
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <SafeAreaView style={styles.full} edges={['top']}>
       <View style={styles.todayContent}>
@@ -158,6 +169,8 @@ export function SkeletonToday() {
  * The Track screen while it loads: the "Today / Track" heading and the 2×2 tile grid.
  */
 export function SkeletonTrackers() {
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <SafeAreaView style={styles.full} edges={['top']}>
       <View style={styles.todayContent}>
@@ -175,28 +188,29 @@ export function SkeletonTrackers() {
   );
 }
 
-const styles = StyleSheet.create({
-  full: { flex: 1, backgroundColor: palette.bone },
-  todayContent: { padding: spacing.lg },
-  todayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  ringWrap: { alignItems: 'center', marginTop: spacing['2xl'] },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  gridItem: { flexGrow: 1, flexBasis: '46%' },
-  screen: { padding: spacing.lg },
-  stack: { gap: spacing.md },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    backgroundColor: palette.bone,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-  },
-  cardBody: { flex: 1, gap: spacing.sm },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    full: { flex: 1, backgroundColor: t.bg },
+    todayContent: { padding: spacing.lg },
+    todayHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    ringWrap: { alignItems: 'center', marginTop: spacing['2xl'] },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+    gridItem: { flexGrow: 1, flexBasis: '46%' },
+    screen: { padding: spacing.lg },
+    stack: { gap: spacing.md },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      padding: spacing.lg,
+      borderRadius: radius.lg,
+      backgroundColor: t.surface,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    cardBody: { flex: 1, gap: spacing.sm },
+  });
