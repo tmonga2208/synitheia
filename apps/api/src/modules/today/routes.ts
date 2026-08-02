@@ -5,14 +5,19 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   DEFAULT_TRACKED_DOMAINS,
   addLocalDays,
+  addMonths,
+  awardForMonth,
   completionRate,
   computeDailyFlow,
+  firstOfMonth,
   flowComponentsForSummary,
   flowPercentForSummary,
   greetingFor,
   isHabitComplete,
+  lastOfMonth,
   localDateSchema,
   localMinutesOfDay,
+  monthKeyOf,
   netMinor,
   startOfLocalWeek,
   todayLocalDate,
@@ -32,8 +37,10 @@ import {
 import { timelineFor } from '../../context/engine.js';
 import { flowInputOf, getDailySummary } from '../../context/aggregator.js';
 import { runDetectors } from '../../context/detectors.js';
+import type { AuthedUser } from '../../core/auth-guard.js';
 import * as habits from '../habits/service.js';
 import * as subscriptions from '../subscriptions/service.js';
+import { grantAwards } from '../xp/service.js';
 
 /**
  * The Today screen, in one request.
@@ -59,6 +66,51 @@ import * as subscriptions from '../subscriptions/service.js';
 function withId<T extends { _id: Types.ObjectId }>(doc: T): Omit<T, '_id'> & { id: string } {
   const { _id, ...rest } = doc;
   return { ...rest, id: _id.toString() };
+}
+
+/**
+ * Award last month's "closed within budget" bonus, lazily.
+ *
+ * There is no scheduler in this app, deliberately — a month boundary is not an event
+ * anything reacts to on its own. Instead this runs on every Today load, exactly like
+ * `postDueSubscriptions` below: the `budget:<YYYY-MM>` dedupe key in `awardForMonth`
+ * means it can run on every single load for the rest of the month and grant once.
+ *
+ * NET spend only, via the same `netMinor` reduction the rest of Today uses for the
+ * day's total — a repaid dinner must not count as spending, or a split expense could
+ * silently cost (or save) a user 100 XP for money that never actually left their pocket.
+ *
+ * A missing budget (`null`) is not a budget of zero — it means no target was ever set,
+ * so `awardForMonth` grants nothing and, just as importantly, never penalizes.
+ */
+export async function awardMonthlyBudget(user: AuthedUser, today: LocalDate): Promise<void> {
+  const uid = new Types.ObjectId(user.id);
+  const month = addMonths(monthKeyOf(today), -1);
+
+  const prefs = await UserPreferenceModel.findOne(
+    { userId: uid },
+    { monthlyBudgetMinor: 1 },
+  ).lean();
+  if (prefs?.monthlyBudgetMinor == null) return;
+
+  const monthExpenses = await ExpenseModel.find(
+    { userId: uid, localDate: { $gte: firstOfMonth(month), $lte: lastOfMonth(month) } },
+    { amountMinor: 1, participants: 1 },
+  ).lean();
+
+  const spentMinor = monthExpenses.reduce(
+    (acc, e) =>
+      acc +
+      netMinor({
+        amountMinor: e.amountMinor,
+        // Absent on expenses written before splitting existed. See aggregator.ts.
+        participants: (e.participants as Participant[] | undefined) ?? [],
+      }),
+    0,
+  );
+
+  const award = awardForMonth({ month, spentMinor, budgetMinor: prefs.monthlyBudgetMinor });
+  await grantAwards(user.id, award ? [award] : []);
 }
 
 export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
@@ -97,6 +149,10 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
 
         await runDetectors(user.id, user.timezone, today).catch((err: unknown) => {
           req.log.warn({ err }, 'detectors failed; serving Today without suggestions');
+        });
+
+        await awardMonthlyBudget(user, today).catch((err: unknown) => {
+          req.log.warn({ err }, 'monthly budget award failed; serving Today without it');
         });
       }
 
