@@ -528,66 +528,66 @@ function SourceCard({
         ) : null}
       </View>
 
-      {/* ── Two decisions, two switches, visibly apart ───────────────────── */}
-      <View style={styles.consents}>
-        <View style={styles.consentRow}>
-          <View style={styles.consentCopy}>
-            <Text variant="bodyMedium" color={unavailable ? t.textFaint : t.textPrimary}>
-              Collect this data
-            </Text>
-            <Text variant="caption" color={t.textFaint}>
-              {unavailable
-                ? 'Not something we can do — see above.'
-                : 'Read it into your timeline and your day.'}
-            </Text>
-          </View>
-
-          <Switch
-            value={connected}
-            disabled={unavailable}
-            onValueChange={onCollectChange}
-            accessibilityLabel={`Collect ${item.title}`}
-            trackColor={{ false: t.border, true: t.accent }}
-            thumbColor={t.onAccent}
-            ios_backgroundColor={t.border}
-          />
-        </View>
-
-        <View style={styles.consentDivider} />
-
-        <View style={styles.consentRow}>
-          <View style={styles.consentCopy}>
-            <View style={styles.aiLabel}>
-              <Sparkles size={14} color={t.textMuted} strokeWidth={1.8} />
-              <Text
-                variant="bodyMedium"
-                color={connected && aiEnabled ? t.textPrimary : t.textFaint}
-              >
-                Let Synítheia AI use it
+      {/* ── Two decisions, two switches, visibly apart ─────────────────────
+          An unavailable source gets no switches at all. A control that can never
+          move is not a control — it implies a choice the user does not have, and
+          the badge and the explanation above already say the whole story. */}
+      {!unavailable ? (
+        <View style={styles.consents}>
+          <View style={styles.consentRow}>
+            <View style={styles.consentCopy}>
+              <Text variant="bodyMedium" color={t.textPrimary}>
+                Collect this data
+              </Text>
+              <Text variant="caption" color={t.textFaint}>
+                Read it into your timeline and your day.
               </Text>
             </View>
-            <Text variant="caption" color={t.textFaint}>
-              {unavailable
-                ? 'Nothing is collected, so there is nothing to reason about.'
-                : !connected
+
+            <Switch
+              value={connected}
+              onValueChange={onCollectChange}
+              accessibilityLabel={`Collect ${item.title}`}
+              trackColor={{ false: t.border, true: t.accent }}
+              thumbColor={t.onAccent}
+              ios_backgroundColor={t.border}
+            />
+          </View>
+
+          <View style={styles.consentDivider} />
+
+          <View style={styles.consentRow}>
+            <View style={styles.consentCopy}>
+              <View style={styles.aiLabel}>
+                <Sparkles size={14} color={t.textMuted} strokeWidth={1.8} />
+                <Text
+                  variant="bodyMedium"
+                  color={connected && aiEnabled ? t.textPrimary : t.textFaint}
+                >
+                  Let Synítheia AI use it
+                </Text>
+              </View>
+              <Text variant="caption" color={t.textFaint}>
+                {!connected
                   ? 'Turn collection on first — a source we do not read cannot be reasoned about.'
                   : !aiEnabled
                     ? 'Turn Synítheia AI on above to allow this.'
                     : 'A separate decision. You can keep a source and still keep it out of the model.'}
-            </Text>
-          </View>
+              </Text>
+            </View>
 
-          <Switch
-            value={item.aiAllowed}
-            disabled={unavailable || !connected || !aiEnabled}
-            onValueChange={onAiChange}
-            accessibilityLabel={`Let Synítheia AI use ${item.title}`}
-            trackColor={{ false: t.border, true: t.accent }}
-            thumbColor={t.onAccent}
-            ios_backgroundColor={t.border}
-          />
+            <Switch
+              value={item.aiAllowed}
+              disabled={!connected || !aiEnabled}
+              onValueChange={onAiChange}
+              accessibilityLabel={`Let Synítheia AI use ${item.title}`}
+              trackColor={{ false: t.border, true: t.accent }}
+              thumbColor={t.onAccent}
+              ios_backgroundColor={t.border}
+            />
+          </View>
         </View>
-      </View>
+      ) : null}
     </Card>
   );
 }
