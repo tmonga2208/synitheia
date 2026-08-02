@@ -118,4 +118,39 @@ describe('grantAwards', () => {
     expect(delta).toBe(100);
     expect(after - before).toBe(delta);
   });
+
+  /**
+   * The property the whole feature turns on: the unique `{ userId, key }` index, not
+   * call ordering, is what prevents the double-award. A regressed "findOne, then create
+   * if absent" implementation would pass every test above unchanged — by the time a
+   * second sequential `await` runs, the first row is already committed and a query finds
+   * it just as reliably as the index would. Only concurrent, in-flight calls for the
+   * same key expose the difference: under check-then-insert both calls can observe "not
+   * found" before either commits, and both insert. This fires both calls at once and
+   * asserts exactly one row and one increment survive.
+   */
+  it('two concurrent grants for the same key still produce exactly one row and one increment', async () => {
+    const userId = await seedUser();
+    const award: XpAward = { key: 'habit:h1:2026-07-18', amount: 5 };
+
+    const [first, second] = await Promise.all([
+      grantAwards(userId, [award]),
+      grantAwards(userId, [award]),
+    ]);
+
+    // Exactly one of the two racing calls won the insert; the other saw 11000 and
+    // granted nothing. Which one won is not deterministic, so only the pair is asserted.
+    expect([first, second].sort((a, b) => a - b)).toEqual([0, 5]);
+    expect(await XpAwardModel.countDocuments({ userId: new Types.ObjectId(userId) })).toBe(1);
+    const user = await UserModel.findById(userId);
+    expect(user?.xp).toBe(5);
+  });
+
+  it('throws rather than silently reporting a delta that never reached user.xp when the user does not exist', async () => {
+    const missingUserId = new Types.ObjectId().toString();
+
+    await expect(
+      grantAwards(missingUserId, [{ key: 'habit:h1:2026-07-18', amount: 5 }]),
+    ).rejects.toThrow(missingUserId);
+  });
 });

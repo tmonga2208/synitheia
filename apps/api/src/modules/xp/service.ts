@@ -33,6 +33,23 @@ function isDuplicateKeyError(error: unknown): boolean {
  * live one. Instead every award is inserted directly; a duplicate-key error (Mongo code
  * 11000) means "already granted" and is swallowed, while any other error propagates,
  * since silently swallowing an arbitrary write failure would silently lose a real award.
+ *
+ * If insert N of M throws something other than 11000, awards 1..N-1 are already
+ * committed to the ledger and this function throws without ever reaching the `$inc` —
+ * so the ledger and `user.xp` disagree until someone acts. That is self-healing, but
+ * only because retrying the SAME full batch is safe: the already-committed rows collide
+ * on 11000 and are skipped, and only the awards that never landed are applied. A caller
+ * that retries a *different* batch, or drops the failure instead of retrying, leaves the
+ * drift in place — so the retry-the-same-batch contract belongs to whoever calls this,
+ * not to this function.
+ *
+ * `user.xp` is only ever incremented for a `userId` that actually resolves to a User
+ * document. A ledger row for a user that does not exist is corrupt state — the row was
+ * still inserted (nothing here prevents that; there is no FK), but the increment that
+ * would make its return value true never happens, so this throws instead of reporting a
+ * delta that silently never reached `user.xp`. That is deliberately loud: a caller with a
+ * `userId` from auth should never see this, so if it fires, something upstream is wrong
+ * and callers must not have a "well, it returned a number" excuse to ignore it.
  */
 export async function grantAwards(userId: string, awards: readonly XpAward[]): Promise<number> {
   if (awards.length === 0) return 0;
@@ -55,7 +72,12 @@ export async function grantAwards(userId: string, awards: readonly XpAward[]): P
   }
 
   if (granted > 0) {
-    await UserModel.updateOne({ _id: userObjectId }, { $inc: { xp: granted } });
+    const result = await UserModel.updateOne({ _id: userObjectId }, { $inc: { xp: granted } });
+    if (result.matchedCount === 0) {
+      throw new Error(
+        `grantAwards: no User document for id ${userId} — ${granted} XP was ledgered but never applied`,
+      );
+    }
   }
 
   return granted;
