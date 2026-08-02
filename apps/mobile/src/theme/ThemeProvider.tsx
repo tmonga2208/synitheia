@@ -161,7 +161,55 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return resolved === 'dark' ? darkTheme : lightTheme;
   }, [preference, systemScheme]);
 
+  useSyncNativeAppearance(preference);
+
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
+}
+
+/**
+ * Makes the *native* layer agree with the app's theme, not only the screens this
+ * `<ThemeContext>` paints.
+ *
+ * Before this, `preference` only ever changed what React Native rendered. Every surface
+ * the OS itself draws — the keyboard, `Alert.alert`, the status bar, and (see
+ * `app/(tabs)/_layout.tsx`) the native tab bar's own system materials — kept following the
+ * PHONE's actual Dark/Light Mode setting, because nothing had ever told either platform's
+ * window/activity that this app has an opinion independent of it. A user who chose Dark on
+ * a light phone got a dark app wrapped in a light keyboard and light system alerts, which
+ * reads as broken rather than as an override actually taking effect.
+ *
+ * `Appearance.setColorScheme()` (confirmed against the installed RN 0.81.5, not assumed
+ * from memory — see `node_modules/react-native/Libraries/Utilities/Appearance.js:97-106`,
+ * `React/CoreModules/RCTAppearance.mm:112-123`, and
+ * `ReactAndroid/.../appearance/AppearanceModule.kt:55-64`) is the supported hook for this:
+ * on iOS it sets `overrideUserInterfaceStyle` on every connected `UIWindow`, and on Android
+ * it calls `AppCompatDelegate.setDefaultNightMode()` — both of which the OS's OWN chrome
+ * reads from, not just RN's `useColorScheme()`.
+ *
+ * `'system'` maps to `null`, deliberately NOT to whatever `resolved` currently happens to
+ * be. Passing the resolved NAME (e.g. `'light'`) would pin the native override even though
+ * the user picked System — the app would stop following a later OS change until relaunched.
+ * `null` clears any override (RN turns that into iOS's `UIUserInterfaceStyleUnspecified` /
+ * Android's `MODE_NIGHT_FOLLOW_SYSTEM`), which is exactly "let the OS decide again". This is
+ * also why the effect depends on `preference`, not `resolved`: `resolved` can change for a
+ * System user purely because the OS flipped, and re-deriving the argument from `preference`
+ * each time means that case always recomputes to the same `null` rather than accidentally
+ * pinning whatever the OS happened to be at that instant.
+ *
+ * A plain side effect, not a render-time call: `setColorScheme()` mutates global,
+ * OS-level state (every window; the app's night-mode default), so it must run exactly once
+ * per actual `preference` change, not on every render — the same reasoning that keeps
+ * `useThemeHydrated`'s AsyncStorage read in an effect rather than at module scope.
+ */
+function useSyncNativeAppearance(preference: ThemePreference): void {
+  useEffect(() => {
+    // Lazy for the same reason `useSystemColorScheme` requires `react-native` lazily below:
+    // a static import would run react-native's module body the moment Vitest imports this
+    // file for `resolveTheme`, which `ThemeProvider.test.ts` cannot survive under Node.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- see file header
+    const { Appearance } = require('react-native') as typeof ReactNative;
+    Appearance.setColorScheme(preference === 'system' ? null : preference);
+  }, [preference]);
 }
 
 /** The live `Theme`. Throws outside `<ThemeProvider>` — a silent `undefined` would surface as a blank screen. */
