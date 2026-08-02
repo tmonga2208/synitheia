@@ -119,6 +119,71 @@ export async function archiveHabit(user: AuthedUser, habitId: string) {
   await invalidateDailySummary(user.id, todayLocalDate(user.timezone));
 }
 
+export interface HabitCompletionAwardInput {
+  userId: string;
+  /**
+   * The RESOLVED habit document's `_id`, never a string off a request.
+   * `objectIdSchema` is `/^[a-f\d]{24}$/i`, case-INSENSITIVE, so `/habits/6A6E…/log`
+   * and `/habits/6a6e…/log` both validate and both resolve to the same habit — but a
+   * key built from the raw string would differ between them, and the unique index
+   * cannot catch keys that genuinely differ. Taking an ObjectId rather than a string
+   * makes that mistake unavailable to callers rather than merely discouraged.
+   */
+  habitId: Types.ObjectId;
+  localDate: LocalDate;
+  /** The streak as recomputed AFTER this completion, not the pre-log value. */
+  currentStreak: number;
+  logger?: Pick<FastifyBaseLogger, 'warn'>;
+}
+
+/**
+ * Everything a completed habit earns, granted in one place.
+ *
+ * This exists as a function rather than a block inside `logHabit` because a habit can
+ * be completed down more than one path: the manual log, and a Health step sync that
+ * fills a step-measured habit without the user touching the app. Both are completions
+ * by every definition the rest of the app uses — both write `completedAt`, both
+ * recompute the streak — so both must earn the same XP. Copying the block would let the
+ * two drift, and a missing award has no symptom loud enough for anyone to notice the
+ * drift had happened.
+ *
+ * The caller decides WHETHER the habit is complete; this decides what that is worth.
+ *
+ * XP is a nicety layered on top of a write that has already landed — a ledger hiccup
+ * must never surface as a failed habit tap or a failed health sync — so the grant is
+ * swallowed and logged here, the same contract as `today/routes.ts`'s "detectors must
+ * not break Today" wrapping. Swallowed, but never silent: `grantAwards`' own doc
+ * comment is explicit that a failure like "no User document for this id" is
+ * deliberately loud, and dropping it here would undo that. A caller with no logger
+ * (only the direct-caller test files, never a real route) still gets `console.warn`.
+ */
+export async function grantHabitCompletionAwards(
+  input: HabitCompletionAwardInput,
+): Promise<void> {
+  const { userId, habitId, localDate, currentStreak, logger } = input;
+
+  try {
+    const [scheduled, dayLogs] = await Promise.all([
+      scheduledOn(userId, localDate),
+      logsForDate(userId, localDate),
+    ]);
+
+    await grantAwards(
+      userId,
+      awardsForHabitLog({
+        habitId: habitId.toString(),
+        localDate,
+        complete: true,
+        currentStreak,
+        scheduledCount: scheduled.length,
+        completedCount: dayLogs.filter(isHabitComplete).length,
+      }),
+    );
+  } catch (error) {
+    (logger ?? console).warn({ err: error }, 'failed to grant habit XP');
+  }
+}
+
 /**
  * Log progress on a habit.
  *
@@ -187,44 +252,13 @@ export async function logHabit(
   await invalidateDailySummary(user.id, localDate);
 
   if (complete) {
-    /**
-     * XP is a nicety layered on top of a write that already landed — a ledger
-     * hiccup must never surface as a failed habit tap. Swallowed and logged, same
-     * contract as `today/routes.ts`'s "detectors must not break Today" wrapping.
-     */
-    try {
-      const [scheduled, dayLogs] = await Promise.all([
-        scheduledOn(user.id, localDate),
-        logsForDate(user.id, localDate),
-      ]);
-
-      await grantAwards(
-        user.id,
-        awardsForHabitLog({
-          /**
-           * The RESOLVED document's id, never `habitId` — which is the raw string off
-           * the request. `objectIdSchema` is `/^[a-f\d]{24}$/i`, case-INSENSITIVE, so
-           * `/habits/6A6E…/log` and `/habits/6a6e…/log` both validate and both resolve
-           * to this same document, but would mint two different dedupe keys. The unique
-           * index cannot save us there — the keys genuinely differ — and a double award
-           * has no user-visible symptom, so nothing would ever report it. Every key
-           * segment must come from a persisted value, not from client input.
-           */
-          habitId: habit._id.toString(),
-          localDate,
-          complete,
-          currentStreak: updated.currentStreak,
-          scheduledCount: scheduled.length,
-          completedCount: dayLogs.filter(isHabitComplete).length,
-        }),
-      );
-    } catch (error) {
-      // A caller with no logger (only the two pre-existing direct-caller test
-      // files, never the real route) must still see this somewhere — grantAwards'
-      // own doc comment is explicit that a failure like "no User document for
-      // this id" is deliberately loud, and a silent swallow here would undo that.
-      (logger ?? console).warn({ err: error }, 'failed to grant habit XP');
-    }
+    await grantHabitCompletionAwards({
+      userId: user.id,
+      habitId: habit._id,
+      localDate,
+      currentStreak: updated.currentStreak,
+      logger,
+    });
 
     await emit({
       userId: user.id,
