@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { contrastRatio } from './contrast.js';
+import { composite, contrastRatio } from './contrast.js';
 import { darkTheme, flowTint, lightTheme, type Theme } from './theme.js';
+
+/**
+ * Flatten a fill that may be an `rgba()` string over the surface it is drawn on.
+ *
+ * The light flow ramp's middle bands are alpha tints, and a contrast ratio can only be
+ * computed against an opaque colour. `contrastRatio` not accepting `rgba()` is not a reason
+ * to leave those bands unmeasured — it is the reason `composite` exists.
+ */
+function flatten(fill: string, surface: string): string {
+  const m = /^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\s*\)$/.exec(fill);
+  if (!m) return fill;
+
+  const hex = `#${[1, 2, 3]
+    .map((i) => Number(m[i]).toString(16).padStart(2, '0'))
+    .join('')}`;
+  return composite(hex, Number(m[4]), surface);
+}
 
 const THEMES: [name: string, t: Theme][] = [
   ['light', lightTheme],
@@ -62,6 +79,11 @@ const EXCEPTIONS = [
   // values, already computed, if that pass ever happens.
   //
   // The DARK accents carry no exception: all eight clear 3.0 / 4.5 outright.
+  //
+  // These two rows record the WORST of the eight, which is what an exception floor means.
+  // They deliberately do not hold the other seven — `HABIT_RATIOS` below pins every accent
+  // individually, because a group floor on its own would let sage `text` fall from 4.9319
+  // to 4.08 without a single test noticing.
   { pair: 'habitAccent.base/surface', themes: ['light'], floor: 2.72 },
   { pair: 'habitAccent.text/surface', themes: ['light'], floor: 4.08 },
 
@@ -78,6 +100,44 @@ const EXCEPTIONS = [
   { pair: 'warning/surface', themes: ['light'], floor: 2.4 }, // measured 2.4771
   { pair: 'warning/surfaceRaised', themes: ['light'], floor: 2.2 }, // measured 2.2135
 ];
+
+/**
+ * What each habit accent measures against its own theme's `surface`, per habit rather than
+ * per group.
+ *
+ * The group floors in `EXCEPTIONS` record the worst of the eight, which is the right shape
+ * for an exception but the wrong shape for a guard: with only those, seven of the eight
+ * light accents could drift by up to 0.85 and still pass. The light set is ratified to ship
+ * exactly as it is, and nothing else in the repo pins it — `tokens.test.ts` covers only
+ * `flowTint`, and it is deleted in Task 9 with the rest of the shim. So each accent is held
+ * to its own number here.
+ *
+ * Dark is pinned on the same terms. Its floors are the real 3.0 / 4.5, so without this an
+ * accent could silently slide from the 3.15 / 5.0 the derivation targeted down to the bare
+ * minimum and still be "passing".
+ */
+const HABIT_RATIOS: Record<string, Record<string, { base: number; wash: number; text: number }>> = {
+  light: {
+    '#7D927D': { base: 3.1821, wash: 1.1283, text: 4.9319 }, // sage
+    '#7D8FA9': { base: 3.1351, wash: 1.1595, text: 4.7587 }, // indigo
+    '#C08A7D': { base: 2.7859, wash: 1.1325, text: 4.3282 }, // clay
+    '#B0917D': { base: 2.7784, wash: 1.1335, text: 4.3011 }, // sand
+    '#8A9AA9': { base: 2.7465, wash: 1.1203, text: 4.0884 }, // slate
+    '#A98DA9': { base: 2.8265, wash: 1.1342, text: 4.5016 }, // mauve
+    '#7DA095': { base: 2.7246, wash: 1.115, text: 4.1414 }, // teal
+    '#B08A8A': { base: 2.9179, wash: 1.143, text: 4.5573 }, // rose
+  },
+  dark: {
+    '#7D927D': { base: 3.1661, wash: 1.187, text: 5.013 }, // sage
+    '#7D8FA9': { base: 3.1536, wash: 1.1855, text: 5.0469 }, // indigo
+    '#C08A7D': { base: 3.1656, wash: 1.175, text: 5.0326 }, // clay
+    '#B0917D': { base: 3.1582, wash: 1.1791, text: 5.0614 }, // sand
+    '#8A9AA9': { base: 3.1532, wash: 1.1841, text: 5.0333 }, // slate
+    '#A98DA9': { base: 3.1601, wash: 1.1892, text: 5.0231 }, // mauve
+    '#7DA095': { base: 3.1857, wash: 1.1849, text: 5.0235 }, // teal
+    '#B08A8A': { base: 3.1619, wash: 1.1831, text: 5.0218 }, // rose
+  },
+};
 
 function floorFor(pair: string, theme: string, fallback = 4.5): number {
   const e = EXCEPTIONS.find((x) => x.pair === pair && x.themes.includes(theme));
@@ -189,6 +249,29 @@ describe.each(THEMES)('%s theme contrast', (name, t) => {
     }
   });
 
+  it('holds every habit accent individually where it ships', () => {
+    // The guard the group floors above cannot provide. Tolerance is 0.005 — tight enough
+    // that no perceptible colour change survives it.
+    const pinned = HABIT_RATIOS[name] as Record<string, Record<string, number>>;
+
+    for (const [color, accent] of Object.entries(t.habitAccents)) {
+      const expected = pinned[color] as Record<string, number>;
+
+      for (const field of ['base', 'wash', 'text'] as const) {
+        const actual = contrastRatio(accent[field], t.surface);
+        const was = expected[field] as number;
+        const direction = actual > was ? 'UP' : 'DOWN';
+
+        expect(
+          Math.abs(actual - was),
+          `${name} habit ${color} .${field} moved ${direction}: ${was} → ${actual.toFixed(4)} ` +
+            `(now ${accent[field]}). These colours are ratified to ship exactly as they are; ` +
+            `if the change is intended, update HABIT_RATIOS and say so in the commit.`,
+        ).toBeLessThan(0.005);
+      }
+    }
+  });
+
   it('the eight habit accents stay eight distinguishable colours', () => {
     // The failure contrast maths cannot see: eight accents all pushed to the same
     // near-grey still pass every ratio above. HabitCard's per-habit tinting is the most
@@ -260,43 +343,145 @@ describe('the exception list itself', () => {
   });
 });
 
-describe('dark flowTint ramp', () => {
-  const t = darkTheme;
-  // One sample inside each of the five bands.
-  const STEPS = [0, 20, 50, 70, 95];
+/**
+ * The History calendar's heat-map, both themes.
+ *
+ * The light ramp used to be covered only by `tokens.test.ts`, which imports the `tokens.js`
+ * shim and is therefore deleted in Task 9 — leaving the light heat-map with no coverage at
+ * all, in the one feature where this repo has already shipped a WCAG defect. These are the
+ * assertions ported across so that does not happen.
+ */
+const BANDS: [label: string, sample: number][] = [
+  ['0–14', 0],
+  ['15–39', 20],
+  ['40–64', 50],
+  ['65–84', 70],
+  ['85–100', 95],
+];
 
-  it('keeps every step’s numeral legible on its own fill', () => {
-    // MonthGrid renders date numerals at `type.caption` (12px), which WCAG 1.4.3 counts
-    // as NORMAL text at 4.5:1 — the exact rule this codebase got wrong once. The dark
-    // ramp returns opaque composited fills, so these are the ratios a user really sees.
-    for (const percent of STEPS) {
+describe.each(THEMES)('%s flowTint ramp', (name, t) => {
+  // The light ramp's middle bands are alpha over the page; `composite` exists precisely so
+  // they can still be measured. Measuring a tint against its own base rather than its
+  // composite would report a number the user never sees.
+  const fills = BANDS.map(([, percent]) => flatten(flowTint(percent, t).background, t.surface));
+
+  it('keeps every band’s numeral legible on its own fill', () => {
+    // MonthGrid renders date numerals at `type.caption` (12px), which WCAG 1.4.3 counts as
+    // NORMAL text at 4.5:1, not the 3:1 large-text floor. That is the rule that was got
+    // wrong here once, from memory rather than measurement.
+    BANDS.forEach(([label, percent], i) => {
       const step = flowTint(percent, t);
-      expect(contrastRatio(step.text, step.background), `flow ${percent}%`).toBeGreaterThanOrEqual(
-        4.5,
-      );
+      // Only the solid top band is excepted, and only in light — where that band IS the
+      // `onAccent`-on-`accentDeep` pairing already recorded above, so it reuses that floor
+      // rather than adding a second entry for one colour pair. Dark's top band is
+      // `onAccent` on `accent` and is held to the full 4.5.
+      const floor = i === BANDS.length - 1 ? floorFor('onAccent/accentDeep', name) : 4.5;
+
+      expect(
+        contrastRatio(step.text, fills[i] as string),
+        `${name} ${label}% — numeral ${step.text} on ${fills[i]}`,
+      ).toBeGreaterThanOrEqual(floor);
+    });
+  });
+
+  it('is monotonic — a better day is never a weaker fill', () => {
+    // The two ramps travel in opposite directions (light darkens away from bone, dark
+    // lightens away from charcoal), so the shared property is distance from `surface`
+    // rather than luminance. Either way: more colour = better day.
+    const distances = fills.map((f) => contrastRatio(f, t.surface));
+
+    for (let i = 1; i < distances.length; i += 1) {
+      expect(
+        distances[i] as number,
+        `${name} band ${BANDS[i]?.[0]}% is no further from surface than ${BANDS[i - 1]?.[0]}%`,
+      ).toBeGreaterThan(distances[i - 1] as number);
     }
   });
 
-  it('travels upward in colour — more colour means a better day', () => {
-    // The inverse of the light ramp's direction: on charcoal a stronger day is a
-    // *lighter* cell, so each step must stand further off `surface` than the last.
-    const steps = STEPS.map((percent) => contrastRatio(flowTint(percent, t).background, t.surface));
-
-    for (let i = 1; i < steps.length; i += 1) {
-      expect(steps[i] as number, `step ${STEPS[i]}%`).toBeGreaterThan(steps[i - 1] as number);
+  it('puts the band boundaries exactly where they are specified', () => {
+    // The thresholds are the contract and are identical in both themes.
+    for (const [lastOfBand, firstOfNext] of [
+      [14, 15],
+      [39, 40],
+      [64, 65],
+      [84, 85],
+    ]) {
+      expect(flowTint(lastOfBand as number, t), `${lastOfBand}% must stay in its band`).not.toEqual(
+        flowTint(firstOfNext as number, t),
+      );
     }
+    // ...and nothing inside a band moves.
+    expect(flowTint(15, t)).toEqual(flowTint(39, t));
+    expect(flowTint(40, t)).toEqual(flowTint(64, t));
+    expect(flowTint(65, t)).toEqual(flowTint(84, t));
+    expect(flowTint(85, t)).toEqual(flowTint(100, t));
   });
 
   it('gives a logged-but-zero day a visible fill, distinct from an empty cell', () => {
-    // Same statement as light mode: a day logged at 0% and a day with nothing logged at
-    // all are different things, and the grid draws the latter as a hollow outline.
+    // A day logged at 0% and a day with nothing logged at all are different statements.
+    // The grid draws the latter as a hollow outline and must never reuse this fill for it.
     const zero = flowTint(0, t);
     expect(zero.background).not.toBe('transparent');
-    expect(contrastRatio(zero.background, t.surface)).toBeGreaterThan(1.05);
+    expect(contrastRatio(fills[0] as string, t.surface)).toBeGreaterThan(1.05);
   });
 
   it('clamps out-of-range input rather than throwing', () => {
     expect(flowTint(-10, t)).toEqual(flowTint(0, t));
     expect(flowTint(999, t)).toEqual(flowTint(100, t));
+  });
+});
+
+describe('the light flowTint ramp ships the exact fills it always has', () => {
+  it('pins every band, including the rgba strings', () => {
+    // `tokens.test.ts` pins these today and goes away with the shim in Task 9. Pinned as
+    // literals rather than as ratios because the alpha values themselves are the contract —
+    // MonthGrid draws these straight into a style.
+    expect(lightTheme.flowRamp).toEqual([
+      { background: '#EFECEA', text: '#6B6B68' },
+      { background: 'rgba(125, 146, 125, 0.24)', text: '#2D2D2D' },
+      { background: 'rgba(125, 146, 125, 0.46)', text: '#2D2D2D' },
+      { background: 'rgba(125, 146, 125, 0.74)', text: '#2D2D2D' },
+      { background: '#67806A', text: '#FFFFFF' },
+    ]);
+  });
+
+  it('keeps the top band on sageDeep rather than sage', () => {
+    // sageDeep measures 4.3099 against white; sage measures 3.3441 and fails outright. A
+    // future "simplification" back to sage is a regression, not a tidy-up.
+    expect(lightTheme.flowRamp[4].background).toBe(lightTheme.accentDeep);
+    expect(contrastRatio(lightTheme.onAccent, lightTheme.accentDeep)).toBeGreaterThan(
+      contrastRatio(lightTheme.onAccent, lightTheme.accent),
+    );
+  });
+});
+
+describe('the habit accents ship the exact colours they were ratified at', () => {
+  // `HABIT_RATIOS` pins what each accent measures; this pins what each accent IS. Both are
+  // needed: a hue change that happened to preserve its contrast ratio would pass the first
+  // and still repaint eight habit cards.
+  it('light', () => {
+    expect(lightTheme.habitAccents).toEqual({
+      '#7D927D': { base: '#7D927D', wash: '#E8EDE8', text: '#5E7260' },
+      '#7D8FA9': { base: '#7D8FA9', wash: '#E5E9EF', text: '#5E7189' },
+      '#C08A7D': { base: '#C08A7D', wash: '#F4E9E6', text: '#9B6A5E' },
+      '#B0917D': { base: '#B0917D', wash: '#F1EAE4', text: '#8C7160' },
+      '#8A9AA9': { base: '#8A9AA9', wash: '#E9EDF0', text: '#6C7C8A' },
+      '#A98DA9': { base: '#A98DA9', wash: '#F0E9F0', text: '#856B85' },
+      '#7DA095': { base: '#7DA095', wash: '#E6EFEC', text: '#5E8076' },
+      '#B08A8A': { base: '#B08A8A', wash: '#F2E8E8', text: '#8C6A6A' },
+    });
+  });
+
+  it('dark', () => {
+    expect(darkTheme.habitAccents).toEqual({
+      '#7D927D': { base: '#597159', wash: '#252c2b', text: '#779377' },
+      '#7D8FA9': { base: '#536c90', wash: '#242b35', text: '#768eb0' },
+      '#C08A7D': { base: '#a6533f', wash: '#332726', text: '#c57865' },
+      '#B0917D': { base: '#8a6248', wash: '#2e2928', text: '#b08366' },
+      '#8A9AA9': { base: '#576d82', wash: '#252b32', text: '#778fa4' },
+      '#A98DA9': { base: '#865d86', wash: '#2d2933', text: '#a77fa7' },
+      '#7DA095': { base: '#4c7367', wash: '#232c2e', text: '#639686' },
+      '#B08A8A': { base: '#975a5a', wash: '#31282b', text: '#b27f7f' },
+    });
   });
 });

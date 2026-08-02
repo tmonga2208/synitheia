@@ -32,6 +32,16 @@
  *     palette.white       → t.onAccent  (when it sits on a filled accent/danger control)
  *     palette.danger / warning / scrim → the same names
  *
+ *   The one mapping that trips people up — RULED 2026-08-02, do not re-decide it:
+ *
+ *     a bottom sheet, a modal, a menu        → t.surface        NOT t.surfaceRaised
+ *     a chip, an input, a secondary button   → t.surfaceRaised
+ *
+ *   "Raised" here means a small inset control that has to separate from the surface it
+ *   sits on, not "high in the z-order". A sheet already reads as raised because it sits
+ *   over `scrim` at 55% black, and mapping it to `surface` is also what keeps light mode
+ *   byte-identical — sheets are `bone` today, the same as the page behind them.
+ *
  * If a call site's role cannot be settled from its immediate context, flag it rather than
  * guess — a wrong guess here is invisible in light mode and glaring at night.
  */
@@ -258,7 +268,15 @@ export interface Theme {
   bg: string;
   /** A card, a sheet — anything sitting on `bg`. */
   surface: string;
-  /** A secondary fill that must separate from `surface`: chips, inputs, secondary buttons. */
+  /**
+   * A small inset control that has to separate from the surface it sits on: chips, inputs,
+   * secondary buttons.
+   *
+   * NOT a sheet or a menu, despite the name — those take `surface`. "Raised" is about
+   * needing its own fill, not about z-order; a sheet already reads as raised because it
+   * sits over `scrim`. Ruled 2026-08-02, and it is also what keeps light mode
+   * byte-identical, since sheets are `bone` today.
+   */
   surfaceRaised: string;
   /** Hairline separators and card edges. Never a text colour. */
   border: string;
