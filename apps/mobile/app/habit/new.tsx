@@ -31,7 +31,7 @@ import {
 } from '../../src/components/primitives.js';
 import { DEFAULT_ICON, IconPicker, iconFor } from '../../src/components/IconPicker.js';
 import { ApiError, api } from '../../src/api/client.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 

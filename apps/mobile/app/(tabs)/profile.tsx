@@ -25,7 +25,7 @@ import {
 import { Card, Chip, Text, Touchable } from '../../src/components/primitives.js';
 import { SkeletonList } from '../../src/components/Skeleton.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, motion, radius, spacing } from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, motion, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles, useThemePreference } from '../../src/theme/ThemeProvider.js';
 import type { ThemePreference } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';

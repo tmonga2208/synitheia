@@ -16,7 +16,7 @@ import {
   type PersonalEvent,
 } from '@synitheia/shared';
 import { Card, Text, Touchable } from './primitives.js';
-import { motion, radius, spacing } from '../theme/tokens.js';
+import { motion, radius, spacing } from '../theme/theme.js';
 import { useTheme } from '../theme/ThemeProvider.js';
 
 interface TimelineProps {

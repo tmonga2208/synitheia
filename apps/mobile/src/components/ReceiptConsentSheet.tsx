@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ImageIcon } from 'lucide-react-native';
 import { Button, Text } from './primitives.js';
 import { api } from '../api/client.js';
-import { radius, spacing } from '../theme/tokens.js';
+import { radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
 

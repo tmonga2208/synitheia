@@ -21,7 +21,7 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
-import { spacing } from '../src/theme/tokens.js';
+import { spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
 

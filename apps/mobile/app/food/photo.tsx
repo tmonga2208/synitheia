@@ -22,7 +22,7 @@ import {
   Touchable,
 } from '../../src/components/primitives.js';
 import { api, ApiError } from '../../src/api/client.js';
-import { radius, spacing } from '../../src/theme/tokens.js';
+import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 

@@ -10,7 +10,7 @@ import { Button, Card, Chip, Input, Text, Touchable } from '../src/components/pr
 import { iconFor } from '../src/components/IconPicker.js';
 import { ApiError, api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
-import { radius, spacing } from '../src/theme/tokens.js';
+import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
 

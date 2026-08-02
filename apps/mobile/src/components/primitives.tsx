@@ -20,7 +20,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { MIN_TAP_TARGET, motion, radius, spacing, type } from '../theme/tokens.js';
+import { MIN_TAP_TARGET, motion, radius, spacing, type } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
 

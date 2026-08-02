@@ -9,7 +9,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { radius, spacing } from '../theme/tokens.js';
+import { radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
 

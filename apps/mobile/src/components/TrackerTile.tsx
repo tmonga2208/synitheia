@@ -8,7 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ChevronRight } from 'lucide-react-native';
 import { Text, Touchable } from './primitives.js';
-import { motion, radius, spacing } from '../theme/tokens.js';
+import { motion, radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
 

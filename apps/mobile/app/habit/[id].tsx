@@ -23,7 +23,7 @@ import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { iconFor } from '../../src/components/IconPicker.js';
 import { api } from '../../src/api/client.js';
 import type { HabitHistory, ListResponse, WireHabit } from '../../src/api/types.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 

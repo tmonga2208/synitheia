@@ -8,7 +8,7 @@ import {
   type MonthKey,
 } from '@synitheia/shared';
 import { Text, Touchable } from './primitives.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import { flowTint, type Theme } from '../theme/theme.js';
 

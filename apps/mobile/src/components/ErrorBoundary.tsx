@@ -6,7 +6,7 @@ import { SafeAreaView, Text as RNText, View } from 'react-native';
 // colour reference of its own, so it is the one shared primitive safe to use in EITHER
 // fallback below, themed or not.
 import { Touchable } from './primitives.js';
-import { radius, shadow, spacing, type } from '../theme/tokens.js';
+import { radius, shadow, spacing, type } from '../theme/theme.js';
 import { useTheme } from '../theme/ThemeProvider.js';
 import type { ShadowStyle } from '../theme/theme.js';
 // This is the ONE legitimate exception to "no raw palette outside src/theme/" (enforced by

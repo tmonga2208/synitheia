@@ -17,7 +17,7 @@ import {
 } from '@synitheia/shared';
 import { Card, Text, Touchable } from './primitives.js';
 import { iconFor } from './IconPicker.js';
-import { MIN_TAP_TARGET, motion, radius, spacing } from '../theme/tokens.js';
+import { MIN_TAP_TARGET, motion, radius, spacing } from '../theme/theme.js';
 import { useTheme } from '../theme/ThemeProvider.js';
 import { accentFor } from '../theme/theme.js';
 

@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { motion, type } from '../theme/tokens.js';
+import { motion, type } from '../theme/theme.js';
 import { useTheme } from '../theme/ThemeProvider.js';
 import { Text } from './primitives.js';
 

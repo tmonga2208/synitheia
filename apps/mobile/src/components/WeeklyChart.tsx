@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { asLocalDate, localWeekdayIndex, type TodayResponse } from '@synitheia/shared';
 import { Card, Text } from './primitives.js';
-import { motion, radius, spacing } from '../theme/tokens.js';
+import { motion, radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
 

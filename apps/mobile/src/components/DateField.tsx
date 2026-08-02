@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Button, Text, Touchable } from './primitives.js';
-import { radius, spacing } from '../theme/tokens.js';
+import { radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
 

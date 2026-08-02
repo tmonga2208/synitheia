@@ -6,7 +6,7 @@ import { asMinor, formatMoney } from '@synitheia/shared';
 import { Text, Touchable } from './primitives.js';
 import { api } from '../api/client.js';
 import { useAuth } from '../store/auth.js';
-import { radius, spacing } from '../theme/tokens.js';
+import { radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../theme/theme.js';
 

@@ -39,7 +39,7 @@ import { Timeline } from '../../src/components/Timeline.js';
 import { ApiError, api } from '../../src/api/client.js';
 import { useHealthSync } from '../../src/health/useHealthSync.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 

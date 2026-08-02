@@ -48,7 +48,7 @@ import type {
   WireIngestion,
 } from '../../src/api/types.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, radius, spacing, type as typeScale } from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing, type as typeScale } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 

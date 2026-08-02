@@ -11,7 +11,7 @@ import {
   type Minor,
 } from '@synitheia/shared';
 import { Button, Card, Chip, Input, Text, Touchable } from './primitives.js';
-import { radius, spacing } from '../theme/tokens.js';
+import { radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../theme/theme.js';
 

@@ -16,7 +16,7 @@ import { SkeletonList } from '../../src/components/Skeleton.js';
 import { api } from '../../src/api/client.js';
 import type { ListResponse, WireExpense } from '../../src/api/types.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 import { BillsRow, OwedBanner } from '../../src/components/OwedBanner.js';

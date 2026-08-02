@@ -12,7 +12,7 @@ import { Lock, Mail } from 'lucide-react-native';
 import { Button, Input, Text, Touchable } from '../../src/components/primitives.js';
 import { ApiError } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
-import { radius, spacing } from '../../src/theme/tokens.js';
+import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 

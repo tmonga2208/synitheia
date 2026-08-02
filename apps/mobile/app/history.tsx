@@ -25,7 +25,7 @@ import {
 import { MonthGrid } from '../src/components/MonthGrid.js';
 import { api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { flowTint, type Theme } from '../src/theme/theme.js';
 

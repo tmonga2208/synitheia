@@ -40,7 +40,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { Chip, Input, Text, Touchable } from './primitives.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../theme/theme.js';
 
