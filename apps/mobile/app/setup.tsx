@@ -10,7 +10,9 @@ import { Button, Card, Chip, Input, Text, Touchable } from '../src/components/pr
 import { iconFor } from '../src/components/IconPicker.js';
 import { ApiError, api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
-import { accentFor, palette, radius, spacing } from '../src/theme/tokens.js';
+import { radius, spacing } from '../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../src/theme/theme.js';
 
 /**
  * Setup.
@@ -42,10 +44,13 @@ const DOMAINS: { key: TrackedDomain; label: string; blurb: string }[] = [
   { key: 'water', label: 'Water', blurb: 'Daily hydration' },
 ];
 
-const ACCENT = accentFor('#7D927D');
+const ACCENT_COLOR = '#7D927D';
 const TIMES = ['07:00', '08:30', '12:00', '18:00', '21:00'];
 
 export default function Setup() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const ACCENT = accentFor(ACCENT_COLOR, t);
   const user = useAuth((s) => s.user);
   const hydrate = useAuth((s) => s.hydrate);
   const currency = user?.currency ?? 'INR';
@@ -129,7 +134,7 @@ export default function Setup() {
               accessibilityRole="button"
               accessibilityLabel="Go back a step"
             >
-              <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+              <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
             </Touchable>
           ) : (
             <View style={styles.back} />
@@ -139,7 +144,11 @@ export default function Setup() {
             {steps.map((s, i) => (
               <View
                 key={s}
-                style={[styles.pip, i === step && styles.pipActive, i < step && styles.pipDone]}
+                style={[
+                  styles.pip,
+                  i === step && [styles.pipActive, { backgroundColor: ACCENT.base }],
+                  i < step && { backgroundColor: t.accentSoft },
+                ]}
               />
             ))}
           </View>
@@ -156,7 +165,7 @@ export default function Setup() {
             {current === 'domains' ? (
               <>
                 <Text variant="title">What do you want to track?</Text>
-                <Text variant="body" color={palette.stoneMuted} style={styles.sub}>
+                <Text variant="body" color={t.textMuted} style={styles.sub}>
                   Only what you pick shows up. You can change this later.
                 </Text>
 
@@ -167,7 +176,10 @@ export default function Setup() {
                     return (
                       <Touchable
                         key={d.key}
-                        style={[styles.domain, on && styles.domainOn]}
+                        style={[
+                          styles.domain,
+                          on && { borderColor: ACCENT.base, backgroundColor: ACCENT.wash },
+                        ]}
                         onPress={() => toggleDomain(d.key)}
                         accessibilityRole="checkbox"
                         accessibilityState={{ checked: on }}
@@ -175,13 +187,18 @@ export default function Setup() {
                       >
                         <View style={{ flex: 1 }}>
                           <Text variant="cardTitle">{d.label}</Text>
-                          <Text variant="caption" color={palette.stoneMuted}>
+                          <Text variant="caption" color={t.textMuted}>
                             {d.blurb}
                           </Text>
                         </View>
 
-                        <View style={[styles.tick, on && styles.tickOn]}>
-                          {on ? <Check size={14} color={palette.white} strokeWidth={3} /> : null}
+                        <View
+                          style={[
+                            styles.tick,
+                            on && { backgroundColor: ACCENT.base, borderColor: ACCENT.base },
+                          ]}
+                        >
+                          {on ? <Check size={14} color={t.onAccent} strokeWidth={3} /> : null}
                         </View>
                       </Touchable>
                     );
@@ -193,14 +210,14 @@ export default function Setup() {
             {current === 'habits' ? (
               <>
                 <Text variant="title">Pick a couple to start</Text>
-                <Text variant="body" color={palette.stoneMuted} style={styles.sub}>
+                <Text variant="body" color={t.textMuted} style={styles.sub}>
                   Two or three is plenty. You can add your own later.
                 </Text>
 
                 <View style={styles.habits}>
                   {STARTER_HABITS.map((h) => {
                     const on = habits.includes(h.name);
-                    const accent = accentFor(h.color);
+                    const accent = accentFor(h.color, t);
                     const { Icon } = iconFor(h.icon);
 
                     return (
@@ -223,12 +240,12 @@ export default function Setup() {
                       >
                         <Icon
                           size={20}
-                          color={on ? accent.text : palette.stoneMuted}
+                          color={on ? accent.text : t.textMuted}
                           strokeWidth={1.7}
                         />
                         <Text
                           variant="caption"
-                          color={on ? accent.text : palette.stoneMuted}
+                          color={on ? accent.text : t.textMuted}
                           center
                         >
                           {h.name}
@@ -243,7 +260,7 @@ export default function Setup() {
                   not choose is how a tracker becomes an app you avoid opening.
                 */}
                 {habits.length === 0 ? (
-                  <Text variant="caption" color={palette.stoneFaint} center style={styles.hint}>
+                  <Text variant="caption" color={t.textFaint} center style={styles.hint}>
                     Skip if you like — you can add habits any time.
                   </Text>
                 ) : null}
@@ -253,7 +270,7 @@ export default function Setup() {
             {current === 'targets' ? (
               <>
                 <Text variant="title">A few numbers</Text>
-                <Text variant="body" color={palette.stoneMuted} style={styles.sub}>
+                <Text variant="body" color={t.textMuted} style={styles.sub}>
                   Sensible defaults are filled in. Change them, or carry on.
                 </Text>
 
@@ -295,18 +312,18 @@ export default function Setup() {
             {current === 'reminder' ? (
               <>
                 <Text variant="title">One nudge a day?</Text>
-                <Text variant="body" color={palette.stoneMuted} style={styles.sub}>
+                <Text variant="body" color={t.textMuted} style={styles.sub}>
                   A single reminder, at a time you choose. Not a stream of them.
                 </Text>
 
                 <View style={styles.times}>
-                  {TIMES.map((t) => (
+                  {TIMES.map((time) => (
                     <Chip
-                      key={t}
-                      label={t}
-                      selected={reminder === t}
-                      onPress={() => setReminder(t)}
-                      accessibilityLabel={`Remind me at ${t}`}
+                      key={time}
+                      label={time}
+                      selected={reminder === time}
+                      onPress={() => setReminder(time)}
+                      accessibilityLabel={`Remind me at ${time}`}
                     />
                   ))}
 
@@ -322,7 +339,7 @@ export default function Setup() {
           </Animated.View>
 
           {error ? (
-            <Text variant="caption" color={palette.danger} style={styles.hint}>
+            <Text variant="caption" color={t.danger} style={styles.hint}>
               {error}
             </Text>
           ) : null}
@@ -341,63 +358,62 @@ export default function Setup() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    minHeight: 56,
-  },
-  back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  progress: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  pip: { width: 8, height: 8, borderRadius: radius.full, backgroundColor: palette.surfaceDim },
-  pipActive: { width: 26, backgroundColor: ACCENT.base },
-  pipDone: { backgroundColor: palette.sageSoft },
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      minHeight: 56,
+    },
+    back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    progress: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    pip: { width: 8, height: 8, borderRadius: radius.full, backgroundColor: t.border },
+    // Active/done fills use ACCENT, a runtime value — applied inline at the call site.
+    pipActive: { width: 26 },
 
-  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
-  sub: { marginTop: spacing.sm, marginBottom: spacing.xl },
-  hint: { marginTop: spacing.lg },
+    content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
+    sub: { marginTop: spacing.sm, marginBottom: spacing.xl },
+    hint: { marginTop: spacing.lg },
 
-  domains: { gap: spacing.md },
-  domain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    backgroundColor: palette.bone,
-  },
-  domainOn: { borderColor: ACCENT.base, backgroundColor: ACCENT.wash },
-  tick: {
-    width: 24,
-    height: 24,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tickOn: { backgroundColor: ACCENT.base, borderColor: ACCENT.base },
+    domains: { gap: spacing.md },
+    domain: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      padding: spacing.lg,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: t.border,
+      backgroundColor: t.surface,
+    },
+    tick: {
+      width: 24,
+      height: 24,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: t.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  habits: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  habit: {
-    width: '30%',
-    minHeight: 92,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    backgroundColor: palette.bone,
-  },
+    habits: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+    habit: {
+      width: '30%',
+      minHeight: 92,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      padding: spacing.sm,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: t.border,
+      backgroundColor: t.surface,
+    },
 
-  card: { gap: spacing.base },
-  times: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  footer: { padding: spacing.lg },
-});
+    card: { gap: spacing.base },
+    times: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    footer: { padding: spacing.lg },
+  });

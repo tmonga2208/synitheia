@@ -20,7 +20,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { MIN_TAP_TARGET, motion, palette, radius, shadow, spacing, type } from '../theme/tokens.js';
+import { MIN_TAP_TARGET, motion, radius, spacing, type } from '../theme/theme.js';
+import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
+import type { Theme } from '../theme/theme.js';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -38,16 +40,17 @@ interface TextProps extends RNTextProps {
  * The only text component. Screens never reach for RNText directly, which is what
  * keeps the type scale from quietly growing a fourteenth size.
  */
-export function Text({
-  variant = 'body',
-  color = palette.stone,
-  center,
-  style,
-  ...rest
-}: TextProps) {
+export function Text({ variant = 'body', color, center, style, ...rest }: TextProps) {
+  const t = useTheme();
+
   return (
     <RNText
-      style={[type[variant], { color }, center && { textAlign: 'center' }, style]}
+      style={[
+        type[variant],
+        { color: color ?? t.textPrimary },
+        center && { textAlign: 'center' },
+        style,
+      ]}
       {...rest}
     />
   );
@@ -62,20 +65,16 @@ interface CardProps extends ViewProps {
   accent?: string;
 }
 
-export function Card({
-  padded = true,
-  elevated = true,
-  accent,
-  style,
-  children,
-  ...rest
-}: CardProps) {
+export function Card({ padded = true, elevated = true, accent, style, children, ...rest }: CardProps) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View
       style={[
         styles.card,
         padded && { padding: spacing.lg },
-        elevated && shadow.card,
+        elevated && t.shadow.card,
         accent ? { borderColor: accent } : null,
         style,
       ]}
@@ -160,6 +159,8 @@ export function Button({
   style,
   ...rest
 }: ButtonProps) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const isPrimary = variant === 'primary';
   const isGhost = variant === 'ghost';
 
@@ -172,11 +173,11 @@ export function Button({
       style={[
         styles.button,
         fullWidth && { alignSelf: 'stretch' },
-        isPrimary && { backgroundColor: palette.sage, ...shadow.button },
+        isPrimary && { backgroundColor: t.accent, ...t.shadow.button },
         variant === 'secondary' && {
-          backgroundColor: palette.sand,
+          backgroundColor: t.surfaceRaised,
           borderWidth: 1,
-          borderColor: palette.surfaceDim,
+          borderColor: t.border,
         },
         isGhost && { backgroundColor: 'transparent' },
         style,
@@ -184,11 +185,11 @@ export function Button({
       {...rest}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? palette.white : palette.stone} />
+        <ActivityIndicator color={isPrimary ? t.onAccent : t.textPrimary} />
       ) : (
         <Text
           variant="cardTitle"
-          color={isPrimary ? palette.white : palette.stone}
+          color={isPrimary ? t.onAccent : t.textPrimary}
           style={{ textAlign: 'center' }}
         >
           {label}
@@ -210,7 +211,9 @@ interface ChipProps extends Omit<TouchableProps, 'children'> {
 
 /** The outlined pills under the ring — "12 Day Streak", "512 XP". */
 export function Chip({ label, icon, selected, accent, style, ...rest }: ChipProps) {
-  const color = accent ?? palette.stone;
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const color = accent ?? t.textPrimary;
 
   return (
     <Touchable
@@ -218,7 +221,7 @@ export function Chip({ label, icon, selected, accent, style, ...rest }: ChipProp
       accessibilityState={{ selected }}
       style={[
         styles.chip,
-        selected && { backgroundColor: palette.sage, borderColor: palette.sage },
+        selected && { backgroundColor: t.accent, borderColor: t.accent },
         !selected && accent ? { borderColor: accent } : null,
         style,
       ]}
@@ -227,7 +230,7 @@ export function Chip({ label, icon, selected, accent, style, ...rest }: ChipProp
       {icon}
       <Text
         variant="caption"
-        color={selected ? palette.white : color}
+        color={selected ? t.onAccent : color}
         style={icon ? { marginLeft: spacing.xs } : undefined}
       >
         {label}
@@ -248,30 +251,33 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   { label, error, leading, style, ...rest },
   ref,
 ) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={{ gap: spacing.sm }}>
       {label ? (
-        <Text variant="label" color={palette.stoneMuted}>
+        <Text variant="label" color={t.textMuted}>
           {label}
         </Text>
       ) : null}
 
-      <View style={[styles.inputWrap, error ? { borderColor: palette.danger } : null]}>
+      <View style={[styles.inputWrap, error ? { borderColor: t.danger } : null]}>
         {leading}
         <TextInput
           ref={ref}
           style={[styles.input, leading ? { marginLeft: spacing.md } : null, style]}
-          placeholderTextColor={palette.stoneFaint}
+          placeholderTextColor={t.textFaint}
           // The design's inputs are large, soft-filled containers; the cursor should
           // match the accent rather than the OS default blue.
-          selectionColor={palette.sage}
+          selectionColor={t.accent}
           accessibilityLabel={label}
           {...rest}
         />
       </View>
 
       {error ? (
-        <Text variant="caption" color={palette.danger}>
+        <Text variant="caption" color={t.danger}>
           {error}
         </Text>
       ) : null}
@@ -290,12 +296,15 @@ export function SectionHeader({
   action?: string;
   onAction?: () => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.sectionHeader}>
       <Text variant="section">{title}</Text>
       {action ? (
         <Touchable onPress={onAction} haptic={false} accessibilityRole="button">
-          <Text variant="label" color={palette.stoneMuted}>
+          <Text variant="label" color={t.textMuted}>
             {action}
           </Text>
         </Touchable>
@@ -324,6 +333,9 @@ export function EmptyState({
   actionLabel?: string;
   onAction?: () => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <Card style={{ alignItems: 'center', paddingVertical: spacing['2xl'] }}>
       {icon ? <View style={styles.emptyIcon}>{icon}</View> : null}
@@ -333,7 +345,7 @@ export function EmptyState({
       </Text>
       <Text
         variant="body"
-        color={palette.stoneMuted}
+        color={t.textMuted}
         center
         style={{ marginTop: spacing.sm, maxWidth: 280 }}
       >
@@ -353,6 +365,8 @@ export function EmptyState({
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const t = useTheme();
+
   return (
     <Card style={{ alignItems: 'center', paddingVertical: spacing['2xl'] }}>
       <Text variant="cardTitle" center>
@@ -360,7 +374,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
       </Text>
       <Text
         variant="body"
-        color={palette.stoneMuted}
+        color={t.textMuted}
         center
         style={{ marginTop: spacing.sm, maxWidth: 280 }}
       >
@@ -379,11 +393,13 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 }
 
 export function LoadingState({ label }: { label?: string }) {
+  const t = useTheme();
+
   return (
     <View style={{ paddingVertical: spacing['3xl'], alignItems: 'center', gap: spacing.md }}>
-      <ActivityIndicator color={palette.sage} />
+      <ActivityIndicator color={t.accent} />
       {label ? (
-        <Text variant="caption" color={palette.stoneMuted}>
+        <Text variant="caption" color={t.textMuted}>
           {label}
         </Text>
       ) : null}
@@ -391,59 +407,60 @@ export function LoadingState({ label }: { label?: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: palette.bone,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-  },
-  button: {
-    minHeight: 56,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  chip: {
-    minHeight: 36,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.base,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    backgroundColor: palette.bone,
-  },
-  inputWrap: {
-    minHeight: MIN_TAP_TARGET + 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: palette.sand,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    paddingHorizontal: spacing.base,
-  },
-  input: {
-    flex: 1,
-    ...type.body,
-    color: palette.stone,
-    paddingVertical: spacing.md,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.base,
-  },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.full,
-    backgroundColor: palette.sageSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: t.surface,
+      borderRadius: radius.xl,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    button: {
+      minHeight: 56,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.xl,
+    },
+    chip: {
+      minHeight: 36,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.base,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: t.border,
+      backgroundColor: t.surface,
+    },
+    inputWrap: {
+      minHeight: MIN_TAP_TARGET + 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: t.surfaceRaised,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: 'transparent',
+      paddingHorizontal: spacing.base,
+    },
+    input: {
+      flex: 1,
+      ...type.body,
+      color: t.textPrimary,
+      paddingVertical: spacing.md,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.base,
+    },
+    emptyIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: radius.full,
+      backgroundColor: t.accentSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });

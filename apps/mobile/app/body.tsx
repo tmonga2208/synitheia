@@ -16,10 +16,12 @@ import {
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
 import { healthSourceName } from '../src/health/healthkit.js';
-import { accentFor, palette, radius, spacing } from '../src/theme/tokens.js';
+import { radius, spacing } from '../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../src/theme/theme.js';
 
 const KEY = ['health-body'] as const;
-const ACCENT = accentFor('#C08A7D');
+const ACCENT_COLOR = '#C08A7D';
 
 interface BodyReport {
   body: BodyMetrics;
@@ -58,6 +60,9 @@ const MISSING_LABEL: Record<BodyInsight['missing'][number], string> = {
  * own — the user taps a goal, and only then is it written.
  */
 export default function Body() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const ACCENT = accentFor(ACCENT_COLOR, t);
   const queryClient = useQueryClient();
 
   const { data, error, isPending, isRefetching, refetch } = useQuery({
@@ -81,7 +86,7 @@ export default function Body() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
     >
-      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
     </Touchable>
   );
 
@@ -132,7 +137,7 @@ export default function Body() {
         */}
         {insight.bmrKcal === null ? (
           <EmptyState
-            icon={<HeartPulse size={26} color={palette.white} strokeWidth={1.6} />}
+            icon={<HeartPulse size={26} color={t.onAccent} strokeWidth={1.6} />}
             title="Not enough to work with"
             body={`${source} has not shared your ${insight.missing
               .map((m) => MISSING_LABEL[m])
@@ -142,7 +147,7 @@ export default function Body() {
 
         {insight.bmi !== null ? (
           <Card style={styles.card} accent={ACCENT.base}>
-            <Text variant="overline" color={palette.stoneMuted}>
+            <Text variant="overline" color={t.textMuted}>
               BMI
             </Text>
             <View style={styles.figureRow}>
@@ -152,7 +157,7 @@ export default function Body() {
               </Text>
             </View>
             {/* Said once, plainly, rather than buried in a disclaimer nobody reads. */}
-            <Text variant="caption" color={palette.stoneFaint}>
+            <Text variant="caption" color={t.textFaint}>
               A rough ratio of weight to height. It cannot tell muscle from fat.
             </Text>
           </Card>
@@ -162,14 +167,14 @@ export default function Body() {
           <Card style={styles.card}>
             <View style={styles.line}>
               <Text variant="bodyMedium">At rest</Text>
-              <Text variant="bodyMedium" color={palette.stoneMuted}>
+              <Text variant="bodyMedium" color={t.textMuted}>
                 {insight.bmrKcal.toLocaleString()} kcal
               </Text>
             </View>
 
             <View style={styles.line}>
               <Text variant="bodyMedium">Burned today</Text>
-              <Text variant="bodyMedium" color={palette.stoneMuted}>
+              <Text variant="bodyMedium" color={t.textMuted}>
                 {insight.tdee.kcal.toLocaleString()} kcal
               </Text>
             </View>
@@ -179,7 +184,7 @@ export default function Body() {
               genuinely different claim from a step-bracket multiplier, and the difference
               is the user's to know.
             */}
-            <Text variant="caption" color={palette.stoneFaint}>
+            <Text variant="caption" color={t.textFaint}>
               {insight.tdee.estimated
                 ? `Estimated from ${(today.steps ?? 0).toLocaleString()} steps — ${source} has not recorded your active energy today.`
                 : `Measured: ${insight.bmrKcal.toLocaleString()} at rest plus ${(today.activeEnergyKcal ?? 0).toLocaleString()} active.`}
@@ -198,7 +203,10 @@ export default function Body() {
               return (
                 <Touchable
                   key={goal.key}
-                  style={[styles.goal, chosen && styles.goalOn]}
+                  style={[
+                    styles.goal,
+                    chosen && { borderColor: ACCENT.base, backgroundColor: ACCENT.wash },
+                  ]}
                   onPress={() => pickGoal.mutate(goal.key)}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: chosen }}
@@ -206,16 +214,16 @@ export default function Body() {
                 >
                   <View style={{ flex: 1 }}>
                     <Text variant="cardTitle">{goal.label}</Text>
-                    <Text variant="caption" color={palette.stoneMuted}>
+                    <Text variant="caption" color={t.textMuted}>
                       {goal.blurb}
                     </Text>
                   </View>
 
                   <View style={styles.goalFigure}>
-                    <Text variant="cardTitle" color={chosen ? ACCENT.text : palette.stone}>
+                    <Text variant="cardTitle" color={chosen ? ACCENT.text : t.textPrimary}>
                       {option.kcal.toLocaleString()}
                     </Text>
-                    <Text variant="caption" color={palette.stoneFaint}>
+                    <Text variant="caption" color={t.textFaint}>
                       kcal
                     </Text>
                   </View>
@@ -229,7 +237,7 @@ export default function Body() {
               than quietly showing a figure that does not match the arithmetic.
             */}
             {data.goal && options[data.goal].floored ? (
-              <Text variant="caption" color={palette.stoneMuted} style={styles.note}>
+              <Text variant="caption" color={t.textMuted} style={styles.note}>
                 Held at the lowest safe intake — a deeper deficit would put you under what
                 your body burns at rest.
               </Text>
@@ -247,31 +255,31 @@ export default function Body() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  card: { gap: spacing.sm, marginTop: spacing.lg },
-  figureRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.md },
-  line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  goal: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    backgroundColor: palette.bone,
-  },
-  goalOn: { borderColor: ACCENT.base, backgroundColor: ACCENT.wash },
-  goalFigure: { alignItems: 'flex-end' },
-  note: { marginTop: spacing.sm, lineHeight: 18 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    card: { gap: spacing.sm, marginTop: spacing.lg },
+    figureRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.md },
+    line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    goal: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      padding: spacing.lg,
+      marginBottom: spacing.sm,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: t.border,
+      backgroundColor: t.surface,
+    },
+    goalFigure: { alignItems: 'flex-end' },
+    note: { marginTop: spacing.sm, lineHeight: 18 },
+  });

@@ -4,7 +4,9 @@ import { router } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Leaf } from 'lucide-react-native';
 import { Button, Text, Touchable } from '../src/components/primitives.js';
-import { palette, radius, spacing } from '../src/theme/tokens.js';
+import { radius, spacing } from '../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import type { Theme } from '../src/theme/theme.js';
 
 /**
  * The welcome screen. One screen, not a carousel.
@@ -19,11 +21,14 @@ import { palette, radius, spacing } from '../src/theme/tokens.js';
  * is attached to an account and actually changes what the app does.
  */
 export default function Onboarding() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <Animated.View entering={FadeIn.duration(500)} style={styles.content}>
         <View style={styles.mark} accessibilityRole="image" accessibilityLabel="Synítheia">
-          <Leaf size={38} color={palette.sage} strokeWidth={1.4} />
+          <Leaf size={38} color={t.accent} strokeWidth={1.4} />
         </View>
 
         <Animated.View entering={FadeInDown.delay(120).duration(420)}>
@@ -31,7 +36,7 @@ export default function Onboarding() {
               and reads as a stray black square under the headline. */}
           <Text variant="display">Your day,{'\n'}understood</Text>
 
-          <Text variant="body" color={palette.stoneMuted} style={styles.body}>
+          <Text variant="body" color={t.textMuted} style={styles.body}>
             Habits, spending, meals and water — tracked together, so Synítheia can tell you
             what they mean as a whole. It notices patterns and asks. It never assumes.
           </Text>
@@ -52,7 +57,7 @@ export default function Onboarding() {
           onPress={() => router.replace('/(auth)/sign-in')}
           style={styles.signIn}
         >
-          <Text variant="bodyMedium" color={palette.stoneMuted}>
+          <Text variant="bodyMedium" color={t.textMuted}>
             I already have an account
           </Text>
         </Touchable>
@@ -61,19 +66,20 @@ export default function Onboarding() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone, paddingHorizontal: spacing.xl },
-  content: { flex: 1, justifyContent: 'center' },
-  mark: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.xl,
-    backgroundColor: palette.sageWash,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing['2xl'],
-  },
-  body: { marginTop: spacing.lg },
-  footer: { gap: spacing.md, paddingBottom: spacing.xl },
-  signIn: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg, paddingHorizontal: spacing.xl },
+    content: { flex: 1, justifyContent: 'center' },
+    mark: {
+      width: 72,
+      height: 72,
+      borderRadius: radius.xl,
+      backgroundColor: t.accentWash,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing['2xl'],
+    },
+    body: { marginTop: spacing.lg },
+    footer: { gap: spacing.md, paddingBottom: spacing.xl },
+    signIn: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  });

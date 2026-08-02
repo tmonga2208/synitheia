@@ -35,10 +35,12 @@ import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
 import type { ListResponse, WireCategory } from '../src/api/types.js';
 import { useAuth } from '../src/store/auth.js';
-import { accentFor, palette, radius, spacing } from '../src/theme/tokens.js';
+import { radius, spacing } from '../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../src/theme/theme.js';
 
 const SUBS_KEY = ['subscriptions'] as const;
-const ACCENT = accentFor('#A98DA9');
+const ACCENT_COLOR = '#A98DA9';
 
 const CYCLES: BillingCycle[] = ['monthly', 'weekly', 'quarterly', 'yearly'];
 
@@ -73,6 +75,9 @@ interface SubsResponse {
  * user must always be able to see — and revoke — what the app adds on their behalf.
  */
 export default function SubscriptionsScreen() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const ACCENT = accentFor(ACCENT_COLOR, t);
   const queryClient = useQueryClient();
   const currency = useAuth((s) => s.user?.currency) ?? 'INR';
   const [adding, setAdding] = useState(false);
@@ -107,7 +112,7 @@ export default function SubscriptionsScreen() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
     >
-      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
     </Touchable>
   );
 
@@ -148,7 +153,7 @@ export default function SubscriptionsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Add a bill"
           >
-            <Plus size={22} color={palette.white} strokeWidth={2.2} />
+            <Plus size={22} color={t.onAccent} strokeWidth={2.2} />
           </Touchable>
         </View>
 
@@ -159,7 +164,7 @@ export default function SubscriptionsScreen() {
 
         {data.items.length === 0 ? (
           <EmptyState
-            icon={<Repeat size={26} color={palette.white} strokeWidth={1.6} />}
+            icon={<Repeat size={26} color={t.onAccent} strokeWidth={1.6} />}
             title="No bills yet"
             body="Add Netflix, rent, the gym — anything that charges you on a schedule. They'll be added on their due date so you don't have to remember."
             actionLabel="Add a bill"
@@ -173,13 +178,13 @@ export default function SubscriptionsScreen() {
               month as "4 weeks" under-reports the year by a full month.
             */}
             <Card style={styles.total} accent={ACCENT.base}>
-              <Text variant="overline" color={palette.stoneMuted}>
+              <Text variant="overline" color={t.textMuted}>
                 Every month
               </Text>
               <Text variant="title" style={{ marginTop: spacing.xs }}>
                 {formatMoney(asMinor(data.monthlyTotalMinor), currency)}
               </Text>
-              <Text variant="caption" color={palette.stoneMuted}>
+              <Text variant="caption" color={t.textMuted}>
                 {data.activeCount === 1 ? '1 bill' : `${data.activeCount} bills`}
                 {data.nextDue
                   ? ` · next: ${data.nextDue.name} on ${data.nextDue.dueDate.slice(5)}`
@@ -194,7 +199,7 @@ export default function SubscriptionsScreen() {
                     <Text variant="cardTitle" numberOfLines={1}>
                       {sub.name}
                     </Text>
-                    <Text variant="caption" color={palette.stoneMuted}>
+                    <Text variant="caption" color={t.textMuted}>
                       {CYCLE_LABEL[sub.cycle]} · due {sub.nextDueDate.slice(5)} ·{' '}
                       {sub.categoryName}
                     </Text>
@@ -205,7 +210,7 @@ export default function SubscriptionsScreen() {
                       {formatMoney(asMinor(sub.amountMinor), currency)}
                     </Text>
                     {sub.cycle !== 'monthly' ? (
-                      <Text variant="caption" color={palette.stoneFaint}>
+                      <Text variant="caption" color={t.textFaint}>
                         {formatMoney(
                           asMinor(monthlyEquivalent(sub.amountMinor, sub.cycle)),
                           currency,
@@ -226,11 +231,11 @@ export default function SubscriptionsScreen() {
                       <Switch
                         value={sub.autoPost}
                         onValueChange={(autoPost) => setAuto.mutate({ id: sub._id, autoPost })}
-                        trackColor={{ true: palette.sage, false: palette.surfaceDim }}
+                        trackColor={{ true: t.accent, false: t.border }}
                         accessibilityLabel={`Add ${sub.name} automatically on its due date`}
                       />
                     </View>
-                    <Text variant="caption" color={palette.stoneMuted}>
+                    <Text variant="caption" color={t.textMuted}>
                       {sub.autoPost ? 'Added automatically' : 'Asks first'}
                     </Text>
                   </View>
@@ -241,7 +246,7 @@ export default function SubscriptionsScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Remove ${sub.name}`}
                   >
-                    <Trash2 size={16} color={palette.stoneFaint} strokeWidth={1.7} />
+                    <Trash2 size={16} color={t.textFaint} strokeWidth={1.7} />
                   </Touchable>
                 </View>
               </Card>
@@ -274,6 +279,8 @@ function AddBillSheet({
   onClose: () => void;
   onAdded: () => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
@@ -362,7 +369,7 @@ function AddBillSheet({
               />
 
               <View>
-                <Text variant="label" color={palette.stoneMuted} style={styles.label}>
+                <Text variant="label" color={t.textMuted} style={styles.label}>
                   How often
                 </Text>
                 <View style={styles.pills}>
@@ -399,14 +406,14 @@ function AddBillSheet({
                 people picking the 28th "to be safe" and being billed early all year.
               */}
               {cycle !== 'weekly' && anchorDay > 28 ? (
-                <Text variant="caption" color={palette.stoneMuted}>
+                <Text variant="caption" color={t.textMuted}>
                   Short months bill on their last day, then it returns to the {anchorDay}
                   {anchorDay === 31 ? 'st' : 'th'}.
                 </Text>
               ) : null}
 
               <View>
-                <Text variant="label" color={palette.stoneMuted} style={styles.label}>
+                <Text variant="label" color={t.textMuted} style={styles.label}>
                   Category
                 </Text>
                 <View style={styles.pills}>
@@ -428,11 +435,11 @@ function AddBillSheet({
                   <Switch
                     value={autoPost}
                     onValueChange={setAutoPost}
-                    trackColor={{ true: palette.sage, false: palette.surfaceDim }}
+                    trackColor={{ true: t.accent, false: t.border }}
                     accessibilityLabel="Add this automatically on its due date"
                   />
                 </View>
-                <Text variant="caption" color={palette.stoneMuted} style={{ flex: 1 }}>
+                <Text variant="caption" color={t.textMuted} style={{ flex: 1 }}>
                   {autoPost
                     ? 'Added to your expenses on its due date.'
                     : "You'll be asked before it's added."}
@@ -440,7 +447,7 @@ function AddBillSheet({
               </View>
 
               {error ? (
-                <Text variant="caption" color={palette.danger}>
+                <Text variant="caption" color={t.danger}>
                   {error}
                 </Text>
               ) : null}
@@ -461,45 +468,47 @@ function AddBillSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  add: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    backgroundColor: palette.sage,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  total: { marginTop: spacing.xl, marginBottom: spacing.lg },
-  row: { marginBottom: spacing.md },
-  rowTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  rowBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.base,
-  },
-  autoRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  /**
-   * iOS 26 redesigned UISwitch and it now paints wider than the classic 51pt — wide
-   * enough to overflow a 51pt box and slide under the label beside it. Size the box to
-   * the real paint width rather than to the number the old docs give.
-   */
-  switchBox: { width: 64, marginRight: spacing.sm },
-  delete: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    add: {
+      width: 44,
+      height: 44,
+      borderRadius: radius.full,
+      backgroundColor: t.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    total: { marginTop: spacing.xl, marginBottom: spacing.lg },
+    row: { marginBottom: spacing.md },
+    rowTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+    rowBottom: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.base,
+    },
+    autoRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+    /**
+     * iOS 26 redesigned UISwitch and it now paints wider than the classic 51pt — wide
+     * enough to overflow a 51pt box and slide under the label beside it. Size the box to
+     * the real paint width rather than to the number the old docs give.
+     */
+    switchBox: { width: 64, marginRight: spacing.sm },
+    delete: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
-  sheet: { flex: 1, backgroundColor: palette.bone },
-  sheetBody: { padding: spacing.lg, gap: spacing.base, paddingBottom: spacing['4xl'] },
-  label: { marginBottom: spacing.sm },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-});
+    // Non-transparent full-screen Modal — replaces the screen, so t.bg not t.surface.
+    sheet: { flex: 1, backgroundColor: t.bg },
+    sheetBody: { padding: spacing.lg, gap: spacing.base, paddingBottom: spacing['4xl'] },
+    label: { marginBottom: spacing.sm },
+    pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  });

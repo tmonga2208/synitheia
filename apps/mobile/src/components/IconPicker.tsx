@@ -40,7 +40,9 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { Chip, Input, Text, Touchable } from './primitives.js';
-import { MIN_TAP_TARGET, accentFor, palette, radius, spacing } from '../theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../theme/theme.js';
+import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../theme/theme.js';
 
 /**
  * The curated set.
@@ -174,11 +176,13 @@ export function IconPicker({
   onSelect,
   onClose,
 }: IconPickerProps) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { width } = useWindowDimensions();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
 
-  const tint = accentFor(accent);
+  const tint = accentFor(accent, t);
   const tileSize =
     (width - spacing.xl * 2 - spacing.md * (COLUMNS - 1)) / COLUMNS;
 
@@ -225,7 +229,7 @@ export function IconPicker({
               haptic={false}
               onPress={onClose}
             >
-              <X size={20} color={palette.stoneMuted} />
+              <X size={20} color={t.textMuted} />
             </Touchable>
           </View>
 
@@ -234,7 +238,7 @@ export function IconPicker({
               <CurrentIcon size={32} color={tint.base} strokeWidth={1.5} />
             </View>
             <View style={styles.previewMeta}>
-              <Text variant="bodyMedium" color={palette.stoneMuted}>
+              <Text variant="bodyMedium" color={t.textMuted}>
                 Current Selection
               </Text>
               <Text variant="heading">{current.label}</Text>
@@ -249,7 +253,7 @@ export function IconPicker({
               accessibilityLabel="Search icons"
               autoCapitalize="none"
               autoCorrect={false}
-              leading={<Search size={18} color={palette.stoneFaint} />}
+              leading={<Search size={18} color={t.textFaint} />}
             />
           </View>
 
@@ -318,7 +322,7 @@ export function IconPicker({
             ))}
 
             {groups.length === 0 ? (
-              <Text variant="body" color={palette.stoneMuted} center>
+              <Text variant="body" color={t.textMuted} center>
                 No icons match “{query.trim()}”.
               </Text>
             ) : null}
@@ -329,16 +333,18 @@ export function IconPicker({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: palette.scrim,
+    backgroundColor: t.scrim,
   },
   backdropDismiss: { flex: 1 },
+  // A bottom sheet: t.surface, not t.surfaceRaised.
   sheet: {
     maxHeight: '88%',
-    backgroundColor: palette.bone,
+    backgroundColor: t.surface,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.xl,
@@ -349,7 +355,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 6,
     borderRadius: radius.full,
-    backgroundColor: palette.surfaceDim,
+    backgroundColor: t.border,
   },
   titleRow: {
     flexDirection: 'row',

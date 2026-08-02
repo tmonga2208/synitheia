@@ -48,13 +48,9 @@ import type {
   WireIngestion,
 } from '../../src/api/types.js';
 import { useAuth } from '../../src/store/auth.js';
-import {
-  MIN_TAP_TARGET,
-  palette,
-  radius,
-  spacing,
-  type as typeScale,
-} from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing, type as typeScale } from '../../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import type { Theme } from '../../src/theme/theme.js';
 
 const CATEGORIES_KEY = ['expense-categories'] as const;
 
@@ -122,6 +118,8 @@ function initialEdit(draft: WireDraft, categories: WireCategory[]): DraftEdit {
 }
 
 export default function NewExpense() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const user = useAuth((s) => s.user);
   const currency = user?.currency ?? 'INR';
   const timezone = user?.timezone ?? 'UTC';
@@ -453,7 +451,7 @@ export default function NewExpense() {
       haptic={false}
       onPress={() => router.back()}
     >
-      <ArrowLeft size={22} color={palette.stone} />
+      <ArrowLeft size={22} color={t.textPrimary} />
     </Touchable>
   );
 
@@ -507,7 +505,7 @@ export default function NewExpense() {
           <View style={styles.header}>{back}</View>
 
           <Text variant="title">{reviewing ? 'Review' : 'New expense'}</Text>
-          <Text variant="body" color={palette.stoneMuted} style={styles.subtitle}>
+          <Text variant="body" color={t.textMuted} style={styles.subtitle}>
             {reviewing
               ? 'We read these from what you shared. Nothing is saved until you confirm — check each one and correct anything we got wrong.'
               : 'Type it in, or hand us a screenshot, a message, or a statement and confirm what we read.'}
@@ -515,7 +513,7 @@ export default function NewExpense() {
 
           {error ? (
             <Card style={styles.errorCard} accessibilityLiveRegion="polite">
-              <Text variant="body" color={palette.danger}>
+              <Text variant="body" color={t.danger}>
                 {error}
               </Text>
             </Card>
@@ -529,13 +527,13 @@ export default function NewExpense() {
           {locked ? (
             <Card style={styles.unlock} accessibilityLiveRegion="polite">
               <View style={styles.unlockHead}>
-                <Lock size={16} color={palette.stoneMuted} strokeWidth={1.8} />
+                <Lock size={16} color={t.textMuted} strokeWidth={1.8} />
                 <Text variant="cardTitle" style={{ flex: 1 }}>
                   {locked.file.name}
                 </Text>
               </View>
 
-              <Text variant="body" color={palette.stoneMuted}>
+              <Text variant="body" color={t.textMuted}>
                 {locked.message}
               </Text>
 
@@ -543,7 +541,7 @@ export default function NewExpense() {
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Statement password"
-                placeholderTextColor={palette.stoneFaint}
+                placeholderTextColor={t.textFaint}
                 secureTextEntry
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -555,7 +553,7 @@ export default function NewExpense() {
                 }}
               />
 
-              <Text variant="caption" color={palette.stoneFaint}>
+              <Text variant="caption" color={t.textFaint}>
                 Used once to open the file. It is never saved.
               </Text>
 
@@ -629,7 +627,7 @@ export default function NewExpense() {
                   keyboardType="decimal-pad"
                   placeholder="0"
                   leading={
-                    <Text variant="cardTitle" color={palette.stoneFaint}>
+                    <Text variant="cardTitle" color={t.textFaint}>
                       {currencyMeta(currency).symbol}
                     </Text>
                   }
@@ -641,7 +639,7 @@ export default function NewExpense() {
                 />
 
                 <View>
-                  <Text variant="label" color={palette.stoneMuted} style={styles.fieldLabel}>
+                  <Text variant="label" color={t.textMuted} style={styles.fieldLabel}>
                     Category
                   </Text>
                   <View style={styles.pills}>
@@ -677,7 +675,7 @@ export default function NewExpense() {
 
                     <Chip
                       label={newCategory === null ? '+ New' : 'Done'}
-                      accent={palette.stoneMuted}
+                      accent={t.textMuted}
                       selected={newCategory !== null}
                       accessibilityLabel={
                         newCategory === null
@@ -692,7 +690,7 @@ export default function NewExpense() {
                     <View style={styles.customPanel}>
                       {customCategories.length > 0 ? (
                         <>
-                          <Text variant="caption" color={palette.stoneMuted}>
+                          <Text variant="caption" color={t.textMuted}>
                             Your categories
                           </Text>
 
@@ -800,19 +798,19 @@ export default function NewExpense() {
 
               <View style={styles.ingestRow}>
                 <IngestAction
-                  icon={<Camera size={20} color={palette.sage} strokeWidth={1.6} />}
+                  icon={<Camera size={20} color={t.accent} strokeWidth={1.6} />}
                   label="Scan a screenshot"
                   busy={ingesting}
                   onPress={() => void runIngest(scanScreenshot)}
                 />
                 <IngestAction
-                  icon={<ClipboardPaste size={20} color={palette.sage} strokeWidth={1.6} />}
+                  icon={<ClipboardPaste size={20} color={t.accent} strokeWidth={1.6} />}
                   label="Paste a message"
                   busy={ingesting}
                   onPress={() => setPasting(true)}
                 />
                 <IngestAction
-                  icon={<FileText size={20} color={palette.sage} strokeWidth={1.6} />}
+                  icon={<FileText size={20} color={t.accent} strokeWidth={1.6} />}
                   label="Import a statement"
                   busy={ingesting}
                   onPress={() => void importStatement()}
@@ -849,6 +847,9 @@ function IngestAction({
   busy: boolean;
   onPress: () => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <Touchable
       accessibilityRole="button"
@@ -858,8 +859,8 @@ function IngestAction({
       onPress={onPress}
       style={styles.ingest}
     >
-      {busy ? <ActivityIndicator color={palette.sage} /> : icon}
-      <Text variant="caption" color={palette.stoneMuted} center>
+      {busy ? <ActivityIndicator color={t.accent} /> : icon}
+      <Text variant="caption" color={t.textMuted} center>
         {label}
       </Text>
     </Touchable>
@@ -877,6 +878,8 @@ function DraftCard({
   categories: WireCategory[];
   onChange: (patch: Partial<DraftEdit>) => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const duplicate = draft.duplicateOfExpenseId !== null;
 
   return (
@@ -902,8 +905,8 @@ function DraftCard({
 
       {duplicate ? (
         <View style={styles.duplicate}>
-          <AlertTriangle size={14} color={palette.warning} strokeWidth={2} />
-          <Text variant="caption" color={palette.warning} style={styles.duplicateCopy}>
+          <AlertTriangle size={14} color={t.warning} strokeWidth={2} />
+          <Text variant="caption" color={t.warning} style={styles.duplicateCopy}>
             This looks like an expense you already have. Add it only if it really happened
             twice.
           </Text>
@@ -912,7 +915,7 @@ function DraftCard({
 
       {/* The exact substring we read this from, so the user can check our work. */}
       {draft.evidence ? (
-        <Text variant="caption" color={palette.stoneFaint} numberOfLines={3}>
+        <Text variant="caption" color={t.textFaint} numberOfLines={3}>
           {`“${draft.evidence}”`}
         </Text>
       ) : null}
@@ -923,7 +926,7 @@ function DraftCard({
         onChangeText={(value) => onChange({ amount: value })}
         keyboardType="decimal-pad"
         leading={
-          <Text variant="bodyMedium" color={palette.stoneFaint}>
+          <Text variant="bodyMedium" color={t.textFaint}>
             {currencyMeta(draft.currency).symbol}
           </Text>
         }
@@ -943,7 +946,7 @@ function DraftCard({
       />
 
       <View>
-        <Text variant="label" color={palette.stoneMuted} style={styles.fieldLabel}>
+        <Text variant="label" color={t.textMuted} style={styles.fieldLabel}>
           Category
         </Text>
         <View style={styles.pills}>
@@ -960,7 +963,7 @@ function DraftCard({
         </View>
       </View>
 
-      <Text variant="caption" color={palette.stoneFaint}>
+      <Text variant="caption" color={t.textFaint}>
         {`We are ${Math.round(draft.confidence * 100)}% sure we read this correctly.`}
       </Text>
     </Card>
@@ -978,6 +981,8 @@ function PasteSheet({
   onClose: () => void;
   onSubmit: (text: string) => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [text, setText] = useState('');
 
   return (
@@ -998,7 +1003,7 @@ function PasteSheet({
             <Text variant="heading" style={styles.sheetTitle}>
               Paste a message
             </Text>
-            <Text variant="caption" color={palette.stoneFaint} style={styles.sheetBody}>
+            <Text variant="caption" color={t.textFaint} style={styles.sheetBody}>
               A transaction SMS, a payment confirmation, an email receipt — whatever you
               have.
             </Text>
@@ -1010,8 +1015,8 @@ function PasteSheet({
               autoFocus
               maxLength={8000}
               placeholder="Rs. 450 debited from A/C XX1234 at BLUE TOKAI on 12 Jul…"
-              placeholderTextColor={palette.stoneFaint}
-              selectionColor={palette.sage}
+              placeholderTextColor={t.textFaint}
+              selectionColor={t.accent}
               accessibilityLabel="Message text"
               style={styles.textArea}
             />
@@ -1033,153 +1038,155 @@ function PasteSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  flex: { flex: 1 },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing['3xl'],
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.base,
-  },
-  iconButton: {
-    width: MIN_TAP_TARGET,
-    height: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-  },
-  subtitle: { marginTop: spacing.xs },
-  card: { marginTop: spacing.xl, gap: spacing.base },
-  fieldLabel: { marginBottom: spacing.sm },
-  customPanel: {
-    gap: spacing.md,
-    marginTop: spacing.base,
-    paddingTop: spacing.base,
-    borderTopWidth: 1,
-    borderTopColor: palette.surfaceDim,
-  },
-  newCategory: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  pills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  sectionTitle: { marginTop: spacing['2xl'] },
-  ingestRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.base,
-  },
-  ingest: {
-    flex: 1,
-    minHeight: 96,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-  },
-  errorCard: {
-    marginTop: spacing.lg,
-    borderColor: palette.danger,
-  },
-  unlock: {
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  unlockHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  passwordInput: {
-    minHeight: MIN_TAP_TARGET,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    color: palette.stone,
-    fontSize: 16,
-    marginTop: spacing.xs,
-  },
-  unlockActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.xs,
-  },
-  drafts: { marginTop: spacing.xl, gap: spacing.base },
-  draft: {
-    gap: spacing.base,
-    opacity: 0.6,
-  },
-  draftIncluded: { opacity: 1 },
-  draftHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  duplicate: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.sm,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.warning,
-  },
-  duplicateCopy: { flex: 1 },
-  cta: { marginTop: spacing.xl },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: palette.scrim,
-  },
-  backdropDismiss: { flex: 1 },
-  sheet: {
-    backgroundColor: palette.bone,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 96,
-    height: 6,
-    borderRadius: radius.full,
-    backgroundColor: palette.surfaceDim,
-  },
-  sheetTitle: { marginTop: spacing.lg },
-  sheetBody: { marginTop: spacing.xs },
-  textArea: {
-    marginTop: spacing.base,
-    minHeight: 140,
-    maxHeight: 220,
-    padding: spacing.base,
-    borderRadius: radius.md,
-    backgroundColor: palette.sand,
-    color: palette.stone,
-    textAlignVertical: 'top',
-    ...typeScale.body,
-  },
-  sheetCta: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    flex: { flex: 1 },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing['3xl'],
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.base,
+    },
+    iconButton: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.md,
+    },
+    subtitle: { marginTop: spacing.xs },
+    card: { marginTop: spacing.xl, gap: spacing.base },
+    fieldLabel: { marginBottom: spacing.sm },
+    customPanel: {
+      gap: spacing.md,
+      marginTop: spacing.base,
+      paddingTop: spacing.base,
+      borderTopWidth: 1,
+      borderTopColor: t.border,
+    },
+    newCategory: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    pills: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    sectionTitle: { marginTop: spacing['2xl'] },
+    ingestRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginTop: spacing.base,
+    },
+    ingest: {
+      flex: 1,
+      minHeight: 96,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    errorCard: {
+      marginTop: spacing.lg,
+      borderColor: t.danger,
+    },
+    unlock: {
+      marginTop: spacing.lg,
+      gap: spacing.sm,
+    },
+    unlockHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    passwordInput: {
+      minHeight: MIN_TAP_TARGET,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
+      color: t.textPrimary,
+      fontSize: 16,
+      marginTop: spacing.xs,
+    },
+    unlockActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginTop: spacing.xs,
+    },
+    drafts: { marginTop: spacing.xl, gap: spacing.base },
+    draft: {
+      gap: spacing.base,
+      opacity: 0.6,
+    },
+    draftIncluded: { opacity: 1 },
+    draftHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    duplicate: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: radius.sm,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.warning,
+    },
+    duplicateCopy: { flex: 1 },
+    cta: { marginTop: spacing.xl },
+    backdrop: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: t.scrim,
+    },
+    backdropDismiss: { flex: 1 },
+    // A real bottom sheet: transparent Modal, slides up over the scrim.
+    sheet: {
+      backgroundColor: t.surface,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 96,
+      height: 6,
+      borderRadius: radius.full,
+      backgroundColor: t.border,
+    },
+    sheetTitle: { marginTop: spacing.lg },
+    sheetBody: { marginTop: spacing.xs },
+    textArea: {
+      marginTop: spacing.base,
+      minHeight: 140,
+      maxHeight: 220,
+      padding: spacing.base,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      color: t.textPrimary,
+      textAlignVertical: 'top',
+      ...typeScale.body,
+    },
+    sheetCta: {
+      marginTop: spacing.lg,
+      marginBottom: spacing.xl,
+    },
+  });

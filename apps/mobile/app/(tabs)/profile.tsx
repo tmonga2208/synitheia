@@ -18,13 +18,17 @@ import {
   LogOut,
   Mail,
   ShieldCheck,
+  SunMoon,
   Target,
   Zap,
 } from 'lucide-react-native';
 import { Card, Chip, Text, Touchable } from '../../src/components/primitives.js';
 import { SkeletonList } from '../../src/components/Skeleton.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, motion, palette, radius, spacing } from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, motion, radius, spacing } from '../../src/theme/theme.js';
+import { useTheme, useThemedStyles, useThemePreference } from '../../src/theme/ThemeProvider.js';
+import type { ThemePreference } from '../../src/theme/ThemeProvider.js';
+import type { Theme } from '../../src/theme/theme.js';
 
 /**
  * The ways into this account.
@@ -44,9 +48,18 @@ const SIGN_IN_METHODS = [
   { key: 'apple', label: 'Apple' },
 ] as const;
 
+const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+];
+
 export default function Profile() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const user = useAuth((s) => s.user);
   const signOut = useAuth((s) => s.signOut);
+  const { preference, setPreference } = useThemePreference();
 
   const [methodsOpen, setMethodsOpen] = useState(false);
   const chevron = useSharedValue(0);
@@ -99,7 +112,7 @@ export default function Profile() {
             />
           ) : (
             <View style={[styles.avatar, styles.avatarFallback]}>
-              <Text variant="title" color={palette.white}>
+              <Text variant="title" color={t.onAccent}>
                 {initial}
               </Text>
             </View>
@@ -108,14 +121,14 @@ export default function Profile() {
           <Text variant="title" center style={styles.name}>
             {user.name}
           </Text>
-          <Text variant="body" color={palette.stoneFaint} center>
+          <Text variant="body" color={t.textFaint} center>
             {user.email}
           </Text>
 
           <View style={styles.chips}>
             <Chip
               label={user.xp > 0 ? `${user.xp} XP` : 'Start collecting XP'}
-              icon={<Zap size={14} color={palette.stone} strokeWidth={2} />}
+              icon={<Zap size={14} color={t.textPrimary} strokeWidth={2} />}
               accessibilityRole="text"
               haptic={false}
             />
@@ -124,7 +137,7 @@ export default function Profile() {
 
         <Card padded={false} style={styles.rows}>
           <Row
-            icon={<ShieldCheck size={20} color={palette.sage} strokeWidth={1.6} />}
+            icon={<ShieldCheck size={20} color={t.accent} strokeWidth={1.6} />}
             title="Connected Context"
             subtitle="What we know, where it came from, and what the AI may read"
             onPress={() => router.push('/privacy')}
@@ -133,7 +146,7 @@ export default function Profile() {
           <View style={styles.divider} />
 
           <Row
-            icon={<Target size={20} color={palette.sage} strokeWidth={1.6} />}
+            icon={<Target size={20} color={t.accent} strokeWidth={1.6} />}
             title="Targets"
             subtitle="Water, calories, and your monthly budget"
             onPress={() => router.push('/targets')}
@@ -142,11 +155,60 @@ export default function Profile() {
           <View style={styles.divider} />
 
           <Row
-            icon={<HeartPulse size={20} color={palette.sage} strokeWidth={1.6} />}
+            icon={<HeartPulse size={20} color={t.accent} strokeWidth={1.6} />}
             title="Body & calories"
             subtitle="BMI, what you burn, and your calorie goal"
             onPress={() => router.push('/body')}
           />
+
+          <View style={styles.divider} />
+
+          {/*
+            Not a Row — this one has no single destination to push to. The icon/title/
+            subtitle line matches the Row idiom exactly; what follows it is the control
+            itself, inset the same way "methods" sits under Sign-in methods below. The three
+            options are `Chip`, not a bespoke segmented control, per the brief.
+          */}
+          <View style={styles.row}>
+            <View style={styles.rowIcon}>
+              <SunMoon size={20} color={t.accent} strokeWidth={1.6} />
+            </View>
+
+            <View style={styles.rowCopy}>
+              <Text variant="cardTitle">Appearance</Text>
+              <Text variant="caption" color={t.textFaint}>
+                Light, dark, or match your device
+              </Text>
+            </View>
+          </View>
+
+          <View
+            style={styles.appearance}
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Appearance"
+          >
+            {APPEARANCE_OPTIONS.map((option) => {
+              const selected = preference === option.value;
+
+              return (
+                <Chip
+                  key={option.value}
+                  label={option.label}
+                  selected={selected}
+                  // The selected segment must read as selected without relying on the
+                  // accent-vs-grey fill alone — a checkmark glyph is the second signal.
+                  icon={
+                    selected ? <Check size={14} color={t.onAccent} strokeWidth={2.5} /> : undefined
+                  }
+                  accessibilityRole="radio"
+                  accessibilityLabel={option.label}
+                  haptic={false}
+                  style={styles.appearanceChip}
+                  onPress={() => setPreference(option.value)}
+                />
+              );
+            })}
+          </View>
 
           <View style={styles.divider} />
 
@@ -166,18 +228,18 @@ export default function Profile() {
             style={styles.row}
           >
             <View style={styles.rowIcon}>
-              <KeyRound size={20} color={palette.sage} strokeWidth={1.6} />
+              <KeyRound size={20} color={t.accent} strokeWidth={1.6} />
             </View>
 
             <View style={styles.rowCopy}>
               <Text variant="cardTitle">Sign-in methods</Text>
-              <Text variant="caption" color={palette.stoneFaint}>
+              <Text variant="caption" color={t.textFaint}>
                 {connectedLabel}
               </Text>
             </View>
 
             <Animated.View style={chevronStyle}>
-              <ChevronDown size={20} color={palette.stoneFaint} strokeWidth={1.6} />
+              <ChevronDown size={20} color={t.textFaint} strokeWidth={1.6} />
             </Animated.View>
           </Touchable>
 
@@ -198,13 +260,13 @@ export default function Profile() {
                         {method.key === 'password' ? (
                           <Mail
                             size={16}
-                            color={connected ? palette.sage : palette.stoneFaint}
+                            color={connected ? t.accent : t.textFaint}
                             strokeWidth={1.7}
                           />
                         ) : (
                           <Text
                             variant="caption"
-                            color={connected ? palette.sage : palette.stoneFaint}
+                            color={connected ? t.accent : t.textFaint}
                           >
                             {method.label.charAt(0)}
                           </Text>
@@ -215,7 +277,7 @@ export default function Profile() {
                         <Text variant="bodyMedium">{method.label}</Text>
                         <Text
                           variant="caption"
-                          color={connected ? palette.sage : palette.stoneFaint}
+                          color={connected ? t.accent : t.textFaint}
                         >
                           {connected ? user.email : 'Not connected'}
                         </Text>
@@ -223,7 +285,7 @@ export default function Profile() {
 
                       {connected ? (
                         <View style={styles.tick}>
-                          <Check size={12} color={palette.white} strokeWidth={3} />
+                          <Check size={12} color={t.onAccent} strokeWidth={3} />
                         </View>
                       ) : null}
                     </View>
@@ -236,9 +298,9 @@ export default function Profile() {
           <View style={styles.divider} />
 
           <Row
-            icon={<LogOut size={20} color={palette.danger} strokeWidth={1.6} />}
+            icon={<LogOut size={20} color={t.danger} strokeWidth={1.6} />}
             title="Sign out"
-            titleColor={palette.danger}
+            titleColor={t.danger}
             onPress={confirmSignOut}
             showChevron={false}
           />
@@ -263,6 +325,9 @@ function Row({
   onPress: () => void;
   showChevron?: boolean;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <Touchable
       accessibilityRole="button"
@@ -279,14 +344,14 @@ function Row({
           {title}
         </Text>
         {subtitle ? (
-          <Text variant="caption" color={palette.stoneFaint}>
+          <Text variant="caption" color={t.textFaint}>
             {subtitle}
           </Text>
         ) : null}
       </View>
 
       {showChevron ? (
-        <ChevronRight size={20} color={palette.stoneFaint} strokeWidth={1.6} />
+        <ChevronRight size={20} color={t.textFaint} strokeWidth={1.6} />
       ) : null}
     </Touchable>
   );
@@ -294,81 +359,94 @@ function Row({
 
 const AVATAR = 88;
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: spacing.xl,
-    marginBottom: spacing['2xl'],
-  },
-  avatar: {
-    width: AVATAR,
-    height: AVATAR,
-    borderRadius: radius.full,
-    backgroundColor: palette.sand,
-  },
-  avatarFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.sage,
-  },
-  name: { marginTop: spacing.base },
-  chips: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.base,
-  },
-  rows: { overflow: 'hidden' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.base,
-    minHeight: MIN_TAP_TARGET + spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.base,
-  },
-  rowIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.sand,
-  },
-  rowCopy: { flex: 1, gap: spacing.xs },
-  divider: {
-    height: 1,
-    marginLeft: spacing.lg + 40 + spacing.base,
-    backgroundColor: palette.surfaceDim,
-  },
-  // Indented to sit under the parent bar rather than beside it, so the nesting is legible
-  // without a second card or another divider.
-  methods: {
-    paddingLeft: spacing.lg + 40 + spacing.base,
-    paddingRight: spacing.lg,
-    paddingBottom: spacing.lg,
-    gap: spacing.base,
-  },
-  method: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  methodIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.sand,
-  },
-  methodIconOn: { backgroundColor: palette.sageWash },
-  tick: {
-    width: 20,
-    height: 20,
-    borderRadius: radius.full,
-    backgroundColor: palette.sage,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.xl,
+    },
+    header: {
+      alignItems: 'center',
+      paddingTop: spacing.xl,
+      marginBottom: spacing['2xl'],
+    },
+    avatar: {
+      width: AVATAR,
+      height: AVATAR,
+      borderRadius: radius.full,
+      backgroundColor: t.surfaceRaised,
+    },
+    avatarFallback: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.accent,
+    },
+    name: { marginTop: spacing.base },
+    chips: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.base,
+    },
+    rows: { overflow: 'hidden' },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.base,
+      minHeight: MIN_TAP_TARGET + spacing.lg,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.base,
+    },
+    rowIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.surfaceRaised,
+    },
+    rowCopy: { flex: 1, gap: spacing.xs },
+    divider: {
+      height: 1,
+      marginLeft: spacing.lg + 40 + spacing.base,
+      backgroundColor: t.border,
+    },
+    // Indented to sit under the parent bar rather than beside it, so the nesting is legible
+    // without a second card or another divider.
+    methods: {
+      paddingLeft: spacing.lg + 40 + spacing.base,
+      paddingRight: spacing.lg,
+      paddingBottom: spacing.lg,
+      gap: spacing.base,
+    },
+    // Same inset as `methods` — the three segments read as detail under "Appearance"
+    // rather than a sibling row of their own.
+    appearance: {
+      flexDirection: 'row',
+      paddingLeft: spacing.lg + 40 + spacing.base,
+      paddingRight: spacing.lg,
+      paddingBottom: spacing.lg,
+      gap: spacing.sm,
+    },
+    // `Chip`'s default 36pt is a label pill, not a control — these are tapped directly, so
+    // they get their own floor rather than changing the shared primitive's height everywhere.
+    appearanceChip: { minHeight: MIN_TAP_TARGET, flex: 1 },
+    method: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    methodIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: radius.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.surfaceRaised,
+    },
+    methodIconOn: { backgroundColor: t.accentWash },
+    tick: {
+      width: 20,
+      height: 20,
+      borderRadius: radius.full,
+      backgroundColor: t.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });

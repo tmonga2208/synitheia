@@ -21,7 +21,9 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
-import { palette, spacing } from '../src/theme/tokens.js';
+import { spacing } from '../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import type { Theme } from '../src/theme/theme.js';
 
 /**
  * The Targets screen — water, calories, and the monthly budget, editable on their own.
@@ -40,6 +42,8 @@ function minorToInput(minor: number | null, currency: string): string {
 }
 
 function TargetsForm({ initial }: { initial: TargetsView }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const queryClient = useQueryClient();
   const tracks = (d: TrackedDomain): boolean => initial.trackedDomains.includes(d);
 
@@ -86,13 +90,13 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >
-        <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+        <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
       </Touchable>
 
       <Text variant="title" style={styles.title}>
         Targets
       </Text>
-      <Text variant="body" color={palette.stoneMuted} style={styles.sub}>
+      <Text variant="body" color={t.textMuted} style={styles.sub}>
         The numbers your day is measured against. Change them whenever they stop fitting.
       </Text>
 
@@ -130,7 +134,7 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
       </Card>
 
       {error ? (
-        <Text variant="caption" color={palette.danger} style={{ marginTop: spacing.md }}>
+        <Text variant="caption" color={t.danger} style={{ marginTop: spacing.md }}>
           {error}
         </Text>
       ) : null}
@@ -146,6 +150,8 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
 }
 
 export default function Targets() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const query = useQuery({
     queryKey: ['targets'],
     queryFn: () => api.get<TargetsView>('/me/targets'),
@@ -164,7 +170,7 @@ export default function Targets() {
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+            <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
           </Touchable>
           <ErrorState
             message={
@@ -192,19 +198,20 @@ export default function Targets() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  flex: { flex: 1 },
-  content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  title: { marginTop: spacing.base },
-  sub: { marginTop: spacing.xs, marginBottom: spacing.xl },
-  card: { gap: spacing.base },
-  cta: { marginTop: spacing.xl },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    flex: { flex: 1 },
+    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    title: { marginTop: spacing.base },
+    sub: { marginTop: spacing.xs, marginBottom: spacing.xl },
+    card: { gap: spacing.base },
+    cta: { marginTop: spacing.xl },
+  });

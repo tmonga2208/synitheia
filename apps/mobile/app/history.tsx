@@ -25,7 +25,9 @@ import {
 import { MonthGrid } from '../src/components/MonthGrid.js';
 import { api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
-import { MIN_TAP_TARGET, flowTint, palette, radius, spacing } from '../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import { flowTint, type Theme } from '../src/theme/theme.js';
 
 function monthQuery(month: MonthKey) {
   return {
@@ -35,6 +37,8 @@ function monthQuery(month: MonthKey) {
 }
 
 export default function History() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const user = useAuth((s) => s.user);
   const timezone = user?.timezone ?? 'UTC';
   const today = todayLocalDate(timezone);
@@ -89,7 +93,7 @@ export default function History() {
           onPress={() => router.back()}
           style={styles.iconButton}
         >
-          <ChevronLeft size={24} color={palette.stone} strokeWidth={1.8} />
+          <ChevronLeft size={24} color={t.textPrimary} strokeWidth={1.8} />
         </Touchable>
         <Text variant="heading">History</Text>
       </View>
@@ -113,7 +117,10 @@ export default function History() {
         >
           <ChevronLeft
             size={20}
-            color={earliestDisabled ? palette.surfaceDim : palette.stoneMuted}
+            // DELIBERATE LIGHT-MODE CHANGE — see the matching note on the next chevron and
+            // in MonthGrid. Disabled was `palette.surfaceDim` #DBDAD7 (1.3303 on bone), now
+            // `t.textFaint` #A3A3A0 (2.4065). Not a regression in a screenshot diff.
+            color={earliestDisabled ? t.textFaint : t.textMuted}
             strokeWidth={1.8}
           />
         </Touchable>
@@ -131,7 +138,12 @@ export default function History() {
         >
           <ChevronRight
             size={20}
-            color={atLatest ? palette.surfaceDim : palette.stoneMuted}
+            // DELIBERATE LIGHT-MODE CHANGE — the second of the two disabled month-stepper
+            // chevrons. `palette.surfaceDim` #DBDAD7 (1.3303 on bone) → `t.textFaint`
+            // #A3A3A0 (2.4065). `textFaint` is the documented role for a disabled control;
+            // `t.border` would have been 1.3713 in dark — invisible. See the design spec's
+            // "Light-mode changes" section.
+            color={atLatest ? t.textFaint : t.textMuted}
             strokeWidth={1.8}
           />
         </Touchable>
@@ -168,7 +180,7 @@ export default function History() {
           />
 
           <View style={styles.legend}>
-            <Text variant="caption" color={palette.stoneFaint}>
+            <Text variant="caption" color={t.textFaint}>
               less
             </Text>
             {[10, 45, 70, 100].map((percent) => (
@@ -176,11 +188,11 @@ export default function History() {
                 key={percent}
                 style={[
                   styles.swatch,
-                  { backgroundColor: flowTint(percent).background },
+                  { backgroundColor: flowTint(percent, t).background },
                 ]}
               />
             ))}
-            <Text variant="caption" color={palette.stoneFaint}>
+            <Text variant="caption" color={t.textFaint}>
               more
             </Text>
           </View>
@@ -207,72 +219,76 @@ export default function History() {
 }
 
 function Stat({ value, label }: { value: string; label: string }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <Card style={styles.stat}>
       <Text variant="heading">{value}</Text>
-      <Text variant="caption" color={palette.stoneFaint}>
+      <Text variant="caption" color={t.textFaint}>
         {label}
       </Text>
     </Card>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: palette.bone,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing['4xl'],
-  },
-  /**
-   * The month bar now sits outside the ScrollView (see the render method), so it
-   * carries its own horizontal padding instead of inheriting `content`'s.
-   */
-  monthBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.base,
-  },
-  /** Wraps the error card with the same horizontal margin `content` gives the loaded state. */
-  state: {
-    paddingHorizontal: spacing.lg,
-  },
-  iconButton: {
-    minWidth: MIN_TAP_TARGET,
-    minHeight: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  legend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: spacing.xs,
-    marginTop: spacing.md,
-  },
-  swatch: {
-    width: spacing.md,
-    height: spacing.md,
-    borderRadius: radius.sm / 2,
-  },
-  stats: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  stat: {
-    flex: 1,
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: t.bg,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.sm,
+    },
+    content: {
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing['4xl'],
+    },
+    /**
+     * The month bar now sits outside the ScrollView (see the render method), so it
+     * carries its own horizontal padding instead of inheriting `content`'s.
+     */
+    monthBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.base,
+    },
+    /** Wraps the error card with the same horizontal margin `content` gives the loaded state. */
+    state: {
+      paddingHorizontal: spacing.lg,
+    },
+    iconButton: {
+      minWidth: MIN_TAP_TARGET,
+      minHeight: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    legend: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: spacing.xs,
+      marginTop: spacing.md,
+    },
+    swatch: {
+      width: spacing.md,
+      height: spacing.md,
+      borderRadius: radius.sm / 2,
+    },
+    stats: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    stat: {
+      flex: 1,
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+  });

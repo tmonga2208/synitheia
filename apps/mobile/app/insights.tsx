@@ -29,17 +29,19 @@ import type {
   WireInsight,
 } from '../src/api/types.js';
 import { useAuth } from '../src/store/auth.js';
-import { MIN_TAP_TARGET, palette, radius, spacing } from '../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import type { Theme } from '../src/theme/theme.js';
 
 const AVAILABILITY_KEY = ['insights', 'availability'] as const;
 const INSIGHTS_KEY = ['insights'] as const;
 
 /** The accent stripe. Attention is not alarm — this app never shouts at anyone. */
-const SEVERITY_COLOR: Record<InsightSeverity, string> = {
-  info: palette.sageSoft,
-  notable: palette.sage,
-  attention: palette.warning,
-};
+function severityColor(severity: InsightSeverity, t: Theme): string {
+  if (severity === 'notable') return t.accent;
+  if (severity === 'attention') return t.warning;
+  return t.accentSoft;
+}
 
 const SEVERITY_LABEL: Record<InsightSeverity, string> = {
   info: 'Observation',
@@ -67,6 +69,8 @@ function formatMetric(metric: SupportingMetric, currency: string): string {
 }
 
 export default function Insights() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const user = useAuth((s) => s.user);
   const currency = user?.currency ?? 'INR';
   const queryClient = useQueryClient();
@@ -181,13 +185,13 @@ export default function Insights() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
     >
-      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
     </Touchable>
   );
 
   const header = (
     <View style={styles.header}>
-      <Text variant="overline" color={palette.stoneFaint}>
+      <Text variant="overline" color={t.textFaint}>
         Synítheia AI
       </Text>
       <Text variant="title">Insights</Text>
@@ -236,7 +240,7 @@ export default function Insights() {
           {header}
 
           <EmptyState
-            icon={<Sparkles size={30} color={palette.white} strokeWidth={1.5} />}
+            icon={<Sparkles size={30} color={t.onAccent} strokeWidth={1.5} />}
             title={notConfigured ? 'Synítheia is unavailable' : 'Synítheia is off'}
             body={
               notConfigured
@@ -262,7 +266,7 @@ export default function Insights() {
           <RefreshControl
             refreshing={insights.isRefetching}
             onRefresh={() => void insights.refetch()}
-            tintColor={palette.sage}
+            tintColor={t.accent}
           />
         }
       >
@@ -282,7 +286,7 @@ export default function Insights() {
           />
         ) : items.length === 0 ? (
           <EmptyState
-            icon={<Sparkles size={30} color={palette.white} strokeWidth={1.5} />}
+            icon={<Sparkles size={30} color={t.onAccent} strokeWidth={1.5} />}
             title="No insights yet"
             body="Synítheia only speaks when it has something to say. Generate a pass over the last 30 days and see what it finds."
           />
@@ -302,7 +306,7 @@ export default function Insights() {
 
         {generateError ? (
           <Card style={styles.notice} accessibilityLiveRegion="polite">
-            <Text variant="body" color={palette.stoneMuted}>
+            <Text variant="body" color={t.textMuted}>
               {generateError}
             </Text>
           </Card>
@@ -337,6 +341,8 @@ function InsightCard({
   onFeedback: (value: InsightFeedback) => void;
   onDismiss: () => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [explained, setExplained] = useState(false);
 
   /**
@@ -351,7 +357,7 @@ function InsightCard({
     enabled: explained,
   });
 
-  const accent = SEVERITY_COLOR[insight.severity];
+  const accent = severityColor(insight.severity, t);
 
   return (
     <Card style={styles.insight}>
@@ -359,14 +365,14 @@ function InsightCard({
 
       <View style={styles.severityRow}>
         <View style={[styles.severityTag, { borderColor: accent }]}>
-          <Text variant="caption" color={palette.stoneMuted}>
+          <Text variant="caption" color={t.textMuted}>
             {SEVERITY_LABEL[insight.severity]}
           </Text>
         </View>
       </View>
 
       <Text variant="cardTitle">{insight.title}</Text>
-      <Text variant="body" color={palette.stoneMuted}>
+      <Text variant="body" color={t.textMuted}>
         {insight.description}
       </Text>
 
@@ -378,8 +384,8 @@ function InsightCard({
         onPress={() => setExplained((open) => !open)}
         style={styles.whyRow}
       >
-        <Info size={14} color={palette.stoneFaint} strokeWidth={1.8} />
-        <Text variant="label" color={palette.stoneMuted}>
+        <Info size={14} color={t.textFaint} strokeWidth={1.8} />
+        <Text variant="label" color={t.textMuted}>
           Why am I seeing this?
         </Text>
       </Touchable>
@@ -392,23 +398,23 @@ function InsightCard({
               <Skeleton width="65%" height={11} />
             </View>
           ) : evidence.error || !evidence.data ? (
-            <Text variant="caption" color={palette.danger}>
+            <Text variant="caption" color={t.danger}>
               {evidence.error instanceof Error
                 ? evidence.error.message
                 : 'We could not load the evidence for this insight.'}
             </Text>
           ) : (
             <>
-              <Text variant="caption" color={palette.stoneMuted}>
+              <Text variant="caption" color={t.textMuted}>
                 {evidence.data.summary}
               </Text>
 
               {evidence.data.metrics.map((metric) => (
                 <View key={metric.key} style={styles.metricRow}>
-                  <Text variant="caption" color={palette.stoneFaint} style={styles.metricLabel}>
+                  <Text variant="caption" color={t.textFaint} style={styles.metricLabel}>
                     {metric.label}
                   </Text>
-                  <Text variant="caption" color={palette.stone}>
+                  <Text variant="caption" color={t.textPrimary}>
                     {formatMetric(metric, currency)}
                     {metric.comparisonValue !== null && metric.comparisonLabel !== null
                       ? ` vs ${formatMetric(
@@ -420,7 +426,7 @@ function InsightCard({
                 </View>
               ))}
 
-              <Text variant="caption" color={palette.stoneFaint}>
+              <Text variant="caption" color={t.textFaint}>
                 {`${evidence.data.period.start} → ${evidence.data.period.end} · ${Math.round(
                   evidence.data.confidence * 100,
                 )}% confidence`}
@@ -449,7 +455,7 @@ function InsightCard({
         onPress={onDismiss}
         style={styles.dismiss}
       >
-        <Text variant="label" color={palette.stoneFaint}>
+        <Text variant="label" color={t.textFaint}>
           Dismiss
         </Text>
       </Touchable>
@@ -457,76 +463,77 @@ function InsightCard({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
-  },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  header: {
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.lg,
-    gap: spacing.xs,
-  },
-  list: { gap: spacing.base },
-  insight: {
-    gap: spacing.sm,
-    overflow: 'hidden',
-  },
-  stripe: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: spacing.xs,
-  },
-  severityRow: { flexDirection: 'row' },
-  severityTag: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    backgroundColor: palette.sand,
-  },
-  whyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    minHeight: MIN_TAP_TARGET,
-  },
-  evidence: {
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: palette.surfaceDim,
-  },
-  metricRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  metricLabel: { flexShrink: 1 },
-  feedbackRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  dismiss: {
-    minHeight: MIN_TAP_TARGET,
-    justifyContent: 'center',
-  },
-  notice: {
-    marginTop: spacing.lg,
-    backgroundColor: palette.sand,
-  },
-  generate: { marginTop: spacing.xl },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.xl,
+    },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    header: {
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.lg,
+      gap: spacing.xs,
+    },
+    list: { gap: spacing.base },
+    insight: {
+      gap: spacing.sm,
+      overflow: 'hidden',
+    },
+    stripe: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: spacing.xs,
+    },
+    severityRow: { flexDirection: 'row' },
+    severityTag: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      backgroundColor: t.surfaceRaised,
+    },
+    whyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      minHeight: MIN_TAP_TARGET,
+    },
+    evidence: {
+      gap: spacing.sm,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: t.border,
+    },
+    metricRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    metricLabel: { flexShrink: 1 },
+    feedbackRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    dismiss: {
+      minHeight: MIN_TAP_TARGET,
+      justifyContent: 'center',
+    },
+    notice: {
+      marginTop: spacing.lg,
+      backgroundColor: t.surfaceRaised,
+    },
+    generate: { marginTop: spacing.xl },
+  });

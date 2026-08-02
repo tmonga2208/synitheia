@@ -2,7 +2,7 @@ import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import trackPng from '../../src/assets/tabs/track.png';
 import todayPng from '../../src/assets/tabs/today.png';
 import youPng from '../../src/assets/tabs/you.png';
-import { palette } from '../../src/theme/tokens.js';
+import { useTheme } from '../../src/theme/ThemeProvider.js';
 
 /**
  * Three destinations, with Today in the middle.
@@ -49,8 +49,35 @@ import { palette } from '../../src/theme/tokens.js';
 export const unstable_settings = { initialRouteName: 'index' };
 
 export default function TabsLayout() {
+  const t = useTheme();
+
+  /**
+   * `tintColor` is the only theme-aware prop this needs.
+   *
+   * Task 8 first wired the bar's background and inactive icon/label colours here directly
+   * (`backgroundColor`, `iconColor`, `labelStyle`, plus `disableTransparentOnScrollEdge` to
+   * reach the tab bar's transparent "scroll edge" state) because, at the time, nothing in
+   * this app ever told the OS that a Dark override was in effect — only the SCREENS knew.
+   * That is no longer true: `ThemeProvider`'s `useSyncNativeAppearance` now calls
+   * `Appearance.setColorScheme()` whenever `preference` changes, which (see that function's
+   * doc comment, and the RN/iOS/Android source it cites) sets `overrideUserInterfaceStyle`
+   * on every `UIWindow` / flips `AppCompatDelegate`'s night mode for the whole app — not
+   * just this screen.
+   *
+   * That is the SAME mechanism the "nothing asked for" Liquid Glass material this file used
+   * to brag about was always reading its light/dark colouring from — it was only ever
+   * correct by coincidence, because the app had never diverged from the OS before Task 8.
+   * Once the window/activity itself carries the app's chosen theme, the untouched system
+   * default (still nothing asked for here beyond `tintColor`) resolves against THAT
+   * override for both the standard and scroll-edge appearances, on both platforms — so the
+   * `backgroundColor`/`iconColor`/`labelStyle`/`disableTransparentOnScrollEdge` block this
+   * file briefly carried is redundant and has been removed; keeping it would have meant a
+   * flat, no-blur dark tab bar for no reason once the native layer already tracks theme on
+   * its own. `tintColor` still needs to be explicit in both modes — it is this app's sage
+   * accent overriding the platform's default tint, not a light/dark distinction.
+   */
   return (
-    <NativeTabs tintColor={palette.sage}>
+    <NativeTabs tintColor={t.accent}>
       <NativeTabs.Trigger name="trackers">
         <Icon sf="square.grid.2x2" androidSrc={trackPng} />
         <Label>Track</Label>

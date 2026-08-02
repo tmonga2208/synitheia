@@ -14,9 +14,11 @@ import {
   Touchable,
 } from '../../src/components/primitives.js';
 import { ApiError, api } from '../../src/api/client.js';
-import { accentFor, palette, radius, spacing } from '../../src/theme/tokens.js';
+import { radius, spacing } from '../../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../../src/theme/theme.js';
 
-const ACCENT = accentFor('#B0917D');
+const ACCENT_COLOR = '#B0917D';
 const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
 /**
@@ -32,6 +34,9 @@ const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
  * rounding lives in two places, the two places will disagree.
  */
 export default function NewFood() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const ACCENT = accentFor(ACCENT_COLOR, t);
   const queryClient = useQueryClient();
 
   const [name, setName] = useState('');
@@ -100,7 +105,7 @@ export default function NewFood() {
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+            <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
           </Touchable>
 
           <Text variant="title" style={{ marginTop: spacing.base }}>
@@ -131,7 +136,7 @@ export default function NewFood() {
             />
 
             <View>
-              <Text variant="label" color={palette.stoneMuted} style={styles.label}>
+              <Text variant="label" color={t.textMuted} style={styles.label}>
                 Meal
               </Text>
               <View style={styles.pills}>
@@ -148,7 +153,7 @@ export default function NewFood() {
             </View>
 
             <View>
-              <Text variant="label" color={palette.stoneMuted} style={styles.label}>
+              <Text variant="label" color={t.textMuted} style={styles.label}>
                 Servings
               </Text>
 
@@ -159,7 +164,7 @@ export default function NewFood() {
                   accessibilityRole="button"
                   accessibilityLabel="Fewer servings"
                 >
-                  <Minus size={18} color={palette.stone} strokeWidth={2} />
+                  <Minus size={18} color={t.textPrimary} strokeWidth={2} />
                 </Touchable>
 
                 <Text variant="cardTitle">{servings}</Text>
@@ -170,14 +175,14 @@ export default function NewFood() {
                   accessibilityRole="button"
                   accessibilityLabel="More servings"
                 >
-                  <Plus size={18} color={palette.stone} strokeWidth={2} />
+                  <Plus size={18} color={t.textPrimary} strokeWidth={2} />
                 </Touchable>
               </View>
             </View>
           </Card>
 
           <Card style={styles.card}>
-            <Text variant="label" color={palette.stoneMuted}>
+            <Text variant="label" color={t.textMuted}>
               Per serving
             </Text>
 
@@ -195,7 +200,7 @@ export default function NewFood() {
               invent a protein number to log their lunch — an invented macro is worse than
               a missing one, because it looks like data.
             */}
-            <Text variant="caption" color={palette.stoneFaint}>
+            <Text variant="caption" color={t.textFaint}>
               Macros are optional.
             </Text>
 
@@ -236,13 +241,13 @@ export default function NewFood() {
           {/* What will actually be logged, once servings are applied. */}
           {perServing.calories > 0 ? (
             <Card style={styles.total} accent={ACCENT.base}>
-              <Text variant="overline" color={palette.stoneMuted}>
+              <Text variant="overline" color={t.textMuted}>
                 Logging
               </Text>
               <Text variant="title" style={{ marginTop: spacing.xs }}>
                 {total.calories} kcal
               </Text>
-              <Text variant="caption" color={palette.stoneMuted}>
+              <Text variant="caption" color={t.textMuted}>
                 {servings} {servings === 1 ? 'serving' : 'servings'} · {total.proteinG}g
                 protein · {total.carbsG}g carbs · {total.fatG}g fat
               </Text>
@@ -250,7 +255,7 @@ export default function NewFood() {
           ) : null}
 
           {error ? (
-            <Text variant="caption" color={palette.danger}>
+            <Text variant="caption" color={t.danger}>
               {error}
             </Text>
           ) : null}
@@ -276,41 +281,42 @@ function guessMeal(): MealType {
   return 'snack';
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: { padding: spacing.lg, paddingBottom: spacing['4xl'], gap: spacing.base },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  photoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 44,
-  },
-  card: { gap: spacing.base },
-  label: { marginBottom: spacing.sm },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-  },
-  stepButton: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  macros: { flexDirection: 'row', gap: spacing.sm },
-  macro: { flex: 1 },
-  total: { marginTop: spacing.xs },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: { padding: spacing.lg, paddingBottom: spacing['4xl'], gap: spacing.base },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    photoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minHeight: 44,
+    },
+    card: { gap: spacing.base },
+    label: { marginBottom: spacing.sm },
+    pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    stepper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.xl,
+    },
+    stepButton: {
+      width: 44,
+      height: 44,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: t.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    macros: { flexDirection: 'row', gap: spacing.sm },
+    macro: { flex: 1 },
+    total: { marginTop: spacing.xs },
+  });

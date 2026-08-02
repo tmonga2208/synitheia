@@ -27,9 +27,11 @@ import { DateField } from '../../src/components/DateField.js';
 import { ReceiptConsentSheet } from '../../src/components/ReceiptConsentSheet.js';
 import { ApiError, api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
-import { accentFor, palette, radius, spacing } from '../../src/theme/tokens.js';
+import { radius, spacing } from '../../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../../src/theme/theme.js';
 
-const ACCENT = accentFor('#C08A7D');
+const ACCENT_COLOR = '#C08A7D';
 
 interface WireExpenseDetail {
   _id: string;
@@ -84,6 +86,9 @@ const SOURCE_LABEL: Record<string, { label: string; explain: string }> = {
 };
 
 export default function ExpenseDetail() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const accent = accentFor(ACCENT_COLOR, t);
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
   const timezone = useAuth((s) => s.user?.timezone) ?? 'UTC';
@@ -203,7 +208,7 @@ export default function ExpenseDetail() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
     >
-      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
     </Touchable>
   );
 
@@ -257,7 +262,7 @@ export default function ExpenseDetail() {
           />
 
           {reschedule.error ? (
-            <Text variant="caption" color={palette.danger} style={{ marginTop: spacing.sm }}>
+            <Text variant="caption" color={t.danger} style={{ marginTop: spacing.sm }}>
               {reschedule.error instanceof ApiError
                 ? reschedule.error.message
                 : 'Could not move this expense.'}
@@ -274,11 +279,11 @@ export default function ExpenseDetail() {
         {/* Where this row came from. Kept visible, permanently, not just when it happened. */}
         <View style={styles.provenance}>
           {e.source === 'subscription' ? (
-            <Repeat size={14} color={palette.stoneMuted} strokeWidth={1.8} />
+            <Repeat size={14} color={t.textMuted} strokeWidth={1.8} />
           ) : e.source === 'manual' ? null : (
-            <Sparkles size={14} color={palette.stoneMuted} strokeWidth={1.8} />
+            <Sparkles size={14} color={t.textMuted} strokeWidth={1.8} />
           )}
-          <Text variant="caption" color={palette.stoneMuted} style={{ flex: 1 }}>
+          <Text variant="caption" color={t.textMuted} style={{ flex: 1 }}>
             {provenance.label} · {provenance.explain}
           </Text>
         </View>
@@ -295,10 +300,10 @@ export default function ExpenseDetail() {
             */}
             <Card style={styles.splitSummary} elevated={false}>
               <View style={styles.splitRow}>
-                <Text variant="caption" color={palette.stoneMuted}>
+                <Text variant="caption" color={t.textMuted}>
                   {e.paidBy.name} paid the bill
                 </Text>
-                <Text variant="bodyMedium" color={palette.stoneMuted}>
+                <Text variant="bodyMedium" color={t.textMuted}>
                   {e.billAmountMinor !== null
                     ? formatMoney(asMinor(e.billAmountMinor), e.currency)
                     : '—'}
@@ -306,7 +311,7 @@ export default function ExpenseDetail() {
               </View>
 
               <View style={[styles.splitRow, styles.splitTotal]}>
-                <Text variant="caption" color={palette.stoneMuted}>
+                <Text variant="caption" color={t.textMuted}>
                   Your share
                 </Text>
                 <Text variant="cardTitle">
@@ -324,7 +329,7 @@ export default function ExpenseDetail() {
 
             <Card style={styles.splitSummary} elevated={false}>
               <View style={styles.splitRow}>
-                <Text variant="caption" color={palette.stoneMuted}>
+                <Text variant="caption" color={t.textMuted}>
                   You paid
                 </Text>
                 <Text variant="bodyMedium">
@@ -332,15 +337,15 @@ export default function ExpenseDetail() {
                 </Text>
               </View>
               <View style={styles.splitRow}>
-                <Text variant="caption" color={palette.stoneMuted}>
+                <Text variant="caption" color={t.textMuted}>
                   Still owed to you
                 </Text>
-                <Text variant="bodyMedium" color={ACCENT.text}>
+                <Text variant="bodyMedium" color={accent.text}>
                   {formatMoney(asMinor(owed), e.currency)}
                 </Text>
               </View>
               <View style={[styles.splitRow, styles.splitTotal]}>
-                <Text variant="caption" color={palette.stoneMuted}>
+                <Text variant="caption" color={t.textMuted}>
                   Cost to you so far
                 </Text>
                 <Text variant="cardTitle">{formatMoney(asMinor(net), e.currency)}</Text>
@@ -355,7 +360,7 @@ export default function ExpenseDetail() {
                   <View style={styles.personRow}>
                     <View style={{ flex: 1 }}>
                       <Text variant="bodyMedium">{p.name}</Text>
-                      <Text variant="caption" color={palette.stoneMuted}>
+                      <Text variant="caption" color={t.textMuted}>
                         {paid
                           ? `Paid you ${formatMoney(asMinor(p.shareMinor), e.currency)}`
                           : `Owes ${formatMoney(asMinor(p.shareMinor), e.currency)}`}
@@ -365,7 +370,7 @@ export default function ExpenseDetail() {
                     <Chip
                       label={paid ? 'Paid' : 'Mark paid'}
                       selected={paid}
-                      accent={ACCENT.text}
+                      accent={accent.text}
                       accessibilityLabel={
                         paid
                           ? `${p.name} has paid you. Tap to undo.`
@@ -407,8 +412,8 @@ export default function ExpenseDetail() {
               accessibilityRole="button"
               accessibilityLabel="Remove receipt"
             >
-              <Trash2 size={15} color={palette.stoneFaint} strokeWidth={1.8} />
-              <Text variant="caption" color={palette.stoneFaint}>
+              <Trash2 size={15} color={t.textFaint} strokeWidth={1.8} />
+              <Text variant="caption" color={t.textFaint}>
                 Remove receipt
               </Text>
             </Touchable>
@@ -421,7 +426,7 @@ export default function ExpenseDetail() {
               accessibilityRole="button"
               accessibilityLabel="Photograph a receipt"
             >
-              <Camera size={20} color={palette.sage} strokeWidth={1.6} />
+              <Camera size={20} color={t.accent} strokeWidth={1.6} />
               <Text variant="caption">Photograph it</Text>
             </Touchable>
 
@@ -431,20 +436,20 @@ export default function ExpenseDetail() {
               accessibilityRole="button"
               accessibilityLabel="Choose a receipt image"
             >
-              <ImageIcon size={20} color={palette.sage} strokeWidth={1.6} />
+              <ImageIcon size={20} color={t.accent} strokeWidth={1.6} />
               <Text variant="caption">Choose an image</Text>
             </Touchable>
           </View>
         )}
 
         {upload.isPending ? (
-          <Text variant="caption" color={palette.stoneMuted} style={{ marginTop: spacing.sm }}>
+          <Text variant="caption" color={t.textMuted} style={{ marginTop: spacing.sm }}>
             Saving…
           </Text>
         ) : null}
 
         {upload.error ? (
-          <Text variant="caption" color={palette.danger} style={{ marginTop: spacing.sm }}>
+          <Text variant="caption" color={t.danger} style={{ marginTop: spacing.sm }}>
             {upload.error instanceof ApiError
               ? upload.error.message
               : 'Could not save that image.'}
@@ -481,75 +486,78 @@ export default function ExpenseDetail() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  amount: { marginTop: spacing.xs, marginBottom: spacing.md },
-  when: { marginTop: spacing.base },
-  note: {
-    backgroundColor: palette.sand,
-    borderRadius: radius.md,
-    marginTop: spacing.lg,
-  },
-  provenance: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  splitSummary: {
-    backgroundColor: palette.sand,
-    borderRadius: radius.md,
-    gap: spacing.xs,
-    marginBottom: spacing.base,
-  },
-  splitRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  splitTotal: {
-    borderTopWidth: 1,
-    borderTopColor: palette.surfaceDim,
-    paddingTop: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  person: { marginBottom: spacing.sm },
-  personRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
-  receipt: {
-    width: '100%',
-    height: 320,
-    borderRadius: radius.lg,
-    backgroundColor: palette.sand,
-  },
-  removeReceipt: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 44,
-    marginTop: spacing.sm,
-  },
-  receiptActions: { flexDirection: 'row', gap: spacing.md },
-  receiptAction: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 96,
-    borderRadius: radius.md,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    amount: { marginTop: spacing.xs, marginBottom: spacing.md },
+    when: { marginTop: spacing.base },
+    // A nested inset panel sitting on the raw screen — matches the `sand → surfaceRaised`
+    // reading used for the same pattern in SplitWith.tsx's summary panel.
+    note: {
+      backgroundColor: t.surfaceRaised,
+      borderRadius: radius.md,
+      marginTop: spacing.lg,
+    },
+    provenance: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+      marginBottom: spacing.xl,
+    },
+    splitSummary: {
+      backgroundColor: t.surfaceRaised,
+      borderRadius: radius.md,
+      gap: spacing.xs,
+      marginBottom: spacing.base,
+    },
+    splitRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    splitTotal: {
+      borderTopWidth: 1,
+      borderTopColor: t.border,
+      paddingTop: spacing.sm,
+      marginTop: spacing.xs,
+    },
+    person: { marginBottom: spacing.sm },
+    personRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+    },
+    receipt: {
+      width: '100%',
+      height: 320,
+      borderRadius: radius.lg,
+      backgroundColor: t.surfaceRaised,
+    },
+    removeReceipt: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      minHeight: 44,
+      marginTop: spacing.sm,
+    },
+    receiptActions: { flexDirection: 'row', gap: spacing.md },
+    receiptAction: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      minHeight: 96,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+  });

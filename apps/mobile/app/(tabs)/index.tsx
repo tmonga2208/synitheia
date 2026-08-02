@@ -39,7 +39,9 @@ import { Timeline } from '../../src/components/Timeline.js';
 import { ApiError, api } from '../../src/api/client.js';
 import { useHealthSync } from '../../src/health/useHealthSync.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, palette, radius, spacing } from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import type { Theme } from '../../src/theme/theme.js';
 
 const TODAY_KEY = ['today'] as const;
 
@@ -63,6 +65,8 @@ function formatMetric(metric: SupportingMetric, currency: string): string {
 }
 
 export default function Today() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   /**
    * Apple Health, pulled on every foreground.
    *
@@ -201,7 +205,7 @@ export default function Today() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={() => void refetch()}
-            tintColor={palette.sage}
+            tintColor={t.accent}
           />
         }
       >
@@ -222,7 +226,7 @@ export default function Today() {
               />
             ) : (
               <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text variant="cardTitle" color={palette.white}>
+                <Text variant="cardTitle" color={t.onAccent}>
                   {firstName.charAt(0).toUpperCase()}
                 </Text>
               </View>
@@ -238,7 +242,7 @@ export default function Today() {
               onPress={() => router.push('/history')}
               style={styles.iconButton}
             >
-              <CalendarDays size={22} color={palette.stone} strokeWidth={1.6} />
+              <CalendarDays size={22} color={t.textPrimary} strokeWidth={1.6} />
             </Touchable>
 
             <Touchable
@@ -248,19 +252,19 @@ export default function Today() {
               onPress={() => router.push('/reminders')}
               style={styles.iconButton}
             >
-              <Bell size={22} color={palette.stone} strokeWidth={1.6} />
+              <Bell size={22} color={t.textPrimary} strokeWidth={1.6} />
             </Touchable>
           </View>
         </View>
 
         {/* ─── Greeting ────────────────────────────────────────────────────── */}
-        <Text variant="overline" color={palette.stone}>
+        <Text variant="overline" color={t.textPrimary}>
           {overline}
         </Text>
         <Text variant="title" style={styles.greeting}>
           {`${data.greeting}, ${firstName}`}
         </Text>
-        <Text variant="body" color={palette.stoneFaint} style={styles.subtitle}>
+        <Text variant="body" color={t.textFaint} style={styles.subtitle}>
           {data.streakDays > 0
             ? `You're on a ${data.streakDays}-day streak. Keep the momentum.`
             : 'Take a deep breath and start your journey.'}
@@ -275,7 +279,7 @@ export default function Today() {
           {/* At zero these become an invitation rather than a score of nothing. */}
           <Chip
             label={data.streakDays > 0 ? `${data.streakDays} Day Streak` : 'Streaks'}
-            icon={<Zap size={14} color={palette.stone} strokeWidth={2} />}
+            icon={<Zap size={14} color={t.textPrimary} strokeWidth={2} />}
             accessibilityRole="text"
             haptic={false}
           />
@@ -296,7 +300,7 @@ export default function Today() {
 
           {data.habits.length === 0 ? (
             <EmptyState
-              icon={<Leaf size={30} color={palette.white} strokeWidth={1.5} />}
+              icon={<Leaf size={30} color={t.onAccent} strokeWidth={1.5} />}
               title="No Rituals Yet"
               body="Your ritual is a blank canvas. Start small to build a life of intention."
               actionLabel="+ Add A New Habit"
@@ -323,7 +327,7 @@ export default function Today() {
               <Card key={suggestion.id} style={styles.suggestion}>
                 <View style={styles.tagRow}>
                   <View style={styles.tag}>
-                    <Text variant="caption" color={palette.stoneFaint}>
+                    <Text variant="caption" color={t.textFaint}>
                       detected
                     </Text>
                   </View>
@@ -332,7 +336,7 @@ export default function Today() {
                 <Text variant="cardTitle">{suggestion.title}</Text>
 
                 {suggestion.description ? (
-                  <Text variant="body" color={palette.stoneMuted}>
+                  <Text variant="body" color={t.textMuted}>
                     {suggestion.description}
                   </Text>
                 ) : null}
@@ -343,7 +347,7 @@ export default function Today() {
                   <Text
                     key={`${suggestion.id}:${item.label}`}
                     variant="caption"
-                    color={palette.stoneFaint}
+                    color={t.textFaint}
                   >
                     {`• ${item.label}`}
                   </Text>
@@ -410,11 +414,11 @@ export default function Today() {
               accessibilityLabel="Open Synítheia AI insights"
               style={styles.insightsLink}
             >
-              <Sparkles size={18} color={palette.sage} strokeWidth={1.7} />
-              <Text variant="bodyMedium" color={palette.stoneMuted} style={{ flex: 1 }}>
+              <Sparkles size={18} color={t.accent} strokeWidth={1.7} />
+              <Text variant="bodyMedium" color={t.textMuted} style={{ flex: 1 }}>
                 What Synítheia noticed
               </Text>
-              <ChevronRight size={18} color={palette.stoneFaint} strokeWidth={1.7} />
+              <ChevronRight size={18} color={t.textFaint} strokeWidth={1.7} />
             </Touchable>
           </View>
         )}
@@ -435,12 +439,14 @@ function InsightCard({
   insight: NonNullable<TodayResponse['featuredInsight']>;
   currency: string;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [explained, setExplained] = useState(false);
 
   return (
     <Card style={styles.insight}>
       <Text variant="cardTitle">{insight.title}</Text>
-      <Text variant="body" color={palette.stoneMuted}>
+      <Text variant="body" color={t.textMuted}>
         {insight.description}
       </Text>
 
@@ -452,24 +458,24 @@ function InsightCard({
         onPress={() => setExplained((open) => !open)}
         style={styles.whyRow}
       >
-        <Info size={14} color={palette.stoneFaint} strokeWidth={1.8} />
-        <Text variant="label" color={palette.stoneMuted}>
+        <Info size={14} color={t.textFaint} strokeWidth={1.8} />
+        <Text variant="label" color={t.textMuted}>
           Why am I seeing this?
         </Text>
       </Touchable>
 
       {explained ? (
         <View style={styles.evidence} accessibilityLiveRegion="polite">
-          <Text variant="caption" color={palette.stoneMuted}>
+          <Text variant="caption" color={t.textMuted}>
             {insight.evidenceSummary}
           </Text>
 
           {insight.supportingMetrics.map((metric) => (
             <View key={metric.key} style={styles.metricRow}>
-              <Text variant="caption" color={palette.stoneFaint} style={styles.metricLabel}>
+              <Text variant="caption" color={t.textFaint} style={styles.metricLabel}>
                 {metric.label}
               </Text>
-              <Text variant="caption" color={palette.stone}>
+              <Text variant="caption" color={t.textPrimary}>
                 {formatMetric(metric, currency)}
                 {metric.comparisonValue !== null && metric.comparisonLabel !== null
                   ? ` vs ${formatMetric(
@@ -488,113 +494,114 @@ function InsightCard({
 
 const AVATAR = 44;
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  avatarTarget: {
-    minWidth: MIN_TAP_TARGET,
-    minHeight: MIN_TAP_TARGET,
-    justifyContent: 'center',
-  },
-  avatar: {
-    width: AVATAR,
-    height: AVATAR,
-    borderRadius: radius.full,
-    backgroundColor: palette.sand,
-  },
-  avatarFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.sage,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  iconButton: {
-    width: MIN_TAP_TARGET,
-    height: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-  },
-  greeting: { marginTop: spacing.xs },
-  subtitle: { marginTop: spacing.xs },
-  ring: {
-    alignItems: 'center',
-    marginTop: spacing.xl,
-  },
-  chips: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.xl,
-  },
-  section: { marginTop: spacing['2xl'] },
-  insightsLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    minHeight: MIN_TAP_TARGET,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.base,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-  },
-  habits: { gap: spacing.base },
-  suggestions: {
-    marginTop: spacing['2xl'],
-    gap: spacing.base,
-  },
-  suggestion: { gap: spacing.sm },
-  tagRow: { flexDirection: 'row' },
-  tag: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-  },
-  suggestionActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.md,
-    marginTop: spacing.sm,
-  },
-  suggestionButton: { minWidth: 120 },
-  insight: {
-    marginTop: spacing['2xl'],
-    gap: spacing.sm,
-  },
-  whyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    minHeight: MIN_TAP_TARGET,
-  },
-  evidence: {
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: palette.surfaceDim,
-  },
-  metricRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  metricLabel: { flexShrink: 1 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.xl,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    avatarTarget: {
+      minWidth: MIN_TAP_TARGET,
+      minHeight: MIN_TAP_TARGET,
+      justifyContent: 'center',
+    },
+    avatar: {
+      width: AVATAR,
+      height: AVATAR,
+      borderRadius: radius.full,
+      backgroundColor: t.surfaceRaised,
+    },
+    avatarFallback: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.accent,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    iconButton: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.md,
+    },
+    greeting: { marginTop: spacing.xs },
+    subtitle: { marginTop: spacing.xs },
+    ring: {
+      alignItems: 'center',
+      marginTop: spacing.xl,
+    },
+    chips: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: spacing.xl,
+    },
+    section: { marginTop: spacing['2xl'] },
+    insightsLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      minHeight: MIN_TAP_TARGET,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.base,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    habits: { gap: spacing.base },
+    suggestions: {
+      marginTop: spacing['2xl'],
+      gap: spacing.base,
+    },
+    suggestion: { gap: spacing.sm },
+    tagRow: { flexDirection: 'row' },
+    tag: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+      borderRadius: radius.full,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    suggestionActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: spacing.md,
+      marginTop: spacing.sm,
+    },
+    suggestionButton: { minWidth: 120 },
+    insight: {
+      marginTop: spacing['2xl'],
+      gap: spacing.sm,
+    },
+    whyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      minHeight: MIN_TAP_TARGET,
+    },
+    evidence: {
+      gap: spacing.sm,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: t.border,
+    },
+    metricRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    metricLabel: { flexShrink: 1 },
+  });

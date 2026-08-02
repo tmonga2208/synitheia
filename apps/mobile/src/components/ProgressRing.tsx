@@ -7,7 +7,8 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { motion, palette, type } from '../theme/tokens.js';
+import { motion, type } from '../theme/theme.js';
+import { useTheme } from '../theme/ThemeProvider.js';
 import { Text } from './primitives.js';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -39,11 +40,15 @@ export function ProgressRing({
   percent,
   size = 240,
   strokeWidth = 22,
-  color = palette.sage,
-  trackColor = palette.surfaceDim,
+  color,
+  trackColor,
   showLabel = true,
   children,
 }: ProgressRingProps) {
+  const t = useTheme();
+  // Defaults resolved here, not in the destructure, so they can reach the theme.
+  const strokeColor = color ?? t.accent;
+  const track = trackColor ?? t.border;
   const clamped = Math.min(100, Math.max(0, percent));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -78,7 +83,7 @@ export function ProgressRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={trackColor}
+          stroke={track}
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -86,7 +91,7 @@ export function ProgressRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={color}
+          stroke={strokeColor}
           strokeWidth={strokeWidth}
           fill="none"
           strokeDasharray={circumference}
@@ -101,7 +106,7 @@ export function ProgressRing({
             <Text variant="display">{Math.round(clamped)}</Text>
             {/* The % sits smaller and muted — the number is what matters. */}
             <Text
-              color={palette.stoneFaint}
+              color={t.textFaint}
               style={{ ...type.title, marginLeft: 2 }}
             >
               %

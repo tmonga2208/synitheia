@@ -15,7 +15,9 @@ import { SkeletonList } from '../src/components/Skeleton.js';
 import { HabitCard, type TodayHabit } from '../src/components/HabitCard.js';
 import { api } from '../src/api/client.js';
 import type { ListResponse, WireHabit } from '../src/api/types.js';
-import { MIN_TAP_TARGET, palette, radius, spacing } from '../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import type { Theme } from '../src/theme/theme.js';
 
 const HABITS_KEY = ['habits'] as const;
 const TODAY_KEY = ['today'] as const;
@@ -45,6 +47,8 @@ function merge(habits: WireHabit[], today: TodayResponse | undefined): TodayHabi
 }
 
 export default function Habits() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const queryClient = useQueryClient();
 
   const habitsQuery = useQuery({
@@ -114,14 +118,14 @@ export default function Habits() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
     >
-      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
     </Touchable>
   );
 
   const header = (
     <View style={styles.header}>
       <View style={styles.headerCopy}>
-        <Text variant="overline" color={palette.stoneFaint}>
+        <Text variant="overline" color={t.textFaint}>
           Your rituals
         </Text>
         <Text variant="title">Habits</Text>
@@ -133,7 +137,7 @@ export default function Habits() {
         onPress={() => router.push('/habit/new')}
         style={styles.add}
       >
-        <Plus size={22} color={palette.white} strokeWidth={2} />
+        <Plus size={22} color={t.onAccent} strokeWidth={2} />
       </Touchable>
     </View>
   );
@@ -174,7 +178,7 @@ export default function Habits() {
           <RefreshControl
             refreshing={habitsQuery.isRefetching}
             onRefresh={() => void habitsQuery.refetch()}
-            tintColor={palette.sage}
+            tintColor={t.accent}
           />
         }
       >
@@ -183,7 +187,7 @@ export default function Habits() {
 
         {habits.length === 0 ? (
           <EmptyState
-            icon={<Leaf size={30} color={palette.white} strokeWidth={1.5} />}
+            icon={<Leaf size={30} color={t.onAccent} strokeWidth={1.5} />}
             title="No Rituals Yet"
             body="Your ritual is a blank canvas. Start small to build a life of intention."
             actionLabel="+ Add A New Habit"
@@ -206,34 +210,35 @@ export default function Habits() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
-  },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  headerCopy: { gap: spacing.xs },
-  add: {
-    width: MIN_TAP_TARGET + 4,
-    height: MIN_TAP_TARGET + 4,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.sage,
-  },
-  list: { gap: spacing.base },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.xl,
+    },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    headerCopy: { gap: spacing.xs },
+    add: {
+      width: MIN_TAP_TARGET + 4,
+      height: MIN_TAP_TARGET + 4,
+      borderRadius: radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.accent,
+    },
+    list: { gap: spacing.base },
+  });

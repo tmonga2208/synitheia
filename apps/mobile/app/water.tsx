@@ -17,10 +17,12 @@ import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ProgressRing } from '../src/components/ProgressRing.js';
 import { ApiError, api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
-import { accentFor, palette, radius, spacing } from '../src/theme/tokens.js';
+import { radius, spacing } from '../src/theme/theme.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../src/theme/theme.js';
 
 const WATER_KEY = ['water'] as const;
-const ACCENT = accentFor('#8A9AA9');
+const ACCENT_COLOR = '#8A9AA9';
 
 interface WireWaterEntry {
   _id: string;
@@ -43,6 +45,9 @@ interface WaterResponse {
  * is a question you only ever ask on purpose.
  */
 export default function WaterScreen() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const ACCENT = accentFor(ACCENT_COLOR, t);
   const queryClient = useQueryClient();
   const timezone = useAuth((s) => s.user?.timezone) ?? 'UTC';
 
@@ -81,7 +86,7 @@ export default function WaterScreen() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
     >
-      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
     </Touchable>
   );
 
@@ -126,7 +131,7 @@ export default function WaterScreen() {
         <View style={styles.ring}>
           <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={18}>
             <Text variant="title">{data.totalMl}</Text>
-            <Text variant="caption" color={palette.stoneMuted}>
+            <Text variant="caption" color={t.textMuted}>
               of {data.targetMl.toLocaleString()} ml
             </Text>
           </ProgressRing>
@@ -144,7 +149,7 @@ export default function WaterScreen() {
               <Text variant="bodyMedium" color={ACCENT.text}>
                 +{ml}
               </Text>
-              <Text variant="caption" color={palette.stoneFaint}>
+              <Text variant="caption" color={t.textFaint}>
                 ml
               </Text>
             </Touchable>
@@ -155,7 +160,7 @@ export default function WaterScreen() {
 
         {data.items.length === 0 ? (
           <EmptyState
-            icon={<Droplets size={26} color={palette.white} strokeWidth={1.6} />}
+            icon={<Droplets size={26} color={t.onAccent} strokeWidth={1.6} />}
             title="Nothing yet"
             body="Tap a glass above to log your first water of the day."
           />
@@ -167,7 +172,7 @@ export default function WaterScreen() {
                 <Text variant="cardTitle" style={{ flex: 1 }}>
                   {entry.amountMl} ml
                 </Text>
-                <Text variant="caption" color={palette.stoneMuted}>
+                <Text variant="caption" color={t.textMuted}>
                   {time.format(new Date(entry.loggedAt))}
                 </Text>
                 <Touchable
@@ -176,7 +181,7 @@ export default function WaterScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`Remove ${entry.amountMl} millilitres logged at ${time.format(new Date(entry.loggedAt))}`}
                 >
-                  <Trash2 size={16} color={palette.stoneFaint} strokeWidth={1.7} />
+                  <Trash2 size={16} color={t.textFaint} strokeWidth={1.7} />
                 </Touchable>
               </View>
             </Card>
@@ -187,36 +192,37 @@ export default function WaterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  ring: { alignItems: 'center', marginVertical: spacing.xl },
-  presets: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing['2xl'] },
-  preset: {
-    flex: 1,
-    minHeight: 56,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    backgroundColor: palette.sand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  entry: { marginBottom: spacing.sm },
-  entryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.base,
-    paddingHorizontal: spacing.lg,
-  },
-  dot: { width: 8, height: 8, borderRadius: radius.full },
-  delete: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    ring: { alignItems: 'center', marginVertical: spacing.xl },
+    presets: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing['2xl'] },
+    preset: {
+      flex: 1,
+      minHeight: 56,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: t.border,
+      backgroundColor: t.surfaceRaised,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    entry: { marginBottom: spacing.sm },
+    entryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.base,
+      paddingHorizontal: spacing.lg,
+    },
+    dot: { width: 8, height: 8, borderRadius: radius.full },
+    delete: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  });

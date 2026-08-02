@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Button, Text, Touchable } from './primitives.js';
-import { palette, radius, spacing } from '../theme/tokens.js';
+import { radius, spacing } from '../theme/theme.js';
+import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
+import type { Theme } from '../theme/theme.js';
 
 /**
  * When something happened.
@@ -90,6 +92,8 @@ export function DateField({
   timezone,
   disabled = false,
 }: DateFieldProps) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [open, setOpen] = useState(false);
   // The month being browsed. Seeded to the value's month each time the sheet opens, so
   // reopening never strands the user on a month they navigated away to last time.
@@ -161,9 +165,9 @@ export function DateField({
       accessibilityRole="button"
       accessibilityLabel={`${label}: ${formatted}. Tap to change.`}
     >
-      <CalendarDays size={18} color={palette.stoneMuted} strokeWidth={1.8} />
+      <CalendarDays size={18} color={t.textMuted} strokeWidth={1.8} />
       <View style={{ flex: 1 }}>
-        <Text variant="caption" color={palette.stoneMuted}>
+        <Text variant="caption" color={t.textMuted}>
           {label}
         </Text>
         <Text variant="bodyMedium">{formatted}</Text>
@@ -190,7 +194,7 @@ export function DateField({
                 accessibilityRole="button"
                 accessibilityLabel="Previous month"
               >
-                <ChevronLeft size={22} color={palette.stone} strokeWidth={1.8} />
+                <ChevronLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
               </Touchable>
 
               <Text variant="cardTitle">{monthLabel}</Text>
@@ -202,7 +206,7 @@ export function DateField({
                 accessibilityRole="button"
                 accessibilityLabel="Next month"
               >
-                <ChevronRight size={22} color={palette.stone} strokeWidth={1.8} />
+                <ChevronRight size={22} color={t.textPrimary} strokeWidth={1.8} />
               </Touchable>
             </View>
 
@@ -211,7 +215,7 @@ export function DateField({
                 <Text
                   key={i}
                   variant="caption"
-                  color={palette.stoneFaint}
+                  color={t.textFaint}
                   style={styles.weekday}
                 >
                   {d}
@@ -240,12 +244,18 @@ export function DateField({
                   >
                     <Text
                       variant="body"
+                      // The selected day sits on a filled t.accent circle (styles.cellSelected).
+                      // t.bg is the correct token here rather than t.onAccent: dark's onAccent
+                      // is DEFINED as dark bg (see theme.ts), so this reads correctly against
+                      // the filled circle in both themes while staying byte-identical to the
+                      // pre-conversion `palette.bone` in light (t.onAccent's light value is
+                      // pure white, a different literal from bone).
                       color={
                         isSelected
-                          ? palette.bone
+                          ? t.bg
                           : isFuture
-                            ? palette.stoneFaint
-                            : palette.stone
+                            ? t.textFaint
+                            : t.textPrimary
                       }
                     >
                       {day}
@@ -276,67 +286,69 @@ export function DateField({
 
 const CELL = 44;
 
-const styles = StyleSheet.create({
-  field: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    minHeight: 56,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-  },
-  fieldDisabled: { opacity: 0.5 },
-  scrim: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: palette.scrim,
-  },
-  sheet: {
-    backgroundColor: palette.bone,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    padding: spacing.lg,
-    paddingBottom: spacing['2xl'],
-  },
-  monthRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  arrow: {
-    width: CELL,
-    height: CELL,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowDisabled: { opacity: 0.3 },
-  weekRow: { flexDirection: 'row' },
-  weekday: { width: CELL, textAlign: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: {
-    width: CELL,
-    height: CELL,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: CELL / 2,
-  },
-  cellSelected: { backgroundColor: palette.sage },
-  todayDot: {
-    position: 'absolute',
-    bottom: 6,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: palette.sage,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    field: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      minHeight: 56,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    fieldDisabled: { opacity: 0.5 },
+    scrim: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: t.scrim,
+    },
+    // A real bottom sheet: transparent Modal, slides up over the scrim.
+    sheet: {
+      backgroundColor: t.surface,
+      borderTopLeftRadius: radius.lg,
+      borderTopRightRadius: radius.lg,
+      padding: spacing.lg,
+      paddingBottom: spacing['2xl'],
+    },
+    monthRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+    },
+    arrow: {
+      width: CELL,
+      height: CELL,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    arrowDisabled: { opacity: 0.3 },
+    weekRow: { flexDirection: 'row' },
+    weekday: { width: CELL, textAlign: 'center' },
+    grid: { flexDirection: 'row', flexWrap: 'wrap' },
+    cell: {
+      width: CELL,
+      height: CELL,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: CELL / 2,
+    },
+    cellSelected: { backgroundColor: t.accent },
+    todayDot: {
+      position: 'absolute',
+      bottom: 6,
+      width: 4,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: t.accent,
+    },
+    actions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginTop: spacing.lg,
+    },
+  });
