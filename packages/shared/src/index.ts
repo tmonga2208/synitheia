@@ -22,3 +22,4 @@ export * from './domain/month-summary.js';
 export * from './domain/today.js';
 export * from './domain/subscription.js';
 export * from './domain/health.js';
+export * from './domain/xp.js';
