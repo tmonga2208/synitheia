@@ -283,12 +283,37 @@ export interface Theme {
    * Anything drawn ON a filled accent control: glyphs, check marks, switch thumbs, button
    * labels.
    *
-   * This is the token whose value INVERTS between themes, and the reason it exists at all.
-   * Light keeps the app's long-standing white-on-sage (3.34:1, recorded as an exception in
-   * the contrast test). Dark cannot: `accent` is lifted to `#89A889` so it holds against
-   * charcoal, and white on that measures 2.62:1 — every glyph on a sage button would
-   * effectively vanish. So dark draws near-black on the filled control instead (6.86:1),
-   * which is what the token has always meant: whatever stays legible on a filled accent.
+   * ┌─ THIS TOKEN DELIBERATELY INVERTS BETWEEN THEMES. DO NOT "FIX" IT BACK TO WHITE. ─┐
+   *
+   * `onAccent` is `#FFFFFF` in light and `#15171A` — near-black — in dark. That is not an
+   * oversight, and it is the reason the token exists at all. Measured:
+   *
+   *     light   white   #FFFFFF  on  accent #7D927D   3.3441:1   (the app's long-standing
+   *                                                               primary-button look;
+   *                                                               recorded as a documented
+   *                                                               exception in
+   *                                                               theme.contrast.test.ts)
+   *     dark    white   #FFFFFF  on  accent #89A889   2.6165:1   ✗ fails 4.5:1 AND 3:1
+   *     dark    ink     #15171A  on  accent #89A889   6.8635:1   ✓
+   *
+   * Dark `accent` has to be lifted to `#89A889` to hold against the charcoal ground, and at
+   * that lightness white on it is 2.62:1 — every glyph and check mark on a filled sage
+   * control would effectively disappear. Near-black on the same fill is 6.86:1.
+   *
+   * The obvious alternative — keep `onAccent` white and darken dark-mode sage until white
+   * works — does not survive: white needs its ground at luminance ≤ 0.18, which puts sage
+   * around `#5E7460`, and that measures only ~2.5:1 against `surface` #1A1D21. The accent
+   * would stop reading as an accent. There is no value of sage where white-on-accent and
+   * accent-on-surface both clear their floors, so the foreground is what has to move.
+   *
+   * The token's MEANING is unchanged in both themes and is the thing to hold on to:
+   * "whatever stays legible on a filled accent". Only its value moves. This is also what
+   * iOS and Material do — a lightened accent in dark takes a dark on-colour.
+   *
+   * Note the earlier design spec said `onAccent` "stays near-white in both". That sentence
+   * was wrong and has been corrected; the measurements above are the ruling.
+   *
+   * └───────────────────────────────────────────────────────────────────────────────────┘
    */
   onAccent: string;
 
