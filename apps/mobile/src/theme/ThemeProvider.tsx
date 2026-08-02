@@ -57,8 +57,15 @@ interface PreferenceState {
  *
  * Deliberately `AsyncStorage`, not `expo-secure-store`: this is a display preference, not a
  * credential, and there is nothing here for the Keychain to protect.
+ *
+ * Exported for `ThemeProvider.persistence.test.ts`. A zustand store is a plain object with
+ * a `.getState()`; the hook form is a convenience for components, not a requirement — so
+ * exporting it makes `hydrate()` and `setPreference()` reachable from a unit test with no
+ * renderer and no component-test harness, which this repo deliberately does not have.
+ * Application code should use `useThemeHydrated` / `useThemePreference` below rather than
+ * this directly.
  */
-const usePreferenceStore = create<PreferenceState>((set) => ({
+export const usePreferenceStore = create<PreferenceState>((set) => ({
   preference: 'system',
   hydrated: false,
 
@@ -67,20 +74,40 @@ const usePreferenceStore = create<PreferenceState>((set) => ({
     // Fire-and-forget. A write that fails leaves the in-memory choice correct for the rest
     // of this session; the only cost is that the next cold start reverts to 'system',
     // which is an acceptable degradation for a display preference.
+    //
+    // The `.catch` is what makes "fire-and-forget" true rather than merely intended.
+    // Without it, `void` discards the promise but NOT its rejection, and a failed device
+    // write becomes an unhandled rejection — a redbox in dev, and a noisy crash report in
+    // production, on a path this design has already decided to tolerate. Swallowed here
+    // and nowhere else, because here is the only place that knows the failure is benign.
     void (async () => {
       const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
       await AsyncStorage.setItem(STORAGE_KEY, preference);
-    })();
+    })().catch(() => {
+      // Deliberately empty. See above: the in-memory preference is already correct.
+    });
   },
 
   async hydrate() {
     try {
       const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      // Device storage is not a trusted input — it survives app upgrades, so a value
+      // written by another build can be anything. Only the three literals are accepted;
+      // anything else leaves the 'system' default standing rather than being cast to it.
       if (stored === 'light' || stored === 'dark' || stored === 'system') {
         set({ preference: stored });
       }
+    } catch {
+      // Swallowed on purpose, and this is the load-bearing one. `useThemeHydrated` calls
+      // this as `void hydrate()`, so a rejection escaping here is an unhandled rejection
+      // on the exact failure path the `finally` below exists to handle. A storage read
+      // that fails is not an error the user can act on: the preference simply falls back
+      // to 'system', which is the default anyway.
     } finally {
+      // Runs on both paths. `_layout.tsx` holds the splash and renders `null` until
+      // `hydrated` is true, so a read that failed without opening this gate would leave
+      // the app stuck on the splash screen forever rather than merely un-personalised.
       set({ hydrated: true });
     }
   },
@@ -110,7 +137,14 @@ export function useThemeHydrated(): boolean {
   const hydrate = usePreferenceStore((s) => s.hydrate);
 
   useEffect(() => {
-    void hydrate();
+    // `hydrate()` handles its own failures and is documented never to reject (see the
+    // `catch`/`finally` on the store). The `.catch` here is belt-and-braces for that
+    // contract rather than a second handler: if a future edit reintroduces a throwing
+    // path, this keeps it from surfacing as an unhandled rejection inside an effect,
+    // where React gives it no owner and the stack points at nothing useful.
+    void hydrate().catch(() => {
+      // Deliberately empty; the store has already opened the gate in its `finally`.
+    });
   }, [hydrate]);
 
   return hydrated;
