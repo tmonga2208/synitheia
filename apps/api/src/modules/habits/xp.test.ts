@@ -87,6 +87,34 @@ describe('logHabit — XP wiring', () => {
     expect(afterSecond).toBe(afterFirst);
   });
 
+  it('logging the same habit twice with differently-cased ids moves the total once', async () => {
+    const user = await seedUser();
+    const habit = await seedHabit(user.id);
+    const id = habit._id.toString();
+
+    // `objectIdSchema` is /^[a-f\d]{24}$/i — CASE-INSENSITIVE. Both of these validate
+    // at the route, resolve to the same habit document, and must therefore mint the
+    // same dedupe key. Keying off the raw request string instead of the resolved
+    // document's _id makes them two different keys, so the unique index never trips
+    // and the award silently pays twice. A double-award has no user-visible symptom,
+    // which is exactly why this needs a test rather than a reviewer.
+    await logHabit(user, id, { count: 1 });
+    await logHabit(user, id.toUpperCase(), { count: 1 });
+
+    const stored = await UserModel.findById(user.id);
+    expect(stored?.xp).toBe(XP_AMOUNTS.habitComplete + XP_AMOUNTS.dayComplete);
+
+    expect(
+      await XpAwardModel.countDocuments({
+        userId: new Types.ObjectId(user.id),
+        key: `habit:${id}:${todayLocalDate(IST)}`,
+      }),
+    ).toBe(1);
+    expect(
+      await XpAwardModel.countDocuments({ userId: new Types.ObjectId(user.id) }),
+    ).toBe(2); // the habit award and the day bonus, nothing more
+  });
+
   it('un-completing then re-completing grants nothing further', async () => {
     const user = await seedUser();
     const habit = await seedHabit(user.id, 2);

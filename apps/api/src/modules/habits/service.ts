@@ -201,7 +201,16 @@ export async function logHabit(
       await grantAwards(
         user.id,
         awardsForHabitLog({
-          habitId,
+          /**
+           * The RESOLVED document's id, never `habitId` — which is the raw string off
+           * the request. `objectIdSchema` is `/^[a-f\d]{24}$/i`, case-INSENSITIVE, so
+           * `/habits/6A6E…/log` and `/habits/6a6e…/log` both validate and both resolve
+           * to this same document, but would mint two different dedupe keys. The unique
+           * index cannot save us there — the keys genuinely differ — and a double award
+           * has no user-visible symptom, so nothing would ever report it. Every key
+           * segment must come from a persisted value, not from client input.
+           */
+          habitId: habit._id.toString(),
           localDate,
           complete,
           currentStreak: updated.currentStreak,
