@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Image, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Animated, {
@@ -48,11 +48,21 @@ const SIGN_IN_METHODS = [
   { key: 'apple', label: 'Apple' },
 ] as const;
 
-const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
+const APPEARANCE_OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
+  { value: 'light', label: 'Light', hint: 'Always the light theme.' },
+  { value: 'dark', label: 'Dark', hint: 'Always the dark theme.' },
+  {
+    value: 'system',
+    label: 'System',
+    hint: 'Follow your phone, including its night schedule.',
+  },
 ];
+
+const APPEARANCE_LABEL: Record<ThemePreference, string> = {
+  light: 'Light',
+  dark: 'Dark',
+  system: 'System',
+};
 
 export default function Profile() {
   const t = useTheme();
@@ -62,6 +72,7 @@ export default function Profile() {
   const { preference, setPreference } = useThemePreference();
 
   const [methodsOpen, setMethodsOpen] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const chevron = useSharedValue(0);
 
   const chevronStyle = useAnimatedStyle(() => ({
@@ -164,51 +175,16 @@ export default function Profile() {
           <View style={styles.divider} />
 
           {/*
-            Not a Row — this one has no single destination to push to. The icon/title/
-            subtitle line matches the Row idiom exactly; what follows it is the control
-            itself, inset the same way "methods" sits under Sign-in methods below. The three
-            options are `Chip`, not a bespoke segmented control, per the brief.
+            An ordinary Row, with the current choice as its subtitle. The three options
+            live in a sheet rather than inline: a settings list reads as a list of
+            settings, and the value belongs where every other row puts its value.
           */}
-          <View style={styles.row}>
-            <View style={styles.rowIcon}>
-              <SunMoon size={20} color={t.accent} strokeWidth={1.6} />
-            </View>
-
-            <View style={styles.rowCopy}>
-              <Text variant="cardTitle">Appearance</Text>
-              <Text variant="caption" color={t.textFaint}>
-                Light, dark, or match your device
-              </Text>
-            </View>
-          </View>
-
-          <View
-            style={styles.appearance}
-            accessibilityRole="radiogroup"
-            accessibilityLabel="Appearance"
-          >
-            {APPEARANCE_OPTIONS.map((option) => {
-              const selected = preference === option.value;
-
-              return (
-                <Chip
-                  key={option.value}
-                  label={option.label}
-                  selected={selected}
-                  // The selected segment must read as selected without relying on the
-                  // accent-vs-grey fill alone — a checkmark glyph is the second signal.
-                  icon={
-                    selected ? <Check size={14} color={t.onAccent} strokeWidth={2.5} /> : undefined
-                  }
-                  accessibilityRole="radio"
-                  accessibilityLabel={option.label}
-                  haptic={false}
-                  style={styles.appearanceChip}
-                  onPress={() => setPreference(option.value)}
-                />
-              );
-            })}
-          </View>
+          <Row
+            icon={<SunMoon size={20} color={t.accent} strokeWidth={1.6} />}
+            title="Appearance"
+            subtitle={APPEARANCE_LABEL[preference]}
+            onPress={() => setAppearanceOpen(true)}
+          />
 
           <View style={styles.divider} />
 
@@ -306,7 +282,91 @@ export default function Profile() {
           />
         </Card>
       </ScrollView>
+
+      <AppearanceSheet
+        visible={appearanceOpen}
+        preference={preference}
+        onSelect={(value) => {
+          setPreference(value);
+          setAppearanceOpen(false);
+        }}
+        onClose={() => setAppearanceOpen(false)}
+      />
     </SafeAreaView>
+  );
+}
+
+/**
+ * Three choices, one of them checked.
+ *
+ * A real bottom sheet — `transparent` Modal over the scrim — matching the delete-account
+ * sheet on Privacy. The checkmark is the second signal: which row is selected must not
+ * depend on the accent-versus-grey text colour alone.
+ */
+function AppearanceSheet({
+  visible,
+  preference,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  preference: ThemePreference;
+  onSelect: (value: ThemePreference) => void;
+  onClose: () => void;
+}) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.backdrop}>
+        <Touchable
+          style={styles.backdropDismiss}
+          haptic={false}
+          accessibilityRole="button"
+          accessibilityLabel="Close appearance options"
+          onPress={onClose}
+        />
+
+        <SafeAreaView style={styles.sheet} edges={['bottom']}>
+          <View style={styles.handle} />
+
+          <Text variant="heading" style={styles.sheetTitle}>
+            Appearance
+          </Text>
+
+          <View style={styles.options} accessibilityRole="radiogroup">
+            {APPEARANCE_OPTIONS.map((option) => {
+              const selected = preference === option.value;
+
+              return (
+                <Touchable
+                  key={option.value}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={option.label}
+                  accessibilityHint={option.hint}
+                  haptic={false}
+                  onPress={() => onSelect(option.value)}
+                  style={styles.option}
+                >
+                  <View style={styles.optionCopy}>
+                    <Text variant="cardTitle">{option.label}</Text>
+                    <Text variant="caption" color={t.textFaint}>
+                      {option.hint}
+                    </Text>
+                  </View>
+
+                  {selected ? (
+                    <Check size={20} color={t.accent} strokeWidth={2.5} />
+                  ) : null}
+                </Touchable>
+              );
+            })}
+          </View>
+        </SafeAreaView>
+      </View>
+    </Modal>
   );
 }
 
@@ -421,16 +481,37 @@ const makeStyles = (t: Theme) =>
     },
     // Same inset as `methods` — the three segments read as detail under "Appearance"
     // rather than a sibling row of their own.
-    appearance: {
-      flexDirection: 'row',
-      paddingLeft: spacing.lg + 40 + spacing.base,
-      paddingRight: spacing.lg,
-      paddingBottom: spacing.lg,
-      gap: spacing.sm,
+    backdrop: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: t.scrim,
     },
-    // `Chip`'s default 36pt is a label pill, not a control — these are tapped directly, so
-    // they get their own floor rather than changing the shared primitive's height everywhere.
-    appearanceChip: { minHeight: MIN_TAP_TARGET, flex: 1 },
+    backdropDismiss: { flex: 1 },
+    // A real bottom sheet: transparent Modal, slides up over the scrim.
+    sheet: {
+      backgroundColor: t.surface,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 96,
+      height: 6,
+      borderRadius: radius.full,
+      backgroundColor: t.border,
+    },
+    sheetTitle: { marginTop: spacing.lg },
+    options: { paddingVertical: spacing.base },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.base,
+      minHeight: MIN_TAP_TARGET,
+      paddingVertical: spacing.md,
+    },
+    optionCopy: { flex: 1, gap: spacing.xs },
     method: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     methodIcon: {
       width: 32,
