@@ -1,6 +1,8 @@
 import { Types } from 'mongoose';
+import type { FastifyBaseLogger } from 'fastify';
 import {
   addLocalDays,
+  awardsForHabitLog,
   completionRate,
   computeStreak,
   diffLocalDays,
@@ -24,6 +26,7 @@ import {
 import { invalidateDailySummary } from '../../context/aggregator.js';
 import { dedupeKey, emit } from '../../context/engine.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
+import { grantAwards } from '../xp/service.js';
 
 /**
  * Hydrated (has .save()) vs lean (plain object) are kept as separate types on purpose
@@ -128,6 +131,12 @@ export async function logHabit(
   user: AuthedUser,
   habitId: string,
   input: LogHabitInput,
+  /**
+   * Optional so every direct caller in this codebase's tests keeps compiling
+   * unchanged; the real route passes `req.log`, the same facility `today/routes.ts`
+   * already uses for "this must not take down the main write" failures.
+   */
+  logger?: Pick<FastifyBaseLogger, 'warn'>,
 ): Promise<{ log: HabitLogDoc; habit: HabitHydrated }> {
   const habit = await HabitModel.findOne({
     _id: new Types.ObjectId(habitId),
@@ -178,6 +187,32 @@ export async function logHabit(
   await invalidateDailySummary(user.id, localDate);
 
   if (complete) {
+    /**
+     * XP is a nicety layered on top of a write that already landed — a ledger
+     * hiccup must never surface as a failed habit tap. Swallowed and logged, same
+     * contract as `today/routes.ts`'s "detectors must not break Today" wrapping.
+     */
+    try {
+      const [scheduled, dayLogs] = await Promise.all([
+        scheduledOn(user.id, localDate),
+        logsForDate(user.id, localDate),
+      ]);
+
+      await grantAwards(
+        user.id,
+        awardsForHabitLog({
+          habitId,
+          localDate,
+          complete,
+          currentStreak: updated.currentStreak,
+          scheduledCount: scheduled.length,
+          completedCount: dayLogs.filter(isHabitComplete).length,
+        }),
+      );
+    } catch (error) {
+      logger?.warn({ err: error }, 'failed to grant habit XP');
+    }
+
     await emit({
       userId: user.id,
       source: 'manual',
