@@ -79,7 +79,9 @@ flagged in the implementer's report rather than guessed.
 ```
 bg              the screen behind everything
 surface         a card
-surfaceRaised   a sheet, a menu, anything above a card
+surfaceRaised   a small inset control: chips, inputs, secondary buttons
+                (NOT sheets — a sheet uses `surface` and reads as raised against
+                 the scrim, which is also how the light app already behaves)
 border          hairline separators and card edges
 textPrimary     body and headings
 textMuted       metadata, secondary copy
@@ -97,7 +99,7 @@ danger, warning unchanged in role
 bg             #15171A
 surface        #1A1D21
 surfaceRaised  #20242A
-border         #24282D
+border         #2C3138
 ```
 
 Depth comes from the step in lightness. The `shadow` tokens resolve to `shadow.none` in
