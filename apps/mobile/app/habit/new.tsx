@@ -31,13 +31,9 @@ import {
 } from '../../src/components/primitives.js';
 import { DEFAULT_ICON, IconPicker, iconFor } from '../../src/components/IconPicker.js';
 import { ApiError, api } from '../../src/api/client.js';
-import {
-  MIN_TAP_TARGET,
-  accentFor,
-  palette,
-  radius,
-  spacing,
-} from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../../src/theme/theme.js';
 
 const BASE_CATEGORIES = ['Mindfulness', 'Health'] as const;
 
@@ -86,6 +82,8 @@ async function scheduleReminder(habit: Habit, time: TimeOfDay): Promise<void> {
 }
 
 export default function NewHabit() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const queryClient = useQueryClient();
 
   const [name, setName] = useState('');
@@ -110,7 +108,7 @@ export default function NewHabit() {
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const accent = accentFor(color);
+  const accent = accentFor(color, t);
   const SelectedIcon = iconFor(icon).Icon;
   const periodLabel = frequency === 'daily' ? 'Daily' : 'Weekly';
 
@@ -220,7 +218,7 @@ export default function NewHabit() {
               haptic={false}
               onPress={() => router.back()}
             >
-              <ArrowLeft size={22} color={palette.stone} />
+              <ArrowLeft size={22} color={t.textPrimary} />
             </Touchable>
 
             <Touchable
@@ -234,7 +232,7 @@ export default function NewHabit() {
           </View>
 
           <Text variant="title">New Habit</Text>
-          <Text variant="body" color={palette.stoneMuted} style={styles.subtitle}>
+          <Text variant="body" color={t.textMuted} style={styles.subtitle}>
             Design a habit that nourishes your daily life.
           </Text>
 
@@ -319,12 +317,12 @@ export default function NewHabit() {
                     onPress={() => setFrequency(value)}
                     style={[
                       styles.segment,
-                      ...(active ? [{ backgroundColor: palette.sage }] : []),
+                      ...(active ? [{ backgroundColor: t.accent }] : []),
                     ]}
                   >
                     <Text
                       variant="heading"
-                      color={active ? palette.white : palette.stoneMuted}
+                      color={active ? t.onAccent : t.textMuted}
                     >
                       {label}
                     </Text>
@@ -349,9 +347,9 @@ export default function NewHabit() {
             {/* A tick has no goal to set — 'done' is the only target it can have. */}
             {measure === 'check' ? null : (
               <View style={styles.goalRow}>
-                <Text variant="section" color={palette.stoneMuted}>
+                <Text variant="section" color={t.textMuted}>
                   Goal:{' '}
-                  <Text variant="section" color={palette.stone}>
+                  <Text variant="section" color={t.textPrimary}>
                     {`${targetCount.toLocaleString()} ${unit ?? spec.unit ?? ''} ${periodLabel.toLowerCase()}`}
                   </Text>
                 </Text>
@@ -364,7 +362,7 @@ export default function NewHabit() {
                     onPress={() => shiftTarget(-1)}
                     style={styles.stepButton}
                   >
-                    <Minus size={18} color={palette.white} />
+                    <Minus size={18} color={t.onAccent} />
                   </Touchable>
 
                   <Touchable
@@ -374,7 +372,7 @@ export default function NewHabit() {
                     onPress={() => shiftTarget(1)}
                     style={styles.stepButton}
                   >
-                    <Plus size={18} color={palette.white} />
+                    <Plus size={18} color={t.onAccent} />
                   </Touchable>
                 </View>
               </View>
@@ -405,7 +403,7 @@ export default function NewHabit() {
                   setTime((t) => ({ ...t, hour: ((t.hour - 1 + d + 12) % 12) + 1 }))
                 }
               />
-              <Text variant="heading" color={palette.stoneFaint}>
+              <Text variant="heading" color={t.textFaint}>
                 :
               </Text>
               <TimeField
@@ -425,23 +423,23 @@ export default function NewHabit() {
             </View>
 
             <View style={styles.toggleRow}>
-              <Text variant="label" color={palette.stoneMuted}>
+              <Text variant="label" color={t.textMuted}>
                 Notification Enabled
               </Text>
               <Switch
                 value={reminderEnabled}
                 onValueChange={setReminderEnabled}
                 accessibilityLabel="Notification enabled"
-                trackColor={{ false: palette.surfaceDim, true: palette.sage }}
-                thumbColor={palette.white}
-                ios_backgroundColor={palette.surfaceDim}
+                trackColor={{ false: t.border, true: t.accent }}
+                thumbColor={t.onAccent}
+                ios_backgroundColor={t.border}
               />
             </View>
           </Card>
 
           {formError ? (
             <View style={styles.formError} accessibilityLiveRegion="polite">
-              <Text variant="label" color={palette.danger}>
+              <Text variant="label" color={t.danger}>
                 {formError}
               </Text>
             </View>
@@ -488,6 +486,9 @@ function TimeField({
   label: string;
   onStep: (delta: number) => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <Touchable
       accessibilityRole="adjustable"
@@ -500,7 +501,7 @@ function TimeField({
       onPress={() => onStep(1)}
       style={styles.timeTile}
     >
-      <Text variant="heading" color={palette.white}>
+      <Text variant="heading" color={t.onAccent}>
         {value}
       </Text>
     </Touchable>
@@ -518,6 +519,9 @@ function ColorPicker({
   onSelect: (color: string) => void;
   onClose: () => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
@@ -553,7 +557,7 @@ function ColorPicker({
                   style={[
                     styles.swatchOption,
                     { backgroundColor: value },
-                    ...(isSelected ? [{ borderColor: palette.stone }] : []),
+                    ...(isSelected ? [{ borderColor: t.textPrimary }] : []),
                   ]}
                 />
               );
@@ -565,148 +569,150 @@ function ColorPicker({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  flex: { flex: 1 },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing['3xl'],
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.base,
-  },
-  iconButton: {
-    width: MIN_TAP_TARGET,
-    height: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-  },
-  swatch: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.sm,
-  },
-  subtitle: { marginTop: spacing.xs },
-  card: { marginTop: spacing.xl, gap: spacing.base },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  iconChip: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  newCategory: { marginTop: spacing.xs },
-  measures: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  segments: {
-    flexDirection: 'row',
-    padding: spacing.xs,
-    borderRadius: radius.md,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-  },
-  segment: {
-    flex: 1,
-    minHeight: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-  },
-  goalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  stepper: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  stepButton: {
-    width: MIN_TAP_TARGET,
-    height: MIN_TAP_TARGET,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.sageSoft,
-  },
-  clock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  timeTile: {
-    minWidth: MIN_TAP_TARGET,
-    minHeight: MIN_TAP_TARGET,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.sage,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: palette.surfaceDim,
-    paddingTop: spacing.md,
-  },
-  formError: {
-    marginTop: spacing.lg,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.danger,
-  },
-  cta: { marginTop: spacing.xl },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: palette.scrim,
-  },
-  sheet: {
-    backgroundColor: palette.bone,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 96,
-    height: 6,
-    borderRadius: radius.full,
-    backgroundColor: palette.surfaceDim,
-  },
-  sheetTitle: { marginTop: spacing.lg },
-  swatches: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  swatchOption: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.md,
-    borderWidth: 3,
-    borderColor: 'transparent',
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    flex: { flex: 1 },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing['3xl'],
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.base,
+    },
+    iconButton: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.md,
+    },
+    swatch: {
+      width: 36,
+      height: 36,
+      borderRadius: radius.sm,
+    },
+    subtitle: { marginTop: spacing.xs },
+    card: { marginTop: spacing.xl, gap: spacing.base },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    iconChip: {
+      width: 52,
+      height: 52,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pills: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    newCategory: { marginTop: spacing.xs },
+    measures: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    segments: {
+      flexDirection: 'row',
+      padding: spacing.xs,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    segment: {
+      flex: 1,
+      minHeight: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.md,
+    },
+    goalRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    stepper: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    stepButton: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      borderRadius: radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.accentSoft,
+    },
+    clock: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    timeTile: {
+      minWidth: MIN_TAP_TARGET,
+      minHeight: MIN_TAP_TARGET,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.accent,
+    },
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderTopWidth: 1,
+      borderTopColor: t.border,
+      paddingTop: spacing.md,
+    },
+    formError: {
+      marginTop: spacing.lg,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.danger,
+    },
+    cta: { marginTop: spacing.xl },
+    backdrop: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: t.scrim,
+    },
+    // A real bottom sheet: transparent Modal, slides up over the scrim.
+    sheet: {
+      backgroundColor: t.surface,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.xl,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 96,
+      height: 6,
+      borderRadius: radius.full,
+      backgroundColor: t.border,
+    },
+    sheetTitle: { marginTop: spacing.lg },
+    swatches: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.md,
+      marginTop: spacing.lg,
+    },
+    swatchOption: {
+      width: 56,
+      height: 56,
+      borderRadius: radius.md,
+      borderWidth: 3,
+      borderColor: 'transparent',
+    },
+  });

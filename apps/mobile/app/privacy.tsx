@@ -43,7 +43,9 @@ import type {
   ListResponse,
 } from '../src/api/types.js';
 import { useAuth } from '../src/store/auth.js';
-import { MIN_TAP_TARGET, palette, radius, spacing } from '../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import type { Theme } from '../src/theme/theme.js';
 
 const SOURCES_KEY = ['data-sources'] as const;
 const AVAILABILITY_KEY = ['insights', 'availability'] as const;
@@ -55,10 +57,10 @@ const STATUS_LABEL: Record<DataSourceStatus, string> = {
   unavailable: 'Unavailable',
 };
 
-function statusColor(status: DataSourceStatus): string {
-  if (status === 'connected') return palette.sage;
-  if (status === 'unavailable') return palette.stoneFaint;
-  return palette.stoneMuted;
+function statusColor(status: DataSourceStatus, t: Theme): string {
+  if (status === 'connected') return t.accent;
+  if (status === 'unavailable') return t.textFaint;
+  return t.textMuted;
 }
 
 function formatSynced(iso: string | null): string {
@@ -87,6 +89,8 @@ function formatSynced(iso: string | null): string {
  *     control panel.
  */
 export default function Privacy() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const user = useAuth((s) => s.user);
   const queryClient = useQueryClient();
 
@@ -270,7 +274,7 @@ export default function Privacy() {
       haptic={false}
       onPress={() => router.back()}
     >
-      <ArrowLeft size={22} color={palette.stone} />
+      <ArrowLeft size={22} color={t.textPrimary} />
     </Touchable>
   );
 
@@ -309,13 +313,13 @@ export default function Privacy() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>{back}</View>
 
-        <Text variant="overline" color={palette.stoneFaint}>
+        <Text variant="overline" color={t.textFaint}>
           Privacy
         </Text>
         <Text variant="title" style={styles.heading}>
           Connected Context
         </Text>
-        <Text variant="body" color={palette.stoneMuted} style={styles.intro}>
+        <Text variant="body" color={t.textMuted} style={styles.intro}>
           Everything Synítheia knows about you, and where it came from. A source you turn
           off here cannot be read again — even if the operating system still permits it.
         </Text>
@@ -324,12 +328,12 @@ export default function Privacy() {
         <Card style={styles.aiCard}>
           <View style={styles.aiHeader}>
             <View style={styles.aiIcon}>
-              <ImageIcon size={20} color={palette.sage} strokeWidth={1.6} />
+              <ImageIcon size={20} color={t.accent} strokeWidth={1.6} />
             </View>
 
             <View style={styles.aiCopy}>
               <Text variant="cardTitle">Keep receipt images</Text>
-              <Text variant="caption" color={palette.stoneMuted}>
+              <Text variant="caption" color={t.textMuted}>
                 {storeReceipts
                   ? 'Receipt photos are saved to your account.'
                   : 'Receipt photos are not kept. Scanning still works.'}
@@ -339,7 +343,7 @@ export default function Privacy() {
             <Switch
               value={storeReceipts}
               onValueChange={(next) => setReceipts.mutate(next)}
-              trackColor={{ true: palette.sage, false: palette.surfaceDim }}
+              trackColor={{ true: t.accent, false: t.border }}
               accessibilityLabel="Keep receipt images"
             />
           </View>
@@ -349,7 +353,7 @@ export default function Privacy() {
             merely stop future collection, it deletes what was already taken. A toggle
             that quietly keeps your old images is not a privacy control.
           */}
-          <Text variant="caption" color={palette.stoneFaint} style={styles.aiNote}>
+          <Text variant="caption" color={t.textFaint} style={styles.aiNote}>
             Images are stored on our server, not only on this phone. Turning this off
             deletes every receipt already saved.
           </Text>
@@ -359,12 +363,12 @@ export default function Privacy() {
         <Card style={styles.aiCard}>
           <View style={styles.aiHeader}>
             <View style={styles.aiIcon}>
-              <Sparkles size={20} color={palette.sage} strokeWidth={1.6} />
+              <Sparkles size={20} color={t.accent} strokeWidth={1.6} />
             </View>
 
             <View style={styles.aiCopy}>
               <Text variant="cardTitle">Synítheia AI</Text>
-              <Text variant="caption" color={palette.stoneFaint}>
+              <Text variant="caption" color={t.textFaint}>
                 {aiConfigured
                   ? 'Off by default. Nothing is sent to a model until you turn this on.'
                   : 'Unavailable in this build — no model provider is configured.'}
@@ -376,9 +380,9 @@ export default function Privacy() {
               disabled={!aiConfigured}
               onValueChange={(value) => setAiEnabled.mutate(value)}
               accessibilityLabel="Synítheia AI enabled"
-              trackColor={{ false: palette.surfaceDim, true: palette.sage }}
-              thumbColor={palette.white}
-              ios_backgroundColor={palette.surfaceDim}
+              trackColor={{ false: t.border, true: t.accent }}
+              thumbColor={t.onAccent}
+              ios_backgroundColor={t.border}
             />
           </View>
         </Card>
@@ -423,12 +427,12 @@ export default function Privacy() {
             disabled={exporting}
             style={styles.dataRow}
           >
-            <Download size={20} color={palette.stone} strokeWidth={1.6} />
+            <Download size={20} color={t.textPrimary} strokeWidth={1.6} />
             <View style={styles.dataCopy}>
               <Text variant="bodyMedium">
                 {exporting ? 'Preparing your export…' : 'Export my data'}
               </Text>
-              <Text variant="caption" color={palette.stoneFaint}>
+              <Text variant="caption" color={t.textFaint}>
                 Everything we store, as JSON, to take wherever you like.
               </Text>
             </View>
@@ -444,12 +448,12 @@ export default function Privacy() {
             onPress={() => setDeleting(true)}
             style={styles.dataRow}
           >
-            <Trash2 size={20} color={palette.danger} strokeWidth={1.6} />
+            <Trash2 size={20} color={t.danger} strokeWidth={1.6} />
             <View style={styles.dataCopy}>
-              <Text variant="bodyMedium" color={palette.danger}>
+              <Text variant="bodyMedium" color={t.danger}>
                 Delete account
               </Text>
-              <Text variant="caption" color={palette.stoneFaint}>
+              <Text variant="caption" color={t.textFaint}>
                 Erased, not flagged. Your habits, spending, food, and history are gone for
                 good.
               </Text>
@@ -478,6 +482,8 @@ function SourceCard({
   onCollectChange: (collect: boolean) => void;
   onAiChange: (aiAllowed: boolean) => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const unavailable = item.status === 'unavailable';
   const connected = item.status === 'connected';
 
@@ -488,13 +494,13 @@ function SourceCard({
           {item.title}
         </Text>
 
-        <View style={[styles.badge, { borderColor: statusColor(item.status) }]}>
+        <View style={[styles.badge, { borderColor: statusColor(item.status, t) }]}>
           {connected ? (
-            <Check size={12} color={palette.sage} strokeWidth={2.5} />
+            <Check size={12} color={t.accent} strokeWidth={2.5} />
           ) : unavailable ? (
-            <Ban size={12} color={palette.stoneFaint} strokeWidth={2} />
+            <Ban size={12} color={t.textFaint} strokeWidth={2} />
           ) : null}
-          <Text variant="caption" color={statusColor(item.status)}>
+          <Text variant="caption" color={statusColor(item.status, t)}>
             {STATUS_LABEL[item.status]}
           </Text>
         </View>
@@ -502,19 +508,19 @@ function SourceCard({
 
       {/* The `why` is written and served by the server, so the stated purpose cannot
           drift from the actual collection across an app-store release cycle. */}
-      <Text variant="body" color={palette.stoneMuted}>
+      <Text variant="body" color={t.textMuted}>
         {item.why}
       </Text>
 
       <View style={styles.meta}>
-        <Text variant="caption" color={palette.stoneFaint}>
+        <Text variant="caption" color={t.textFaint}>
           {item.platforms}
         </Text>
-        <Text variant="caption" color={palette.stoneFaint}>
+        <Text variant="caption" color={t.textFaint}>
           {item.reliability}
         </Text>
         {!unavailable ? (
-          <Text variant="caption" color={palette.stoneFaint}>
+          <Text variant="caption" color={t.textFaint}>
             {`${formatSynced(item.lastSyncedAt)} · ${item.eventCount} ${
               item.eventCount === 1 ? 'event' : 'events'
             }`}
@@ -526,10 +532,10 @@ function SourceCard({
       <View style={styles.consents}>
         <View style={styles.consentRow}>
           <View style={styles.consentCopy}>
-            <Text variant="bodyMedium" color={unavailable ? palette.stoneFaint : palette.stone}>
+            <Text variant="bodyMedium" color={unavailable ? t.textFaint : t.textPrimary}>
               Collect this data
             </Text>
-            <Text variant="caption" color={palette.stoneFaint}>
+            <Text variant="caption" color={t.textFaint}>
               {unavailable
                 ? 'Not something we can do — see above.'
                 : 'Read it into your timeline and your day.'}
@@ -541,9 +547,9 @@ function SourceCard({
             disabled={unavailable}
             onValueChange={onCollectChange}
             accessibilityLabel={`Collect ${item.title}`}
-            trackColor={{ false: palette.surfaceDim, true: palette.sage }}
-            thumbColor={palette.white}
-            ios_backgroundColor={palette.surfaceDim}
+            trackColor={{ false: t.border, true: t.accent }}
+            thumbColor={t.onAccent}
+            ios_backgroundColor={t.border}
           />
         </View>
 
@@ -552,15 +558,15 @@ function SourceCard({
         <View style={styles.consentRow}>
           <View style={styles.consentCopy}>
             <View style={styles.aiLabel}>
-              <Sparkles size={14} color={palette.stoneMuted} strokeWidth={1.8} />
+              <Sparkles size={14} color={t.textMuted} strokeWidth={1.8} />
               <Text
                 variant="bodyMedium"
-                color={connected && aiEnabled ? palette.stone : palette.stoneFaint}
+                color={connected && aiEnabled ? t.textPrimary : t.textFaint}
               >
                 Let Synítheia AI use it
               </Text>
             </View>
-            <Text variant="caption" color={palette.stoneFaint}>
+            <Text variant="caption" color={t.textFaint}>
               {unavailable
                 ? 'Nothing is collected, so there is nothing to reason about.'
                 : !connected
@@ -576,9 +582,9 @@ function SourceCard({
             disabled={unavailable || !connected || !aiEnabled}
             onValueChange={onAiChange}
             accessibilityLabel={`Let Synítheia AI use ${item.title}`}
-            trackColor={{ false: palette.surfaceDim, true: palette.sage }}
-            thumbColor={palette.white}
-            ios_backgroundColor={palette.surfaceDim}
+            trackColor={{ false: t.border, true: t.accent }}
+            thumbColor={t.onAccent}
+            ios_backgroundColor={t.border}
           />
         </View>
       </View>
@@ -599,6 +605,8 @@ function DeleteAccountSheet({
   email: string;
   onClose: () => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const signOut = useAuth((s) => s.signOut);
 
   const [confirmEmail, setConfirmEmail] = useState('');
@@ -645,7 +653,7 @@ function DeleteAccountSheet({
             </Text>
 
             <View style={styles.sheetBody}>
-              <Text variant="body" color={palette.stoneMuted}>
+              <Text variant="body" color={t.textMuted}>
                 This erases your habits, expenses, food, water, reminders, timeline, and
                 every insight — permanently, not with a flag. There is no undo and no
                 grace period.
@@ -683,126 +691,128 @@ function DeleteAccountSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing['4xl'],
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.base,
-  },
-  iconButton: {
-    width: MIN_TAP_TARGET,
-    height: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-  },
-  heading: { marginTop: spacing.xs },
-  intro: { marginTop: spacing.sm },
-  aiCard: { marginTop: spacing.xl },
-  aiHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  aiIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.sageWash,
-  },
-  aiCopy: { flex: 1, gap: spacing.xs },
-  aiNote: { marginTop: spacing.md },
-  sources: { marginTop: spacing.xl, gap: spacing.base },
-  source: { gap: spacing.md },
-  sourceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  sourceTitle: { flexShrink: 1 },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    backgroundColor: palette.sand,
-  },
-  meta: { gap: spacing.xs },
-  consents: {
-    marginTop: spacing.xs,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    backgroundColor: palette.sand,
-    paddingHorizontal: spacing.base,
-  },
-  consentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    minHeight: MIN_TAP_TARGET + spacing.md,
-    paddingVertical: spacing.md,
-  },
-  consentCopy: { flex: 1, gap: spacing.xs },
-  consentDivider: {
-    height: 1,
-    backgroundColor: palette.surfaceDim,
-  },
-  aiLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  dataCard: { marginTop: spacing.xl, gap: spacing.sm },
-  dataRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.base,
-    minHeight: MIN_TAP_TARGET + spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  dataCopy: { flex: 1, gap: spacing.xs },
-  divider: {
-    height: 1,
-    backgroundColor: palette.surfaceDim,
-  },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: palette.scrim,
-  },
-  backdropDismiss: { flex: 1 },
-  sheet: {
-    backgroundColor: palette.bone,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 96,
-    height: 6,
-    borderRadius: radius.full,
-    backgroundColor: palette.surfaceDim,
-  },
-  sheetTitle: { marginTop: spacing.lg },
-  sheetBody: {
-    marginTop: spacing.lg,
-    gap: spacing.base,
-    paddingBottom: spacing.xl,
-  },
-  deleteButton: { backgroundColor: palette.danger },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing['4xl'],
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.base,
+    },
+    iconButton: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.md,
+    },
+    heading: { marginTop: spacing.xs },
+    intro: { marginTop: spacing.sm },
+    aiCard: { marginTop: spacing.xl },
+    aiHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    aiIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.accentWash,
+    },
+    aiCopy: { flex: 1, gap: spacing.xs },
+    aiNote: { marginTop: spacing.md },
+    sources: { marginTop: spacing.xl, gap: spacing.base },
+    source: { gap: spacing.md },
+    sourceHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    sourceTitle: { flexShrink: 1 },
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 3,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      backgroundColor: t.surfaceRaised,
+    },
+    meta: { gap: spacing.xs },
+    consents: {
+      marginTop: spacing.xs,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: t.border,
+      backgroundColor: t.surfaceRaised,
+      paddingHorizontal: spacing.base,
+    },
+    consentRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      minHeight: MIN_TAP_TARGET + spacing.md,
+      paddingVertical: spacing.md,
+    },
+    consentCopy: { flex: 1, gap: spacing.xs },
+    consentDivider: {
+      height: 1,
+      backgroundColor: t.border,
+    },
+    aiLabel: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    dataCard: { marginTop: spacing.xl, gap: spacing.sm },
+    dataRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.base,
+      minHeight: MIN_TAP_TARGET + spacing.sm,
+      paddingVertical: spacing.sm,
+    },
+    dataCopy: { flex: 1, gap: spacing.xs },
+    divider: {
+      height: 1,
+      backgroundColor: t.border,
+    },
+    backdrop: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: t.scrim,
+    },
+    backdropDismiss: { flex: 1 },
+    // A real bottom sheet: transparent Modal, slides up over the scrim.
+    sheet: {
+      backgroundColor: t.surface,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 96,
+      height: 6,
+      borderRadius: radius.full,
+      backgroundColor: t.border,
+    },
+    sheetTitle: { marginTop: spacing.lg },
+    sheetBody: {
+      marginTop: spacing.lg,
+      gap: spacing.base,
+      paddingBottom: spacing.xl,
+    },
+    deleteButton: { backgroundColor: t.danger },
+  });

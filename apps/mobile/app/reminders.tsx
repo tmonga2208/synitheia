@@ -29,7 +29,9 @@ import {
 import { SkeletonList } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
 import type { ListResponse, WireReminder } from '../src/api/types.js';
-import { MIN_TAP_TARGET, palette, radius, spacing } from '../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import type { Theme } from '../src/theme/theme.js';
 
 const REMINDERS_KEY = ['reminders'] as const;
 
@@ -131,6 +133,8 @@ function describe(reminder: WireReminder): string {
 }
 
 export default function Reminders() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const queryClient = useQueryClient();
   const [composing, setComposing] = useState(false);
 
@@ -232,14 +236,14 @@ export default function Reminders() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
     >
-      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
     </Touchable>
   );
 
   const header = (
     <View style={styles.header}>
       <View style={styles.headerCopy}>
-        <Text variant="overline" color={palette.stoneFaint}>
+        <Text variant="overline" color={t.textFaint}>
           On this device
         </Text>
         <Text variant="title">Reminders</Text>
@@ -251,7 +255,7 @@ export default function Reminders() {
         onPress={() => setComposing(true)}
         style={styles.add}
       >
-        <Plus size={22} color={palette.white} strokeWidth={2} />
+        <Plus size={22} color={t.onAccent} strokeWidth={2} />
       </Touchable>
     </View>
   );
@@ -294,7 +298,7 @@ export default function Reminders() {
           <RefreshControl
             refreshing={query.isRefetching}
             onRefresh={() => void query.refetch()}
-            tintColor={palette.sage}
+            tintColor={t.accent}
           />
         }
       >
@@ -303,7 +307,7 @@ export default function Reminders() {
 
         {reminders.length === 0 ? (
           <EmptyState
-            icon={<Bell size={30} color={palette.white} strokeWidth={1.5} />}
+            icon={<Bell size={30} color={t.onAccent} strokeWidth={1.5} />}
             title="No reminders yet"
             body="A gentle nudge at the right moment does more than a streak ever will. They fire on this device, even offline."
             actionLabel="+ Add a reminder"
@@ -317,7 +321,7 @@ export default function Reminders() {
                   <Text variant="cardTitle" numberOfLines={1}>
                     {reminder.label}
                   </Text>
-                  <Text variant="caption" color={palette.stoneFaint}>
+                  <Text variant="caption" color={t.textFaint}>
                     {describe(reminder)}
                   </Text>
                 </View>
@@ -326,9 +330,9 @@ export default function Reminders() {
                   value={reminder.enabled}
                   onValueChange={(enabled) => toggle.mutate({ reminder, enabled })}
                   accessibilityLabel={`${reminder.label} enabled`}
-                  trackColor={{ false: palette.surfaceDim, true: palette.sage }}
-                  thumbColor={palette.white}
-                  ios_backgroundColor={palette.surfaceDim}
+                  trackColor={{ false: t.border, true: t.accent }}
+                  thumbColor={t.onAccent}
+                  ios_backgroundColor={t.border}
                 />
 
                 <Touchable
@@ -338,7 +342,7 @@ export default function Reminders() {
                   onPress={() => confirmDelete(reminder)}
                   style={styles.iconButton}
                 >
-                  <Trash2 size={18} color={palette.danger} strokeWidth={1.6} />
+                  <Trash2 size={18} color={t.danger} strokeWidth={1.6} />
                 </Touchable>
               </Card>
             ))}
@@ -376,6 +380,8 @@ function ComposeSheet({
   onClose: () => void;
   onSubmit: (input: CreateReminderInput) => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [label, setLabel] = useState('');
   const [kind, setKind] = useState<ReminderKind>('custom');
   const [hour, setHour] = useState(19);
@@ -426,7 +432,7 @@ function ComposeSheet({
               </View>
 
               <View style={styles.timeRow}>
-                <Text variant="label" color={palette.stoneMuted}>
+                <Text variant="label" color={t.textMuted}>
                   Time
                 </Text>
 
@@ -436,7 +442,7 @@ function ComposeSheet({
                     value={pad(hour)}
                     onStep={(d) => setHour((h) => (h + d + 24) % 24)}
                   />
-                  <Text variant="heading" color={palette.stoneFaint}>
+                  <Text variant="heading" color={t.textFaint}>
                     :
                   </Text>
                   <Stepper
@@ -448,7 +454,7 @@ function ComposeSheet({
               </View>
 
               <View>
-                <Text variant="label" color={palette.stoneMuted} style={styles.daysLabel}>
+                <Text variant="label" color={t.textMuted} style={styles.daysLabel}>
                   Repeat — leave empty for every day
                 </Text>
 
@@ -476,7 +482,7 @@ function ComposeSheet({
               </View>
 
               {error ? (
-                <Text variant="caption" color={palette.danger} accessibilityLiveRegion="polite">
+                <Text variant="caption" color={t.danger} accessibilityLiveRegion="polite">
                   {error}
                 </Text>
               ) : null}
@@ -512,6 +518,9 @@ function Stepper({
   value: string;
   onStep: (delta: number) => void;
 }) {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.stepper}>
       <Touchable
@@ -520,7 +529,7 @@ function Stepper({
         onPress={() => onStep(-1)}
         style={styles.stepButton}
       >
-        <Minus size={16} color={palette.stone} strokeWidth={2} />
+        <Minus size={16} color={t.textPrimary} strokeWidth={2} />
       </Touchable>
 
       <Text
@@ -538,109 +547,111 @@ function Stepper({
         onPress={() => onStep(1)}
         style={styles.stepButton}
       >
-        <Plus size={16} color={palette.stone} strokeWidth={2} />
+        <Plus size={16} color={t.textPrimary} strokeWidth={2} />
       </Touchable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
-  },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  headerCopy: { gap: spacing.xs },
-  add: {
-    width: MIN_TAP_TARGET + 4,
-    height: MIN_TAP_TARGET + 4,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.sage,
-  },
-  list: { gap: spacing.md },
-  reminder: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  reminderCopy: { flex: 1, gap: spacing.xs },
-  iconButton: {
-    width: MIN_TAP_TARGET,
-    height: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-  },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: palette.scrim,
-  },
-  backdropDismiss: { flex: 1 },
-  sheet: {
-    backgroundColor: palette.bone,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 96,
-    height: 6,
-    borderRadius: radius.full,
-    backgroundColor: palette.surfaceDim,
-  },
-  sheetTitle: { marginTop: spacing.lg },
-  sheetBody: {
-    marginTop: spacing.lg,
-    gap: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  pills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  timeRow: { gap: spacing.sm },
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.xs,
-    borderRadius: radius.md,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-  },
-  stepButton: {
-    width: MIN_TAP_TARGET,
-    height: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-  },
-  stepValue: { minWidth: 32, textAlign: 'center' },
-  daysLabel: { marginBottom: spacing.sm },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.xl,
+    },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    headerCopy: { gap: spacing.xs },
+    add: {
+      width: MIN_TAP_TARGET + 4,
+      height: MIN_TAP_TARGET + 4,
+      borderRadius: radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.accent,
+    },
+    list: { gap: spacing.md },
+    reminder: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    reminderCopy: { flex: 1, gap: spacing.xs },
+    iconButton: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.md,
+    },
+    backdrop: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: t.scrim,
+    },
+    backdropDismiss: { flex: 1 },
+    // A real bottom sheet: transparent Modal, slides up over the scrim.
+    sheet: {
+      backgroundColor: t.surface,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 96,
+      height: 6,
+      borderRadius: radius.full,
+      backgroundColor: t.border,
+    },
+    sheetTitle: { marginTop: spacing.lg },
+    sheetBody: {
+      marginTop: spacing.lg,
+      gap: spacing.lg,
+      paddingBottom: spacing.xl,
+    },
+    pills: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    timeRow: { gap: spacing.sm },
+    stepperRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    stepper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      padding: spacing.xs,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    stepButton: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.sm,
+    },
+    stepValue: { minWidth: 32, textAlign: 'center' },
+    daysLabel: { marginBottom: spacing.sm },
+  });
