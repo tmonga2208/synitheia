@@ -1,7 +1,21 @@
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose, { Types } from 'mongoose';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { XP_AMOUNTS, type LocalDate } from '@synitheia/shared';
+import Fastify, { type FastifyRequest } from 'fastify';
+import {
+  serializerCompiler,
+  validatorCompiler,
+  type ZodTypeProvider,
+} from 'fastify-type-provider-zod';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  XP_AMOUNTS,
+  addLocalDays,
+  addMonths,
+  firstOfMonth,
+  monthKeyOf,
+  todayLocalDate,
+  type LocalDate,
+} from '@synitheia/shared';
 import {
   ExpenseModel,
   UserModel,
@@ -9,7 +23,7 @@ import {
   XpAwardModel,
 } from '../../db/models.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
-import { awardMonthlyBudget } from './routes.js';
+import { awardMonthlyBudget, registerTodayRoutes } from './routes.js';
 
 let mongo: MongoMemoryReplSet;
 
@@ -22,11 +36,13 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  vi.useRealTimers();
   await mongoose.disconnect();
   await mongo.stop();
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.all([
     ExpenseModel.deleteMany({}),
     XpAwardModel.deleteMany({}),
@@ -70,6 +86,35 @@ async function seedExpense(
     localDate,
     participants,
   });
+}
+
+/**
+ * The `/today` handler, with nothing else.
+ *
+ * `awardMonthlyBudget` is exercised directly by every other test in this file, and that
+ * covers what it computes — but nothing would catch the CALL being deleted from the
+ * handler, or moved outside the `if (localDate === today)` guard, which is the whole
+ * reason the award is once-per-month rather than once-per-Today-load.
+ *
+ * That was parked on the belief that closing it needed `buildApp` with a full `Env`,
+ * JWT, helmet and rate limiting. It does not: `registerTodayRoutes` takes a bare
+ * `FastifyInstance` and needs exactly one thing from it — the `requireAuth` decorator,
+ * which is a plain `app.decorate`, not an auth plugin. So the guard can be replaced with
+ * one that simply asserts an already-known user, and the route under test is the real,
+ * unmodified one.
+ */
+async function buildTodayApp(user: AuthedUser) {
+  const app = Fastify().withTypeProvider<ZodTypeProvider>();
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
+  app.decorate('requireAuth', async (req: FastifyRequest) => {
+    req.user = user;
+  });
+
+  await registerTodayRoutes(app);
+  await app.ready();
+
+  return app;
 }
 
 describe('awardMonthlyBudget — /today lazy award', () => {
@@ -149,6 +194,44 @@ describe('awardMonthlyBudget — /today lazy award', () => {
         key: 'budget:2026-07',
       }),
     ).toBe(1);
+  });
+
+  it('a month under budget grants via a real GET /today, and not for a past localDate', async () => {
+    const user = await seedUser();
+    await seedBudget(user.id, 1000);
+
+    const today = todayLocalDate(IST);
+    const closedMonth = addMonths(monthKeyOf(today), -1);
+    await seedExpense(user.id, firstOfMonth(closedMonth), 500);
+
+    const app = await buildTodayApp(user);
+
+    try {
+      // The guard: a Today load for a date that is NOT the user's today must not run
+      // any of the lazy month/day work. Asserted FIRST, on a clean ledger, so that a
+      // regression moving the call outside `if (localDate === today)` shows up here
+      // rather than being masked by the award the next assertion expects.
+      const past = await app.inject({
+        method: 'GET',
+        url: `/today?localDate=${addLocalDays(today, -3)}`,
+      });
+      expect(past.statusCode).toBe(200);
+      expect(
+        await XpAwardModel.countDocuments({ userId: new Types.ObjectId(user.id) }),
+      ).toBe(0);
+
+      const current = await app.inject({ method: 'GET', url: '/today' });
+      expect(current.statusCode).toBe(200);
+      expect(current.json<{ xp: number }>().xp).toBe(XP_AMOUNTS.monthInBudget);
+      expect(
+        await XpAwardModel.countDocuments({
+          userId: new Types.ObjectId(user.id),
+          key: `budget:${closedMonth}`,
+        }),
+      ).toBe(1);
+    } finally {
+      await app.close();
+    }
   });
 
   it('a split expense counts at its net share, not its gross amount', async () => {

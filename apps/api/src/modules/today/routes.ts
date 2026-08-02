@@ -82,6 +82,13 @@ function withId<T extends { _id: Types.ObjectId }>(doc: T): Omit<T, '_id'> & { i
  *
  * A missing budget (`null`) is not a budget of zero — it means no target was ever set,
  * so `awardForMonth` grants nothing and, just as importantly, never penalizes.
+ *
+ * THIS FUNCTION DOES NOT SWALLOW ITS OWN FAILURES. Unlike the habit and water grants,
+ * which wrap internally because they sit inside a write the user is waiting on, the
+ * wrapping here belongs to the caller — see the `.catch` on the call below, matching its
+ * neighbours `postDueSubscriptions` and `runDetectors`. That is correct where it sits;
+ * anyone calling this from somewhere that is not a route must add their own catch, or a
+ * ledger hiccup becomes an unhandled rejection.
  */
 export async function awardMonthlyBudget(user: AuthedUser, today: LocalDate): Promise<void> {
   const uid = new Types.ObjectId(user.id);
