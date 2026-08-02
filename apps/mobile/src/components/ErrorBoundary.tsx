@@ -6,7 +6,17 @@ import { SafeAreaView, Text as RNText, View } from 'react-native';
 // colour reference of its own, so it is the one shared primitive safe to use in EITHER
 // fallback below, themed or not.
 import { Touchable } from './primitives.js';
-import { radius, shadow, spacing, type } from '../theme/theme.js';
+import { radius, spacing, type } from '../theme/theme.js';
+// The static `shadow` export, like `lightPalette` below, is restricted by lint precisely
+// because it bakes ONE theme's elevation in at import time — every other file must reach
+// it through `t.shadow` so it flattens to `shadow.none` in dark. This file is the same
+// documented exception for the same reason: it backs ONLY the OUTER boundary's static
+// fallback (`buttonShadow: shadow.button`), which by definition renders when `useTheme()`
+// is unavailable. The INNER, themed fallback a few lines down uses `t.shadow.button` and
+// must keep doing so. Split onto its own line so the disable covers `shadow` alone and
+// `radius`/`spacing`/`type` above stay normally checked.
+// eslint-disable-next-line no-restricted-imports -- see comment above; this file is exempt
+import { shadow } from '../theme/theme.js';
 import { useTheme } from '../theme/ThemeProvider.js';
 import type { ShadowStyle } from '../theme/theme.js';
 // This is the ONE legitimate exception to "no raw palette outside src/theme/" (enforced by
