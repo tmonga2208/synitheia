@@ -94,6 +94,14 @@ export function MonthGrid({ month, days, today, onSelect }: MonthGridProps) {
                 <Text
                   variant="caption"
                   color={
+                    // DELIBERATE LIGHT-MODE CHANGE — one of only two on the dark-mode
+                    // branch, so a light screenshot diff here is not a regression. The
+                    // future-day numeral was `palette.surfaceDim` #DBDAD7 (1.3303 on bone)
+                    // and is now `t.textFaint` #A3A3A0 (2.4065). `textFaint` is the
+                    // documented role for a disabled control; the literal token swap,
+                    // `t.border`, would have rendered these at 1.3713 in dark — invisible.
+                    // Light gets slightly MORE legible as a side effect. See the
+                    // "Light-mode changes" section of the design spec.
                     isFuture
                       ? t.textFaint
                       : (tint?.text ?? t.textMuted)

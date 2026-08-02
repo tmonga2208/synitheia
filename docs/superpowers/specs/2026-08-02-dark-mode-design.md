@@ -155,6 +155,70 @@ sage — measures 3.34:1 in light mode, and the History grid's top tint band was
 recorded as shipping at 4.31:1, short of AA. The test must record these rather than
 quietly pass them.
 
+## Light-mode changes
+
+The conversion's standing rule is that light mode stays byte-identical, and it does
+almost everywhere. There are **exactly two** deliberate exceptions, both the same change,
+both verified against the light-mode diff:
+
+| Where | Was | Now | On bone |
+|---|---|---|---|
+| `src/components/MonthGrid.tsx` — the future-day numeral | `palette.surfaceDim` `#DBDAD7` | `t.textFaint` `#A3A3A0` | 1.3303 → 2.4065 |
+| `app/history.tsx` — the two disabled month-stepper chevrons | `palette.surfaceDim` `#DBDAD7` | `t.textFaint` `#A3A3A0` | 1.3303 → 2.4065 |
+
+Both are deliberate and both are recorded at their call sites as well as here, so that
+someone diffing light-mode screenshots does not read them as regressions.
+
+The reason is the same in both cases. `#DBDAD7` is a *border* colour being used as a
+disabled *foreground*, so the mechanical token swap would have been `t.border` — which
+renders at **1.3713 against dark `bg`**, i.e. invisible. `textFaint` is the documented
+role for a disabled control (and is WCAG 1.4.3-exempt as such), so the semantic audit
+classified these by role rather than by token, which is the whole premise of the
+conversion. Light mode gets slightly *more* legible as a side effect.
+
+Nothing else moves. In particular `DateField.tsx` and `SplitWith.tsx` involved
+token-choice judgment calls — `t.bg` versus `t.onAccent` — that resolve to the same
+literal in light and therefore produce **zero** light-mode change. They are not on this
+list, and the count is two, not four.
+
+## The splash screen, and the one thing this feature cannot fix
+
+A cold start used to open with a full-brightness bone flash held for the whole of startup
+— this spec's own problem statement surviving into the implementation, since `_layout.tsx`
+returns `null` and holds the splash until fonts and theme hydration both resolve. `app.json`
+now carries a dark splash variant (`#15171A`, the theme's `bg`). The splash asset is a
+transparent-backed sage mark and composites correctly on either ground, so both variants
+share it.
+
+**Where that has to be configured, and the trap.** A dark splash must be declared in the
+`expo-splash-screen` **config plugin block**, which is what this app.json now uses. Putting
+`dark` inside the legacy top-level `"splash"` key looks right and does **nothing** — it is
+silently ignored on both platforms. Verified against the installed
+`@expo/prebuild-config`, not assumed:
+
+- `getIosSplashConfig`'s `config.splash` branch constructs its return value without a
+  `dark` property at all. Only the plugin-props branch and `config.ios.splash` read one.
+- `getAndroidDarkSplashConfig` returns `null` unless it finds `props.dark` (the plugin) or
+  `config.android.splash.dark`. It never consults `config.splash.dark`.
+
+Resolving the config both ways confirms it: with the plugin, iOS gets
+`dark.backgroundColor: '#15171A'` and Android's dark config is populated; without it, iOS
+has no `dark` key and Android's is `null`. The top-level `splash` block is kept in sync
+with the plugin so the two never disagree, but the **plugin is the one that takes effect**.
+The plugin's light values (`imageWidth: 200`, `enableFullScreenImage_legacy: true`) are set
+to reproduce exactly what the legacy top-level path produced, so light mode is unchanged.
+
+`apps/mobile/ios/` is gitignored prebuild output, so this takes effect on the next
+`expo prebuild`; an existing local native project keeps the old splash until regenerated.
+
+**The honest limit:** the splash is drawn by the OS before any JavaScript runs, so it can
+only follow the **OS** appearance — never the in-app Light/Dark/System override, which
+lives in AsyncStorage and is not readable at that point by anything. A user who pins
+**Dark** on a **light** phone still gets a light splash for the duration of startup, and
+the reverse is true too. This is a property of every splash screen on both platforms, not
+a gap in the implementation; there is no configuration that fixes it. Recorded here
+rather than left to be rediscovered.
+
 ## The lint guard
 
 An ESLint rule forbidding imports of `src/theme/palette` from anywhere outside

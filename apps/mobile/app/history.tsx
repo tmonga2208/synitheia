@@ -117,6 +117,9 @@ export default function History() {
         >
           <ChevronLeft
             size={20}
+            // DELIBERATE LIGHT-MODE CHANGE — see the matching note on the next chevron and
+            // in MonthGrid. Disabled was `palette.surfaceDim` #DBDAD7 (1.3303 on bone), now
+            // `t.textFaint` #A3A3A0 (2.4065). Not a regression in a screenshot diff.
             color={earliestDisabled ? t.textFaint : t.textMuted}
             strokeWidth={1.8}
           />
@@ -135,6 +138,11 @@ export default function History() {
         >
           <ChevronRight
             size={20}
+            // DELIBERATE LIGHT-MODE CHANGE — the second of the two disabled month-stepper
+            // chevrons. `palette.surfaceDim` #DBDAD7 (1.3303 on bone) → `t.textFaint`
+            // #A3A3A0 (2.4065). `textFaint` is the documented role for a disabled control;
+            // `t.border` would have been 1.3713 in dark — invisible. See the design spec's
+            // "Light-mode changes" section.
             color={atLatest ? t.textFaint : t.textMuted}
             strokeWidth={1.8}
           />
