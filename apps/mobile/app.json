@@ -14,7 +14,12 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FBF9F6"
+      "backgroundColor": "#FBF9F6",
+      "dark": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#15171A"
+      }
     },
     "ios": {
       "supportsTablet": false,
@@ -68,6 +73,20 @@
       "expo-router",
       "expo-secure-store",
       "expo-apple-authentication",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#FBF9F6",
+          "imageWidth": 200,
+          "enableFullScreenImage_legacy": true,
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#15171A"
+          }
+        }
+      ],
       [
         "@kingstinct/react-native-healthkit",
         {
