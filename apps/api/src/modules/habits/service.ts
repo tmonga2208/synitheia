@@ -210,7 +210,11 @@ export async function logHabit(
         }),
       );
     } catch (error) {
-      logger?.warn({ err: error }, 'failed to grant habit XP');
+      // A caller with no logger (only the two pre-existing direct-caller test
+      // files, never the real route) must still see this somewhere — grantAwards'
+      // own doc comment is explicit that a failure like "no User document for
+      // this id" is deliberately loud, and a silent swallow here would undo that.
+      (logger ?? console).warn({ err: error }, 'failed to grant habit XP');
     }
 
     await emit({
