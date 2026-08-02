@@ -22,7 +22,9 @@ import {
   Touchable,
 } from '../../src/components/primitives.js';
 import { api, ApiError } from '../../src/api/client.js';
-import { palette, radius, spacing } from '../../src/theme/tokens.js';
+import { radius, spacing } from '../../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import type { Theme } from '../../src/theme/theme.js';
 
 interface WireIngestion {
   _id: string;
@@ -34,10 +36,10 @@ interface WireIngestion {
 const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
 /** What the user is told about a number they are being asked to trust. */
-function confidenceLabel(value: number): { label: string; color: string } {
-  if (value >= 0.75) return { label: 'Confident', color: palette.sage };
-  if (value >= 0.5) return { label: 'Rough estimate', color: palette.warning };
-  return { label: 'Very rough — please check', color: palette.danger };
+function confidenceLabel(value: number, t: Theme): { label: string; color: string } {
+  if (value >= 0.75) return { label: 'Confident', color: t.accent };
+  if (value >= 0.5) return { label: 'Rough estimate', color: t.warning };
+  return { label: 'Very rough — please check', color: t.danger };
 }
 
 interface ItemEdit {
@@ -46,6 +48,8 @@ interface ItemEdit {
 }
 
 export default function FoodPhotoScreen() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const queryClient = useQueryClient();
 
   const [mealType, setMealType] = useState<MealType>(guessMeal());
@@ -152,13 +156,13 @@ export default function FoodPhotoScreen() {
           style={styles.back}
           haptic={false}
         >
-          <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+          <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
         </Touchable>
 
         <Text variant="title" style={{ marginTop: spacing.base }}>
           Log with a photo
         </Text>
-        <Text variant="body" color={palette.stoneMuted} style={{ marginTop: spacing.xs }}>
+        <Text variant="body" color={t.textMuted} style={{ marginTop: spacing.xs }}>
           Take a picture of your plate and we&apos;ll estimate what&apos;s in it. You
           confirm before anything is logged.
         </Text>
@@ -195,8 +199,8 @@ export default function FoodPhotoScreen() {
 
             {analyze.isPending ? (
               <View style={styles.analyzing}>
-                <ActivityIndicator color={palette.sage} />
-                <Text variant="caption" color={palette.stoneMuted}>
+                <ActivityIndicator color={t.accent} />
+                <Text variant="caption" color={t.textMuted}>
                   Looking at your plate…
                 </Text>
               </View>
@@ -217,8 +221,8 @@ export default function FoodPhotoScreen() {
               accessibilityRole="button"
               accessibilityLabel="Add the meal by hand instead"
             >
-              <PenLine size={18} color={palette.stoneMuted} strokeWidth={1.8} />
-              <Text variant="caption" color={palette.stoneMuted}>
+              <PenLine size={18} color={t.textMuted} strokeWidth={1.8} />
+              <Text variant="caption" color={t.textMuted}>
                 Add it by hand instead
               </Text>
             </Touchable>
@@ -234,10 +238,10 @@ export default function FoodPhotoScreen() {
              */}
             {ingestion.caveat ? (
               <Card style={styles.caveat} elevated={false}>
-                <Info size={16} color={palette.stoneMuted} strokeWidth={1.8} />
+                <Info size={16} color={t.textMuted} strokeWidth={1.8} />
                 <Text
                   variant="caption"
-                  color={palette.stoneMuted}
+                  color={t.textMuted}
                   style={{ flex: 1, marginLeft: spacing.sm }}
                 >
                   {ingestion.caveat}
@@ -250,7 +254,7 @@ export default function FoodPhotoScreen() {
               if (!edit) return null;
 
               const macros = rescaleForPortion(item, edit.portionQty);
-              const conf = confidenceLabel(overallFoodConfidence(item));
+              const conf = confidenceLabel(overallFoodConfidence(item), t);
               const step = item.portionUnit === 'g' || item.portionUnit === 'ml' ? 25 : 0.5;
 
               return (
@@ -287,7 +291,7 @@ export default function FoodPhotoScreen() {
                   {item.reasoning ? (
                     <Text
                       variant="caption"
-                      color={palette.stoneFaint}
+                      color={t.textFaint}
                       style={{ marginTop: spacing.sm }}
                     >
                       {item.reasoning}
@@ -317,14 +321,14 @@ export default function FoodPhotoScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`Decrease portion of ${item.name}`}
                     >
-                      <Minus size={18} color={palette.stone} strokeWidth={2} />
+                      <Minus size={18} color={t.textPrimary} strokeWidth={2} />
                     </Touchable>
 
                     <View style={styles.portionValue}>
                       <Text variant="cardTitle">
                         {Math.round(edit.portionQty * 10) / 10} {item.portionUnit}
                       </Text>
-                      <Text variant="caption" color={palette.stoneMuted}>
+                      <Text variant="caption" color={t.textMuted}>
                         {macros.calories} kcal · {macros.proteinG}p · {macros.carbsG}c ·{' '}
                         {macros.fatG}f
                       </Text>
@@ -342,21 +346,21 @@ export default function FoodPhotoScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`Increase portion of ${item.name}`}
                     >
-                      <Plus size={18} color={palette.stone} strokeWidth={2} />
+                      <Plus size={18} color={t.textPrimary} strokeWidth={2} />
                     </Touchable>
                   </View>
                 </Card>
               );
             })}
 
-            <Card style={styles.totals} accent={palette.sage}>
-              <Text variant="overline" color={palette.stoneMuted}>
+            <Card style={styles.totals} accent={t.accent}>
+              <Text variant="overline" color={t.textMuted}>
                 Total
               </Text>
               <Text variant="title" style={{ marginTop: spacing.xs }}>
                 {totals.calories} kcal
               </Text>
-              <Text variant="caption" color={palette.stoneMuted}>
+              <Text variant="caption" color={t.textMuted}>
                 {totals.proteinG}g protein · {totals.carbsG}g carbs · {totals.fatG}g fat
               </Text>
             </Card>
@@ -393,63 +397,64 @@ function guessMeal(): MealType {
   return 'snack';
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  meals: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  actions: { marginTop: spacing.md },
-  analyzing: {
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.xl,
-  },
-  manualRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 44,
-    marginTop: spacing.base,
-  },
-  caveat: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: palette.sand,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.base,
-  },
-  item: { marginBottom: spacing.md },
-  itemExcluded: { opacity: 0.5 },
-  itemHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  portionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.base,
-  },
-  stepper: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  portionValue: { flex: 1, alignItems: 'center' },
-  totals: { marginTop: spacing.base },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    meals: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+      marginBottom: spacing.xl,
+    },
+    actions: { marginTop: spacing.md },
+    analyzing: {
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.xl,
+    },
+    manualRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      minHeight: 44,
+      marginTop: spacing.base,
+    },
+    caveat: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: t.surfaceRaised,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      marginBottom: spacing.base,
+    },
+    item: { marginBottom: spacing.md },
+    itemExcluded: { opacity: 0.5 },
+    itemHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+    portionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.base,
+    },
+    stepper: {
+      width: 44,
+      height: 44,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: t.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    portionValue: { flex: 1, alignItems: 'center' },
+    totals: { marginTop: spacing.base },
+  });

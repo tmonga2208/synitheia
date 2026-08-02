@@ -14,10 +14,12 @@ import {
 import { SkeletonScreen } from '../../src/components/Skeleton.js';
 import { ApiError, api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
-import { accentFor, palette, radius, spacing } from '../../src/theme/tokens.js';
+import { radius, spacing } from '../../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../../src/theme/theme.js';
 
 const OWED_KEY = ['expenses', 'owed'] as const;
-const ACCENT = accentFor('#C08A7D');
+const ACCENT_COLOR = '#C08A7D';
 
 interface OwedEntry {
   expenseId: string;
@@ -49,6 +51,9 @@ interface OwedResponse {
  * fact and is never rewritten.
  */
 export default function OwedScreen() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const ACCENT = accentFor(ACCENT_COLOR, t);
   const queryClient = useQueryClient();
   const currency = useAuth((s) => s.user?.currency) ?? 'INR';
 
@@ -101,7 +106,7 @@ export default function OwedScreen() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
     >
-      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
     </Touchable>
   );
 
@@ -150,7 +155,7 @@ export default function OwedScreen() {
 
         {data.items.length === 0 ? (
           <EmptyState
-            icon={<HandCoins size={26} color={palette.white} strokeWidth={1.6} />}
+            icon={<HandCoins size={26} color={t.onAccent} strokeWidth={1.6} />}
             title="Nobody owes you"
             body="When you split an expense with people, what they owe you shows up here until they pay you back."
           />
@@ -183,7 +188,7 @@ export default function OwedScreen() {
                           <Text variant="bodyMedium" numberOfLines={1}>
                             {entry.merchant ?? entry.categoryName}
                           </Text>
-                          <Text variant="caption" color={palette.stoneMuted}>
+                          <Text variant="caption" color={t.textMuted}>
                             {formatMoney(asMinor(entry.shareMinor), currency)} of{' '}
                             {formatMoney(asMinor(entry.amountMinor), currency)} ·{' '}
                             {entry.localDate}
@@ -196,8 +201,8 @@ export default function OwedScreen() {
                           accessibilityRole="button"
                           accessibilityLabel={`Mark ${entry.name} as paid you back for ${entry.merchant ?? entry.categoryName}`}
                         >
-                          <Check size={16} color={palette.white} strokeWidth={2.4} />
-                          <Text variant="caption" color={palette.white}>
+                          <Check size={16} color={t.onAccent} strokeWidth={2.4} />
+                          <Text variant="caption" color={t.onAccent}>
                             Paid
                           </Text>
                         </Touchable>
@@ -214,39 +219,40 @@ export default function OwedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  total: { marginTop: spacing.lg, marginBottom: spacing.xl },
-  person: { marginBottom: spacing.xl },
-  personHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  entry: { marginBottom: spacing.sm },
-  entryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.base,
-    paddingHorizontal: spacing.lg,
-  },
-  settle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    minHeight: 36,
-    paddingHorizontal: spacing.base,
-    borderRadius: radius.full,
-    backgroundColor: palette.sage,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    total: { marginTop: spacing.lg, marginBottom: spacing.xl },
+    person: { marginBottom: spacing.xl },
+    personHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    entry: { marginBottom: spacing.sm },
+    entryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.base,
+      paddingHorizontal: spacing.lg,
+    },
+    settle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      minHeight: 36,
+      paddingHorizontal: spacing.base,
+      borderRadius: radius.full,
+      backgroundColor: t.accent,
+    },
+  });

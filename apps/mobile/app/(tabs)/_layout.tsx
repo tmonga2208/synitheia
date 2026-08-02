@@ -2,7 +2,7 @@ import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import trackPng from '../../src/assets/tabs/track.png';
 import todayPng from '../../src/assets/tabs/today.png';
 import youPng from '../../src/assets/tabs/you.png';
-import { palette } from '../../src/theme/tokens.js';
+import { useTheme } from '../../src/theme/ThemeProvider.js';
 
 /**
  * Three destinations, with Today in the middle.
@@ -49,8 +49,10 @@ import { palette } from '../../src/theme/tokens.js';
 export const unstable_settings = { initialRouteName: 'index' };
 
 export default function TabsLayout() {
+  const t = useTheme();
+
   return (
-    <NativeTabs tintColor={palette.sage}>
+    <NativeTabs tintColor={t.accent}>
       <NativeTabs.Trigger name="trackers">
         <Icon sf="square.grid.2x2" androidSrc={trackPng} />
         <Label>Track</Label>

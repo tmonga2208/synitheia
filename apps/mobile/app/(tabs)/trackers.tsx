@@ -21,7 +21,9 @@ import { SkeletonTrackers } from '../../src/components/Skeleton.js';
 import { TrackerTile } from '../../src/components/TrackerTile.js';
 import { ApiError, api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
-import { accentFor, palette, radius, spacing } from '../../src/theme/tokens.js';
+import { radius, spacing } from '../../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../../src/theme/theme.js';
 
 const TODAY_KEY = ['today'] as const;
 
@@ -46,18 +48,21 @@ const TODAY_KEY = ['today'] as const;
  * exactly what makes an app feel like several tools stapled together.
  */
 
-/**
- * Colour is domain identity here, drawn from the habit accent palette — the per-item
- * tinting that is already the most distinctive thing in this design language.
- */
-const ACCENTS = {
-  expenses: accentFor('#C08A7D'), // clay
-  water: accentFor('#8A9AA9'), // slate — the closest this palette comes to water
-  nutrition: accentFor('#B0917D'), // sand
-  habits: accentFor('#7D927D'), // sage, the signature
-} as const;
-
 export default function Trackers() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
+  /**
+   * Colour is domain identity here, drawn from the habit accent palette — the per-item
+   * tinting that is already the most distinctive thing in this design language.
+   */
+  const ACCENTS = {
+    expenses: accentFor('#C08A7D', t), // clay
+    water: accentFor('#8A9AA9', t), // slate — the closest this palette comes to water
+    nutrition: accentFor('#B0917D', t), // sand
+    habits: accentFor('#7D927D', t), // sage, the signature
+  } as const;
+
   const user = useAuth((s) => s.user);
   const currency = user?.currency ?? 'INR';
   const queryClient = useQueryClient();
@@ -124,11 +129,11 @@ export default function Trackers() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={() => void refetch()}
-            tintColor={palette.sage}
+            tintColor={t.accent}
           />
         }
       >
-        <Text variant="overline" color={palette.stoneMuted}>
+        <Text variant="overline" color={t.textMuted}>
           Today
         </Text>
         <Text variant="title" style={styles.title}>
@@ -212,7 +217,7 @@ export default function Trackers() {
               <Text variant="bodyMedium" color={ACCENTS.water.text}>
                 +{ml}
               </Text>
-              <Text variant="caption" color={palette.stoneFaint}>
+              <Text variant="caption" color={t.textFaint}>
                 ml
               </Text>
             </Touchable>
@@ -245,26 +250,26 @@ export default function Trackers() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: { padding: spacing.lg, paddingBottom: spacing.xl },
-  title: { marginTop: spacing.xs, marginBottom: spacing.xl },
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: { padding: spacing.lg, paddingBottom: spacing.xl },
+    title: { marginTop: spacing.xs, marginBottom: spacing.xl },
 
-  grid: { gap: spacing.md, marginBottom: spacing['2xl'] },
-  row: { flexDirection: 'row', gap: spacing.md },
+    grid: { gap: spacing.md, marginBottom: spacing['2xl'] },
+    row: { flexDirection: 'row', gap: spacing.md },
 
-  presets: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.base },
-  preset: {
-    flex: 1,
-    minHeight: 56,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-    backgroundColor: palette.sand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    presets: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.base },
+    preset: {
+      flex: 1,
+      minHeight: 56,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: t.border,
+      backgroundColor: t.surfaceRaised,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-
-});
+    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  });

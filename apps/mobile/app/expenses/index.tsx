@@ -16,7 +16,9 @@ import { SkeletonList } from '../../src/components/Skeleton.js';
 import { api } from '../../src/api/client.js';
 import type { ListResponse, WireExpense } from '../../src/api/types.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, palette, radius, spacing } from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import type { Theme } from '../../src/theme/theme.js';
 import { BillsRow, OwedBanner } from '../../src/components/OwedBanner.js';
 
 const EXPENSES_KEY = ['expenses'] as const;
@@ -59,6 +61,8 @@ function groupByDay(items: WireExpense[]): Day[] {
 }
 
 export default function Expenses() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const user = useAuth((s) => s.user);
   const currency = user?.currency ?? 'INR';
 
@@ -78,7 +82,7 @@ export default function Expenses() {
         haptic={false}
         onPress={() => router.back()}
       >
-        <ArrowLeft size={22} color={palette.stone} />
+        <ArrowLeft size={22} color={t.textPrimary} />
       </Touchable>
 
       <Touchable
@@ -87,7 +91,7 @@ export default function Expenses() {
         onPress={() => router.push('/expenses/new')}
         style={styles.add}
       >
-        <Plus size={22} color={palette.white} strokeWidth={2} />
+        <Plus size={22} color={t.onAccent} strokeWidth={2} />
       </Touchable>
     </View>
   );
@@ -127,13 +131,13 @@ export default function Expenses() {
           <RefreshControl
             refreshing={query.isRefetching}
             onRefresh={() => void query.refetch()}
-            tintColor={palette.sage}
+            tintColor={t.accent}
           />
         }
       >
         {header}
 
-        <Text variant="overline" color={palette.stoneFaint}>
+        <Text variant="overline" color={t.textFaint}>
           Your spending
         </Text>
         <Text variant="title" style={styles.heading}>
@@ -146,7 +150,7 @@ export default function Expenses() {
         {days.length === 0 ? (
           <View style={styles.empty}>
             <EmptyState
-              icon={<Wallet size={30} color={palette.white} strokeWidth={1.5} />}
+              icon={<Wallet size={30} color={t.onAccent} strokeWidth={1.5} />}
               title="Nothing logged yet"
               body="Add an expense by hand, or share a payment screenshot and let Synítheia read it for you."
               actionLabel="+ Add an expense"
@@ -157,10 +161,10 @@ export default function Expenses() {
           days.map((day) => (
             <View key={day.localDate} style={styles.day}>
               <View style={styles.dayHeader}>
-                <Text variant="label" color={palette.stoneMuted}>
+                <Text variant="label" color={t.textMuted}>
                   {formatDay(day.localDate)}
                 </Text>
-                <Text variant="label" color={palette.stone}>
+                <Text variant="label" color={t.textPrimary}>
                   {formatMoney(day.totalMinor, currency)}
                 </Text>
               </View>
@@ -186,7 +190,7 @@ export default function Expenses() {
                         <Text variant="bodyMedium" numberOfLines={1}>
                           {expense.merchant ?? expense.categoryName}
                         </Text>
-                        <Text variant="caption" color={palette.stoneFaint} numberOfLines={1}>
+                        <Text variant="caption" color={t.textFaint} numberOfLines={1}>
                           {expense.note
                             ? `${expense.categoryName} · ${expense.note}`
                             : expense.categoryName}
@@ -199,7 +203,7 @@ export default function Expenses() {
                         </Text>
                         <ChevronRight
                           size={16}
-                          color={palette.stoneFaint}
+                          color={t.textFaint}
                           strokeWidth={1.8}
                         />
                       </View>
@@ -215,62 +219,63 @@ export default function Expenses() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing['4xl'],
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.base,
-  },
-  iconButton: {
-    width: MIN_TAP_TARGET,
-    height: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-  },
-  add: {
-    width: MIN_TAP_TARGET,
-    height: MIN_TAP_TARGET,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.sage,
-  },
-  heading: { marginTop: spacing.xs },
-  empty: { marginTop: spacing.xl },
-  day: { marginTop: spacing.xl },
-  dayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  dayCard: { overflow: 'hidden' },
-  expense: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.base,
-    minHeight: MIN_TAP_TARGET,
-  },
-  expenseRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  expenseCopy: { flex: 1, gap: spacing.xs },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: radius.full,
-  },
-  divider: {
-    height: 1,
-    marginLeft: spacing.lg,
-    backgroundColor: palette.surfaceDim,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing['4xl'],
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.base,
+    },
+    iconButton: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.md,
+    },
+    add: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      borderRadius: radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.accent,
+    },
+    heading: { marginTop: spacing.xs },
+    empty: { marginTop: spacing.xl },
+    day: { marginTop: spacing.xl },
+    dayHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    dayCard: { overflow: 'hidden' },
+    expense: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.base,
+      minHeight: MIN_TAP_TARGET,
+    },
+    expenseRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    expenseCopy: { flex: 1, gap: spacing.xs },
+    dot: {
+      width: 10,
+      height: 10,
+      borderRadius: radius.full,
+    },
+    divider: {
+      height: 1,
+      marginLeft: spacing.lg,
+      backgroundColor: t.border,
+    },
+  });

@@ -26,7 +26,9 @@ import { HabitCard } from '../../src/components/HabitCard.js';
 import { Timeline } from '../../src/components/Timeline.js';
 import { api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, palette, spacing } from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, spacing } from '../../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import type { Theme } from '../../src/theme/theme.js';
 
 /**
  * One past day, as a record.
@@ -43,6 +45,8 @@ import { MIN_TAP_TARGET, palette, spacing } from '../../src/theme/tokens.js';
  * water / calories row below is date-accurate and says more anyway.
  */
 export default function Day() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const params = useLocalSearchParams<{ date: string }>();
   const user = useAuth((s) => s.user);
 
@@ -78,9 +82,9 @@ export default function Day() {
           onPress={() => router.back()}
           style={styles.back}
         >
-          <ChevronLeft size={24} color={palette.stone} strokeWidth={1.8} />
+          <ChevronLeft size={24} color={t.textPrimary} strokeWidth={1.8} />
         </Touchable>
-        <Text variant="overline" color={palette.stone}>
+        <Text variant="overline" color={t.textPrimary}>
           {valid ? formatDayLabel(date as LocalDate) : 'Unknown day'}
         </Text>
       </View>
@@ -110,7 +114,7 @@ export default function Day() {
 
           {totals ? (
             <Card style={styles.totals}>
-              <Text variant="bodyMedium" color={palette.stoneMuted}>
+              <Text variant="bodyMedium" color={t.textMuted}>
                 {totals}
               </Text>
             </Card>
@@ -146,35 +150,36 @@ export default function Day() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: palette.bone,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.base,
-  },
-  back: {
-    minWidth: MIN_TAP_TARGET,
-    minHeight: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing['4xl'],
-  },
-  ring: {
-    alignItems: 'center',
-    marginVertical: spacing.xl,
-  },
-  totals: {
-    alignItems: 'center',
-    marginBottom: spacing.base,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: t.bg,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.base,
+    },
+    back: {
+      minWidth: MIN_TAP_TARGET,
+      minHeight: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    content: {
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing['4xl'],
+    },
+    ring: {
+      alignItems: 'center',
+      marginVertical: spacing.xl,
+    },
+    totals: {
+      alignItems: 'center',
+      marginBottom: spacing.base,
+    },
+  });

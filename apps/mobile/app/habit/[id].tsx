@@ -23,18 +23,16 @@ import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { iconFor } from '../../src/components/IconPicker.js';
 import { api } from '../../src/api/client.js';
 import type { HabitHistory, ListResponse, WireHabit } from '../../src/api/types.js';
-import {
-  MIN_TAP_TARGET,
-  accentFor,
-  palette,
-  radius,
-  spacing,
-} from '../../src/theme/tokens.js';
+import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../../src/theme/theme.js';
 
 const HABITS_KEY = ['habits'] as const;
 const TODAY_KEY = ['today'] as const;
 
 export default function HabitDetail() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
 
@@ -104,7 +102,7 @@ export default function HabitDetail() {
       haptic={false}
       onPress={() => router.back()}
     >
-      <ArrowLeft size={22} color={palette.stone} />
+      <ArrowLeft size={22} color={t.textPrimary} />
     </Touchable>
   );
 
@@ -134,7 +132,7 @@ export default function HabitDetail() {
     );
   }
 
-  const accent = accentFor(habit.color);
+  const accent = accentFor(habit.color, t);
   const { Icon } = iconFor(habit.icon);
 
   const todayCount = progress?.todayCount ?? 0;
@@ -183,13 +181,13 @@ export default function HabitDetail() {
         <Text variant="title" style={styles.name}>
           {habit.name}
         </Text>
-        <Text variant="body" color={palette.stoneMuted} style={styles.goal}>
+        <Text variant="body" color={t.textMuted} style={styles.goal}>
           {`Goal: ${goal}`}
         </Text>
 
         <View style={styles.ring}>
           <ProgressRing percent={percent} color={accent.base} />
-          <Text variant="label" color={palette.stoneFaint} style={styles.ringCaption}>
+          <Text variant="label" color={t.textFaint} style={styles.ringCaption}>
             {history
               ? `${history.completedPeriods} of ${history.scheduledPeriods} ${
                   habit.frequency === 'daily' ? 'days' : 'weeks'
@@ -221,8 +219,8 @@ export default function HabitDetail() {
 
         {habit.reminderTime ? (
           <Card style={styles.reminderCard}>
-            <Zap size={18} color={palette.stoneMuted} strokeWidth={1.6} />
-            <Text variant="body" color={palette.stoneMuted}>
+            <Zap size={18} color={t.textMuted} strokeWidth={1.6} />
+            <Text variant="body" color={t.textMuted}>
               {`Gentle reminder at ${habit.reminderTime}`}
             </Text>
           </Card>
@@ -230,10 +228,10 @@ export default function HabitDetail() {
 
         <Card style={styles.archiveCard}>
           <View style={styles.archiveCopy}>
-            <Archive size={18} color={palette.stoneMuted} strokeWidth={1.6} />
+            <Archive size={18} color={t.textMuted} strokeWidth={1.6} />
             <Text variant="cardTitle">Archive this habit</Text>
           </View>
-          <Text variant="body" color={palette.stoneMuted}>
+          <Text variant="body" color={t.textMuted}>
             It leaves your daily list, but every log you have made stays in your history.
           </Text>
 
@@ -250,53 +248,54 @@ export default function HabitDetail() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing['4xl'],
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.base,
-  },
-  iconButton: {
-    width: MIN_TAP_TARGET,
-    height: MIN_TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-  },
-  iconChip: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  name: { marginTop: spacing.xs },
-  goal: { marginTop: spacing.xs },
-  ring: { alignItems: 'center', marginTop: spacing.xl, gap: spacing.md },
-  ringCaption: { marginTop: spacing.sm },
-  chips: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginTop: spacing.xl,
-  },
-  reminderCard: {
-    marginTop: spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  archiveCard: { marginTop: spacing.xl, gap: spacing.md },
-  archiveCopy: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing['4xl'],
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.base,
+    },
+    iconButton: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.md,
+    },
+    iconChip: {
+      width: 52,
+      height: 52,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    name: { marginTop: spacing.xs },
+    goal: { marginTop: spacing.xs },
+    ring: { alignItems: 'center', marginTop: spacing.xl, gap: spacing.md },
+    ringCaption: { marginTop: spacing.sm },
+    chips: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      marginTop: spacing.xl,
+    },
+    reminderCard: {
+      marginTop: spacing.xl,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    archiveCard: { marginTop: spacing.xl, gap: spacing.md },
+    archiveCopy: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+  });

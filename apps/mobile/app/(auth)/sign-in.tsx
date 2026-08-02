@@ -12,13 +12,17 @@ import { Lock, Mail } from 'lucide-react-native';
 import { Button, Input, Text, Touchable } from '../../src/components/primitives.js';
 import { ApiError } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
-import { palette, radius, spacing } from '../../src/theme/tokens.js';
+import { radius, spacing } from '../../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import type { Theme } from '../../src/theme/theme.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type FieldErrors = Partial<Record<'email' | 'password', string>>;
 
 export default function SignIn() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const signIn = useAuth((s) => s.signIn);
   const signInWithApple = useAuth((s) => s.signInWithApple);
   const signInWithGoogle = useAuth((s) => s.signInWithGoogle);
@@ -68,7 +72,7 @@ export default function SignIn() {
           showsVerticalScrollIndicator={false}
         >
           <Text variant="title">Welcome back</Text>
-          <Text variant="body" color={palette.stoneMuted} style={styles.subtitle}>
+          <Text variant="body" color={t.textMuted} style={styles.subtitle}>
             Pick your rituals back up where you left them.
           </Text>
 
@@ -83,7 +87,7 @@ export default function SignIn() {
               autoComplete="email"
               keyboardType="email-address"
               textContentType="emailAddress"
-              leading={<Mail size={18} color={palette.stoneFaint} />}
+              leading={<Mail size={18} color={t.textFaint} />}
             />
 
             <Input
@@ -95,13 +99,13 @@ export default function SignIn() {
               secureTextEntry
               autoComplete="current-password"
               textContentType="password"
-              leading={<Lock size={18} color={palette.stoneFaint} />}
+              leading={<Lock size={18} color={t.textFaint} />}
             />
           </View>
 
           {formError ? (
             <View style={styles.formError} accessibilityLiveRegion="polite">
-              <Text variant="label" color={palette.danger}>
+              <Text variant="label" color={t.danger}>
                 {formError}
               </Text>
             </View>
@@ -119,7 +123,7 @@ export default function SignIn() {
 
           <View style={styles.divider}>
             <View style={styles.rule} />
-            <Text variant="caption" color={palette.stoneFaint}>
+            <Text variant="caption" color={t.textFaint}>
               or
             </Text>
             <View style={styles.rule} />
@@ -148,7 +152,7 @@ export default function SignIn() {
           </View>
 
           <View style={styles.switchRow}>
-            <Text variant="body" color={palette.stoneMuted}>
+            <Text variant="body" color={t.textMuted}>
               New here?
             </Text>
             <Link href="/(auth)/sign-up" replace asChild>
@@ -158,7 +162,7 @@ export default function SignIn() {
                 haptic={false}
                 style={styles.switchLink}
               >
-                <Text variant="bodyMedium" color={palette.sage}>
+                <Text variant="bodyMedium" color={t.accent}>
                   Create an account
                 </Text>
               </Touchable>
@@ -170,44 +174,45 @@ export default function SignIn() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  flex: { flex: 1 },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing['2xl'],
-    paddingBottom: spacing.xl,
-  },
-  subtitle: { marginTop: spacing.sm },
-  fields: { marginTop: spacing['2xl'], gap: spacing.base },
-  formError: {
-    marginTop: spacing.base,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.danger,
-  },
-  cta: { marginTop: spacing.xl },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginVertical: spacing.xl,
-  },
-  rule: { flex: 1, height: 1, backgroundColor: palette.surfaceDim },
-  socials: { gap: spacing.md },
-  switchRow: {
-    marginTop: spacing['2xl'],
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  switchLink: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xs,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    flex: { flex: 1 },
+    content: {
+      flexGrow: 1,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing['2xl'],
+      paddingBottom: spacing.xl,
+    },
+    subtitle: { marginTop: spacing.sm },
+    fields: { marginTop: spacing['2xl'], gap: spacing.base },
+    formError: {
+      marginTop: spacing.base,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.danger,
+    },
+    cta: { marginTop: spacing.xl },
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginVertical: spacing.xl,
+    },
+    rule: { flex: 1, height: 1, backgroundColor: t.border },
+    socials: { gap: spacing.md },
+    switchRow: {
+      marginTop: spacing['2xl'],
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+    },
+    switchLink: {
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.xs,
+    },
+  });

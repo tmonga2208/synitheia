@@ -23,10 +23,12 @@ import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ProgressRing } from '../src/components/ProgressRing.js';
 import { ApiError, api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
-import { accentFor, palette, radius, spacing } from '../src/theme/tokens.js';
+import { radius, spacing } from '../src/theme/tokens.js';
+import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
+import { accentFor, type Theme } from '../src/theme/theme.js';
 
 const FOOD_KEY = ['food'] as const;
-const ACCENT = accentFor('#B0917D');
+const ACCENT_COLOR = '#B0917D';
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -57,6 +59,9 @@ interface FoodResponse {
  * in the moment they confirmed it.
  */
 export default function NutritionScreen() {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const ACCENT = accentFor(ACCENT_COLOR, t);
   const queryClient = useQueryClient();
   const timezone = useAuth((s) => s.user?.timezone) ?? 'UTC';
 
@@ -98,7 +103,7 @@ export default function NutritionScreen() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
     >
-      <ArrowLeft size={22} color={palette.stone} strokeWidth={1.8} />
+      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
     </Touchable>
   );
 
@@ -144,7 +149,7 @@ export default function NutritionScreen() {
         <View style={styles.ring}>
           <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={18}>
             <Text variant="title">{Math.round(totals.calories)}</Text>
-            <Text variant="caption" color={palette.stoneMuted}>
+            <Text variant="caption" color={t.textMuted}>
               of {target.toLocaleString()} kcal
             </Text>
           </ProgressRing>
@@ -160,7 +165,7 @@ export default function NutritionScreen() {
           ).map(([label, grams]) => (
             <View key={label} style={styles.macro}>
               <Text variant="cardTitle">{Math.round(grams)}g</Text>
-              <Text variant="caption" color={palette.stoneMuted}>
+              <Text variant="caption" color={t.textMuted}>
                 {label}
               </Text>
             </View>
@@ -179,7 +184,7 @@ export default function NutritionScreen() {
             accessibilityRole="button"
             accessibilityLabel="Photograph your meal"
           >
-            <Camera size={20} color={palette.sage} strokeWidth={1.6} />
+            <Camera size={20} color={t.accent} strokeWidth={1.6} />
             <Text variant="caption">Photograph it</Text>
           </Touchable>
 
@@ -189,14 +194,14 @@ export default function NutritionScreen() {
             accessibilityRole="button"
             accessibilityLabel="Add a meal by hand"
           >
-            <PenLine size={20} color={palette.sage} strokeWidth={1.6} />
+            <PenLine size={20} color={t.accent} strokeWidth={1.6} />
             <Text variant="caption">Add by hand</Text>
           </Touchable>
         </View>
 
         {data.items.length === 0 ? (
           <EmptyState
-            icon={<UtensilsCrossed size={26} color={palette.white} strokeWidth={1.6} />}
+            icon={<UtensilsCrossed size={26} color={t.onAccent} strokeWidth={1.6} />}
             title="Nothing logged yet"
             body="Photograph your plate and we'll estimate what's in it — or type a meal in yourself."
             actionLabel="Add a meal"
@@ -227,7 +232,7 @@ export default function NutritionScreen() {
 
                           {/* Estimated, not measured — and it says so, for good. */}
                           {entry.source === 'inferred' ? (
-                            <View style={styles.estimated}>
+                            <View style={[styles.estimated, { backgroundColor: ACCENT.wash }]}>
                               <Camera size={11} color={ACCENT.text} strokeWidth={2} />
                               <Text variant="caption" color={ACCENT.text}>
                                 estimated
@@ -236,7 +241,7 @@ export default function NutritionScreen() {
                           ) : null}
                         </View>
 
-                        <Text variant="caption" color={palette.stoneMuted}>
+                        <Text variant="caption" color={t.textMuted}>
                           {Math.round(entry.macros.calories)} kcal ·{' '}
                           {Math.round(entry.macros.proteinG)}p ·{' '}
                           {Math.round(entry.macros.carbsG)}c · {Math.round(entry.macros.fatG)}f
@@ -251,7 +256,7 @@ export default function NutritionScreen() {
                         accessibilityRole="button"
                         accessibilityLabel={`Remove ${entry.name}`}
                       >
-                        <Trash2 size={16} color={palette.stoneFaint} strokeWidth={1.7} />
+                        <Trash2 size={16} color={t.textFaint} strokeWidth={1.7} />
                       </Touchable>
                     </View>
                   </Card>
@@ -263,8 +268,8 @@ export default function NutritionScreen() {
 
         {data.items.some((i) => i.source === 'inferred') ? (
           <View style={styles.footnote}>
-            <Sparkles size={13} color={palette.stoneFaint} strokeWidth={1.8} />
-            <Text variant="caption" color={palette.stoneFaint} style={{ flex: 1 }}>
+            <Sparkles size={13} color={t.textFaint} strokeWidth={1.8} />
+            <Text variant="caption" color={t.textFaint} style={{ flex: 1 }}>
               Estimated meals came from a photo. Portion size is the least certain part —
               tap an entry to correct it.
             </Text>
@@ -275,64 +280,65 @@ export default function NutritionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bone },
-  content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-  back: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.md,
-  },
-  ring: { alignItems: 'center', marginVertical: spacing.xl },
-  macros: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: spacing.xl,
-  },
-  macro: { alignItems: 'center' },
-  addActions: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing['2xl'] },
-  addAction: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 88,
-    borderRadius: radius.md,
-    backgroundColor: palette.sand,
-    borderWidth: 1,
-    borderColor: palette.surfaceDim,
-  },
-  mealGroup: { marginBottom: spacing.xl },
-  entry: { marginBottom: spacing.sm },
-  entryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.base,
-    paddingLeft: spacing.lg,
-    paddingRight: spacing.sm,
-  },
-  entryTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  estimated: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-    backgroundColor: ACCENT.wash,
-  },
-  delete: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  footnote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginTop: spacing.base,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    ring: { alignItems: 'center', marginVertical: spacing.xl },
+    macros: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      marginBottom: spacing.xl,
+    },
+    macro: { alignItems: 'center' },
+    addActions: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing['2xl'] },
+    addAction: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      minHeight: 88,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    mealGroup: { marginBottom: spacing.xl },
+    entry: { marginBottom: spacing.sm },
+    entryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.base,
+      paddingLeft: spacing.lg,
+      paddingRight: spacing.sm,
+    },
+    entryTitle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    // Fill comes from ACCENT, a runtime value — applied inline at the call site.
+    estimated: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+      borderRadius: radius.full,
+    },
+    delete: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    footnote: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      marginTop: spacing.base,
+    },
+  });
