@@ -167,17 +167,27 @@ export default function RootLayout() {
   if ((!fontsLoaded && !fontError) || !themeHydrated) return null;
 
   return (
+    // The OUTER boundary — static light, no `themed` prop. Wraps <ThemeProvider> itself, so
+    // it is the only thing that can catch a crash IN the provider, where useTheme() is not
+    // available. See the doc on ErrorBoundary's `themed` prop before touching either
+    // instance.
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           {/* Outside QueryClientProvider so every consumer below — including AuthGate's
               screens — can call useTheme(). */}
           <ThemeProvider>
-            <QueryClientProvider client={queryClient}>
-              <AuthGate>
-                <ThemedShell />
-              </AuthGate>
-            </QueryClientProvider>
+            {/* The INNER boundary — themed. Catches every crash below this point, which is
+                nearly all of them, and shows a fallback that matches the live theme rather
+                than the outer boundary's static-light one. See the doc on
+                ErrorBoundary's `themed` prop for why both instances exist. */}
+            <ErrorBoundary themed>
+              <QueryClientProvider client={queryClient}>
+                <AuthGate>
+                  <ThemedShell />
+                </AuthGate>
+              </QueryClientProvider>
+            </ErrorBoundary>
           </ThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
