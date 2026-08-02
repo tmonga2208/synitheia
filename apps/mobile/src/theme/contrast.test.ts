@@ -56,4 +56,42 @@ describe('composite', () => {
   it('blends halfway', () => {
     expect(composite('#FFFFFF', 0.5, '#000000').toUpperCase()).toBe('#808080');
   });
+
+  it('clamps an out-of-range alpha to the endpoints', () => {
+    // Unclamped, `f * a + b * (1 - a)` extrapolates PAST both colours: at alpha 2 the
+    // channel goes to 510, which `pad()` renders as three hex digits and silently yields a
+    // malformed colour string rather than throwing. Clamping keeps the output a colour.
+    expect(composite('#FFFFFF', 2, '#000000').toUpperCase()).toBe('#FFFFFF');
+    expect(composite('#FFFFFF', -1, '#000000').toUpperCase()).toBe('#000000');
+    expect(composite('#FFFFFF', Number.NaN, '#000000').toUpperCase()).toBe('#000000');
+  });
+
+  it('always returns a well-formed 6-digit hex colour', () => {
+    for (const alpha of [-5, -0.01, 0, 0.5, 1, 1.01, 99, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(composite('#FFFFFF', alpha, '#15171A'), `alpha ${alpha}`).toMatch(
+        /^#[0-9a-f]{6}$/i,
+      );
+    }
+  });
+});
+
+describe('parseHex validation', () => {
+  it('rejects a non-hex string of the right length', () => {
+    // The length check alone let this through: `Number.parseInt('zz', 16)` is NaN, and a
+    // NaN ratio compares FALSE against every floor — so a typo in a colour would read as a
+    // genuine contrast failure, or worse, pass a `.not` assertion by accident.
+    expect(() => relativeLuminance('#ZZZZZZ')).toThrow(RangeError);
+    expect(() => relativeLuminance('#12345g')).toThrow(RangeError);
+  });
+
+  it('still rejects a wrong-length string', () => {
+    expect(() => relativeLuminance('#FFFF')).toThrow(RangeError);
+    expect(() => relativeLuminance('')).toThrow(RangeError);
+  });
+
+  it('still accepts the forms it always has', () => {
+    expect(() => relativeLuminance('#FFF')).not.toThrow();
+    expect(() => relativeLuminance('#abcdef')).not.toThrow();
+    expect(() => relativeLuminance('ABCDEF')).not.toThrow();
+  });
 });
