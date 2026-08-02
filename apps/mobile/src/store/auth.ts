@@ -123,6 +123,7 @@ interface AuthState {
   /** Wire up the client's session-expiry callback exactly once, at app start. */
   init: () => void;
   hydrate: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: SignUpInput) => Promise<void>;
@@ -163,6 +164,35 @@ export const useAuth = create<AuthState>((set) => {
         // The client already attempted a refresh and cleared tokens if it failed.
         await clearTokens();
         set({ user: null, status: 'anon' });
+      }
+    },
+
+    /**
+     * Re-read the signed-in user, for a screen that shows something about them which
+     * moves while the app is open. `xp` is the one that does: it is written server-side
+     * by habit logs, water logs and the monthly budget award, and this store is
+     * populated only by `hydrate()` and sign-in. Profile therefore showed whatever `xp`
+     * was at launch — "Start collecting XP" for a whole session, no matter what the user
+     * earned. Invisible before XP was ever awarded, because the value was always 0.
+     *
+     * Deliberately NOT `hydrate()`, which is a session gate rather than a refresh:
+     *
+     *   · it sets `status: 'loading'`, which stalls AuthGate's routing effect, and
+     *   · its catch clears the Keychain and drops to `anon` on ANY throw — including a
+     *     plain network failure. Calling it on every screen focus would sign a user out
+     *     for opening Profile on a train.
+     *
+     * So this touches only `user`, and a failure leaves the last known value on screen.
+     * A slightly stale number is the correct outcome of a failed refresh; a sign-out is
+     * not.
+     */
+    async refreshUser() {
+      try {
+        const { user } = await api.get<MeResponse>('/me');
+        set({ user });
+      } catch {
+        // Keep what we have. A genuinely dead session is handled by the client's
+        // refresh flow and the onSessionExpired callback wired up in init().
       }
     },
 
