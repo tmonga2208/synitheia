@@ -18,6 +18,7 @@ import {
   LogOut,
   Mail,
   ShieldCheck,
+  SunMoon,
   Target,
   Zap,
 } from 'lucide-react-native';
@@ -25,7 +26,8 @@ import { Card, Chip, Text, Touchable } from '../../src/components/primitives.js'
 import { SkeletonList } from '../../src/components/Skeleton.js';
 import { useAuth } from '../../src/store/auth.js';
 import { MIN_TAP_TARGET, motion, radius, spacing } from '../../src/theme/tokens.js';
-import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import { useTheme, useThemedStyles, useThemePreference } from '../../src/theme/ThemeProvider.js';
+import type { ThemePreference } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 
 /**
@@ -46,11 +48,18 @@ const SIGN_IN_METHODS = [
   { key: 'apple', label: 'Apple' },
 ] as const;
 
+const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+];
+
 export default function Profile() {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
   const user = useAuth((s) => s.user);
   const signOut = useAuth((s) => s.signOut);
+  const { preference, setPreference } = useThemePreference();
 
   const [methodsOpen, setMethodsOpen] = useState(false);
   const chevron = useSharedValue(0);
@@ -151,6 +160,55 @@ export default function Profile() {
             subtitle="BMI, what you burn, and your calorie goal"
             onPress={() => router.push('/body')}
           />
+
+          <View style={styles.divider} />
+
+          {/*
+            Not a Row — this one has no single destination to push to. The icon/title/
+            subtitle line matches the Row idiom exactly; what follows it is the control
+            itself, inset the same way "methods" sits under Sign-in methods below. The three
+            options are `Chip`, not a bespoke segmented control, per the brief.
+          */}
+          <View style={styles.row}>
+            <View style={styles.rowIcon}>
+              <SunMoon size={20} color={t.accent} strokeWidth={1.6} />
+            </View>
+
+            <View style={styles.rowCopy}>
+              <Text variant="cardTitle">Appearance</Text>
+              <Text variant="caption" color={t.textFaint}>
+                Light, dark, or match your device
+              </Text>
+            </View>
+          </View>
+
+          <View
+            style={styles.appearance}
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Appearance"
+          >
+            {APPEARANCE_OPTIONS.map((option) => {
+              const selected = preference === option.value;
+
+              return (
+                <Chip
+                  key={option.value}
+                  label={option.label}
+                  selected={selected}
+                  // The selected segment must read as selected without relying on the
+                  // accent-vs-grey fill alone — a checkmark glyph is the second signal.
+                  icon={
+                    selected ? <Check size={14} color={t.onAccent} strokeWidth={2.5} /> : undefined
+                  }
+                  accessibilityRole="radio"
+                  accessibilityLabel={option.label}
+                  haptic={false}
+                  style={styles.appearanceChip}
+                  onPress={() => setPreference(option.value)}
+                />
+              );
+            })}
+          </View>
 
           <View style={styles.divider} />
 
@@ -361,6 +419,18 @@ const makeStyles = (t: Theme) =>
       paddingBottom: spacing.lg,
       gap: spacing.base,
     },
+    // Same inset as `methods` — the three segments read as detail under "Appearance"
+    // rather than a sibling row of their own.
+    appearance: {
+      flexDirection: 'row',
+      paddingLeft: spacing.lg + 40 + spacing.base,
+      paddingRight: spacing.lg,
+      paddingBottom: spacing.lg,
+      gap: spacing.sm,
+    },
+    // `Chip`'s default 36pt is a label pill, not a control — these are tapped directly, so
+    // they get their own floor rather than changing the shared primitive's height everywhere.
+    appearanceChip: { minHeight: MIN_TAP_TARGET, flex: 1 },
     method: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     methodIcon: {
       width: 32,
