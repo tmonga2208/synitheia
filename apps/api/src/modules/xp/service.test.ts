@@ -154,3 +154,38 @@ describe('grantAwards', () => {
     ).rejects.toThrow(missingUserId);
   });
 });
+
+/**
+ * `apps/api/src/index.ts` awaits `XpAwardModel.init()` before `app.listen()`, and that
+ * one await is what stands between the ledger and a permanently unprotected collection:
+ * Mongoose's `autoIndex` build is unawaited, so a duplicate landing inside the build
+ * window fails the unique build with 11000 and leaves the index absent forever, signalled
+ * only by an `'index'` event nothing listens for.
+ *
+ * `init()` is memoized — it hands back the promise of the build `autoIndex` already
+ * started rather than kicking off a second one — which is precisely why awaiting it is
+ * the right instrument: it turns a fire-and-forget build into one the boot waits on.
+ * That also means the boot ordering itself is not reachable from a test; `main()` is not
+ * exported, needs a live Mongo and a listening socket, and `init()` here would resolve
+ * off the build this file's `beforeAll` already performed.
+ *
+ * What IS testable, and what the whole fix rests on, is that awaiting `init()` leaves an
+ * index that actually REFUSES. If `unique: true` on `{ userId, key }` were ever dropped,
+ * the boot await would still resolve cleanly and every `grantAwards` test above would
+ * still pass — a `create` per key, no duplicates offered, nothing to collide. This is the
+ * only test that would notice, and the double-award it guards has no user-visible symptom.
+ */
+describe('the XpAward unique index', () => {
+  it('refuses a second row for the same { userId, key } once init() has resolved', async () => {
+    await XpAwardModel.init();
+
+    const userId = new Types.ObjectId();
+    await XpAwardModel.create({ userId, key: 'habit:h1:2026-07-18', amount: 5 });
+
+    await expect(
+      XpAwardModel.create({ userId, key: 'habit:h1:2026-07-18', amount: 5 }),
+    ).rejects.toMatchObject({ code: 11000 });
+
+    expect(await XpAwardModel.countDocuments({ userId })).toBe(1);
+  });
+});
