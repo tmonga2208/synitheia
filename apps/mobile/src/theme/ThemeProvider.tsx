@@ -170,3 +170,19 @@ export function useTheme(): Theme {
   if (!theme) throw new Error('useTheme() must be called within <ThemeProvider>.');
   return theme;
 }
+
+/**
+ * `useTheme()` plus the memoised `StyleSheet.create` call every themed component needs,
+ * collapsed into one line so a converter cannot forget `[t]` in the deps array and ship a
+ * component that silently never re-themes.
+ *
+ * `factory` is a safe `useMemo` dependency even though it is a fresh-looking argument at
+ * each call site: every caller passes a `makeStyles` defined at module scope (e.g.
+ * `const makeStyles = (t: Theme) => StyleSheet.create({...})` in `primitives.tsx`), so the
+ * same function reference is passed on every render — the memo only ever recomputes when
+ * `t` itself changes (i.e. the theme flips), never on a component's own re-render.
+ */
+export function useThemedStyles<T>(factory: (t: Theme) => T): T {
+  const t = useTheme();
+  return useMemo(() => factory(t), [factory, t]);
+}

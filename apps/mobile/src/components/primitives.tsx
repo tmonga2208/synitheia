@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from 'react';
+import { forwardRef } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -21,7 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { MIN_TAP_TARGET, motion, radius, spacing, type } from '../theme/tokens.js';
-import { useTheme } from '../theme/ThemeProvider.js';
+import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -67,7 +67,7 @@ interface CardProps extends ViewProps {
 
 export function Card({ padded = true, elevated = true, accent, style, children, ...rest }: CardProps) {
   const t = useTheme();
-  const styles = useMemo(() => makeStyles(t), [t]);
+  const styles = useThemedStyles(makeStyles);
 
   return (
     <View
@@ -160,7 +160,7 @@ export function Button({
   ...rest
 }: ButtonProps) {
   const t = useTheme();
-  const styles = useMemo(() => makeStyles(t), [t]);
+  const styles = useThemedStyles(makeStyles);
   const isPrimary = variant === 'primary';
   const isGhost = variant === 'ghost';
 
@@ -212,7 +212,7 @@ interface ChipProps extends Omit<TouchableProps, 'children'> {
 /** The outlined pills under the ring — "12 Day Streak", "512 XP". */
 export function Chip({ label, icon, selected, accent, style, ...rest }: ChipProps) {
   const t = useTheme();
-  const styles = useMemo(() => makeStyles(t), [t]);
+  const styles = useThemedStyles(makeStyles);
   const color = accent ?? t.textPrimary;
 
   return (
@@ -252,7 +252,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   ref,
 ) {
   const t = useTheme();
-  const styles = useMemo(() => makeStyles(t), [t]);
+  const styles = useThemedStyles(makeStyles);
 
   return (
     <View style={{ gap: spacing.sm }}>
@@ -297,7 +297,7 @@ export function SectionHeader({
   onAction?: () => void;
 }) {
   const t = useTheme();
-  const styles = useMemo(() => makeStyles(t), [t]);
+  const styles = useThemedStyles(makeStyles);
 
   return (
     <View style={styles.sectionHeader}>
@@ -334,7 +334,7 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   const t = useTheme();
-  const styles = useMemo(() => makeStyles(t), [t]);
+  const styles = useThemedStyles(makeStyles);
 
   return (
     <Card style={{ alignItems: 'center', paddingVertical: spacing['2xl'] }}>
