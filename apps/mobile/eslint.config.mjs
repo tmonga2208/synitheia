@@ -26,6 +26,24 @@ export default [
           ],
         },
       ],
+      // `no-restricted-imports` only sees static `import` declarations. `require()` and
+      // dynamic `import()` reach the same module through a CallExpression/ImportExpression
+      // and are invisible to it — closing that gap here so neither becomes the back door
+      // this rule exists to close.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "ImportExpression[source.value=/theme\\/palette/]",
+          message:
+            'Import semantic tokens via useTheme() from theme/ThemeProvider instead of raw palette values.',
+        },
+        {
+          selector:
+            "CallExpression[callee.name='require'][arguments.0.value=/theme\\/palette/]",
+          message:
+            'Import semantic tokens via useTheme() from theme/ThemeProvider instead of raw palette values.',
+        },
+      ],
     },
   },
 ];
