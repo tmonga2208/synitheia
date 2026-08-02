@@ -50,8 +50,15 @@ broken app. The two most-used neutrals have **opposite fates**:
 - `palette.bone` — 48 uses, every one of them `backgroundColor`. Always a surface.
   Becomes a dark surface.
 - `palette.white` — used almost entirely as a **foreground**: icon glyphs and check marks
-  sitting on filled sage controls, and switch thumbs. Must stay near-white in dark, or
-  every icon on a sage button disappears.
+  sitting on filled sage controls, and switch thumbs. Becomes `onAccent`, whose whole job
+  is being readable on `accent` — which is why it is a separate token from `surface`.
+
+**`onAccent` inverts between themes, and that is correct.** Dark mode lifts sage to
+`#89A889` so it still reads as an accent on charcoal; white on that measures **2.62:1**
+and disappears, while near-black measures **6.86:1**. The alternative — keeping sage dark
+enough for white text — puts the accent at roughly 2.5:1 against the surface, where it no
+longer reads as an accent at all. Both figures were measured during implementation, not
+assumed. A semantic token differing per theme is the point of having semantic tokens.
 
 So each of the 569 references is classified by the **role it plays**, not by the token it
 names. Any call site whose role cannot be determined from its immediate context is
@@ -80,7 +87,7 @@ textFaint       disabled, placeholder
 accent          the sage anchor
 accentSoft      the sage used for de-emphasised marks
 accentWash      tinted fills behind icons
-onAccent        anything drawn ON a filled accent control  ← stays near-white in both
+onAccent        anything drawn ON a filled accent control  ← inverts between themes
 danger, warning unchanged in role
 ```
 
