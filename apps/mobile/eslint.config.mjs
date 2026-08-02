@@ -39,9 +39,20 @@ export default [
               //   import { themes } from '../theme/theme.js'      ← both, by name
               //
               // All four must come through `useTheme()`/`useThemedStyles()` so they follow
-              // the live appearance. Named imports only: `import * as theme from` still
-              // slips past, for the same no-binding-resolution reason as the aliased
-              // `require` in note 2 below, and is left on the same grounds.
+              // the live appearance.
+              //
+              // Namespace imports ARE caught, which is worth knowing because it is the
+              // first hole anyone would go looking for. `importNames` applies to `*`
+              // imports too: ESLint cannot prove which members a namespace object is used
+              // through, so it rejects the whole import rather than letting it past.
+              // Verified against this config, not assumed —
+              // `import * as th from '../theme/theme.js'` reports:
+              //
+              //   * import is invalid because 'shadow,lightTheme,darkTheme,themes' from
+              //   '../theme/theme.js' is restricted from being used by a pattern.
+              //
+              // So this entry is not the "named imports only" half-measure it looks like.
+              // The aliased-`require` gap in note 2 below is real; this is not one.
               group: ['**/theme/theme', '**/theme/theme.js'],
               importNames: ['shadow', 'lightTheme', 'darkTheme', 'themes'],
               message:

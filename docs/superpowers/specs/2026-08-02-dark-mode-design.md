@@ -203,10 +203,21 @@ silently ignored on both platforms. Verified against the installed
 
 Resolving the config both ways confirms it: with the plugin, iOS gets
 `dark.backgroundColor: '#15171A'` and Android's dark config is populated; without it, iOS
-has no `dark` key and Android's is `null`. The top-level `splash` block is kept in sync
-with the plugin so the two never disagree, but the **plugin is the one that takes effect**.
-The plugin's light values (`imageWidth: 200`, `enableFullScreenImage_legacy: true`) are set
-to reproduce exactly what the legacy top-level path produced, so light mode is unchanged.
+has no `dark` key and Android's is `null`.
+
+The top-level `splash` block is therefore left with its **light values only**. A mirrored
+`dark` key there was tried and removed: it changed nothing in the resolved config, and
+leaving an inert copy of exactly the trap this section documents — sitting in a JSON file
+that cannot carry a comment warning it is inert — is worse than not having it. The plugin
+block is the single place a dark splash is declared. The plugin's light values
+(`imageWidth: 200`, `enableFullScreenImage_legacy: true`) reproduce exactly what the legacy
+top-level path produced: without them the iOS image name and layout mode change and the
+Android mark halves from 200 to 100, which would have been a silent light-mode regression
+inside a dark-only fix.
+
+One useful side effect: `withIosSplashInfoPlist` sets `UIUserInterfaceStyle = 'Automatic'`
+whenever a dark splash is configured, so the next prebuild also clears the stale `Light`
+value in `ios/Info.plist` — which was a device-pass blocker in its own right.
 
 `apps/mobile/ios/` is gitignored prebuild output, so this takes effect on the next
 `expo prebuild`; an existing local native project keeps the old splash until regenerated.

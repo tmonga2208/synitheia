@@ -129,10 +129,14 @@ const EXCEPTIONS = [
   // real floor is 3.0, not 4.5 (see `defaultFloorFor`). All three are light-only debt the
   // conversion inherited; every one of them clears 3.0 in dark.
   //
-  // `onAccent` drawn on the 72px `EmptyState` icon circle, whose fill is `accentSoft`
-  // (primitives.tsx `emptyIcon`). Eleven call sites — Today, Habits, Insights, Reminders,
-  // Expenses, Water, Body, Nutrition, Subscriptions, Owed. Dark measures 3.5430 and needs
-  // no row.
+  // `onAccent` drawn on an `accentSoft` fill. Two component shapes do this: the 72px
+  // `EmptyState` icon circle (primitives.tsx `emptyIcon`), used on Today, Habits,
+  // Insights, Reminders, Expenses, Water, Body, Nutrition, Subscriptions and Owed; and
+  // the `Minus`/`Plus` glyphs on habit/new.tsx's `stepButton`. That screen list is
+  // ILLUSTRATIVE, not exhaustive — it is prose and will drift, whereas this row and its
+  // assertion are theme-level and cover every call site automatically. Do not treat the
+  // enumeration as the set of places this pairing has to hold.
+  // Dark measures 3.5430 and needs no row.
   { pair: 'onAccent/accentSoft', themes: ['light'], floor: 2.08 }, // measured 2.0820
   // `onAccent` — the completion check in HabitCard — on the filled per-habit `base`. The
   // row records the WORST of the eight (teal #7DA095, 2.8633); the best is sage at 3.3441,
