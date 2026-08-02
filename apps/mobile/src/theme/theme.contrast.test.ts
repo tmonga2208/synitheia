@@ -28,10 +28,16 @@ const THEMES: [name: string, t: Theme][] = [
  * Every pairing in this app that does NOT meet 4.5:1, with its measured ratio and the
  * decision behind it. An exception that is not written down here is a bug, not a decision.
  *
- * This list is the app's complete accessibility debt, in one place that runs on every
- * commit. Read it as a set of decisions, not as thresholds someone lowered to get green:
- * each floor is the pair's ACTUAL measured ratio, so if a colour is ever changed for the
- * worse the test still fails.
+ * Read it as a set of decisions, not as thresholds someone lowered to get green: each floor
+ * is the pair's ACTUAL measured ratio, so if a colour is ever changed for the worse the
+ * test still fails.
+ *
+ * SCOPE — read this before treating the list as a clean bill of health. It covers every
+ * pairing this file ASSERTS, which is the text × surface matrix plus the specific
+ * non-text pairings named below. It is NOT a survey of every colour combination the app
+ * actually renders: nothing here walks the component tree, so a pairing no `it()` block
+ * below measures is neither excepted nor caught. Adding a row is only half the work —
+ * a pairing also needs an assertion that exercises it, or the row guards nothing.
  *
  * Everything below is LIGHT-only and pre-existing — values that were already shipping
  * before dark mode and are unchanged by it. Dark mode introduced no exception of its own;
@@ -74,9 +80,25 @@ const EXCEPTIONS = [
   // HabitCard's per-habit tinting is the most distinctive thing in this design. That is a
   // light-mode restyle, which is not a change any reviewer would expect to find inside a
   // dark-mode diff — so it is deliberately deferred to a separate accessibility pass
-  // rather than smuggled in here. Decision taken 2026-08-02; see
-  // .superpowers/sdd/2026-08-02-dark-mode/task-2-report.md for the derived replacement
-  // values, already computed, if that pass ever happens.
+  // rather than smuggled in here. Decision taken 2026-08-02.
+  //
+  // The replacement set that pass would apply, already derived and measured by the same
+  // rule the dark accents use (hue preserved; lightness raised to the smallest value
+  // clearing 3.15 for `base` and 5.0 for `text` against `surface`) — inlined here so the
+  // work is not lost, since the working notes it came from are not committed:
+  //
+  //   '#7D927D': { base: '#7D927D', text: '#637663' }, // sage   3.182 / 4.645
+  //   '#7D8FA9': { base: '#7C8EA8', text: '#5F7390' }, // indigo 3.176 / 4.603
+  //   '#C08A7D': { base: '#BA7E70', text: '#A35F4F' }, // clay   3.169 / 4.640
+  //   '#B0917D': { base: '#A88671', text: '#8C6A55' }, // sand   3.165 / 4.639
+  //   '#8A9AA9': { base: '#7E8FA0', text: '#617384' }, // slate  3.160 / 4.654
+  //   '#A98DA9': { base: '#A283A2', text: '#886788' }, // mauve  3.170 / 4.602
+  //   '#7DA095': { base: '#6F9589', text: '#58786E' }, // teal   3.154 / 4.619
+  //   '#B08A8A': { base: '#AC8383', text: '#956565' }, // rose   3.158 / 4.618
+  //
+  // Applying it means deleting these two rows, replacing `lightHabitAccents` in theme.ts,
+  // updating `HABIT_RATIOS.light` and the light literal assertion at the bottom of this
+  // file, and a device pass over `HabitCard` in LIGHT as well as dark.
   //
   // The DARK accents carry no exception: all eight clear 3.0 / 4.5 outright.
   //
@@ -99,6 +121,28 @@ const EXCEPTIONS = [
   { pair: 'warning/bg', themes: ['light'], floor: 2.4 }, // measured 2.4771
   { pair: 'warning/surface', themes: ['light'], floor: 2.4 }, // measured 2.4771
   { pair: 'warning/surfaceRaised', themes: ['light'], floor: 2.2 }, // measured 2.2135
+
+  // ── Icon glyphs on tinted grounds. RATIFIED, deferred to the same pass. ──────────────
+  // Added 2026-08-02 after a review found the list covered the token × surface matrix but
+  // not these three, which are the pairings that actually SHIP at several call sites. All
+  // three are non-text — an icon glyph is a graphical object under WCAG 1.4.11, so the
+  // real floor is 3.0, not 4.5 (see `defaultFloorFor`). All three are light-only debt the
+  // conversion inherited; every one of them clears 3.0 in dark.
+  //
+  // `onAccent` drawn on the 72px `EmptyState` icon circle, whose fill is `accentSoft`
+  // (primitives.tsx `emptyIcon`). Eleven call sites — Today, Habits, Insights, Reminders,
+  // Expenses, Water, Body, Nutrition, Subscriptions, Owed. Dark measures 3.5430 and needs
+  // no row.
+  { pair: 'onAccent/accentSoft', themes: ['light'], floor: 2.08 }, // measured 2.0820
+  // `onAccent` — the completion check in HabitCard — on the filled per-habit `base`. The
+  // row records the WORST of the eight (teal #7DA095, 2.8633); the best is sage at 3.3441,
+  // which does clear 3.0. Dark's eight span 3.3480–3.3826 and all clear it.
+  { pair: 'onAccent/habitAccent.base', themes: ['light'], floor: 2.86 }, // measured 2.8633
+  // `accent` on `accentWash` — accentWash's documented role in theme.ts is literally "a
+  // tinted ground behind an accent icon", so this is the pairing it exists to create.
+  // Live at onboarding.tsx's 72px mark and profile.tsx's connected-method chips. Dark
+  // measures 5.9173 and clears even the text floor.
+  { pair: 'accent/accentWash', themes: ['light'], floor: 2.82 }, // measured 2.8202
 ];
 
 /**
@@ -139,14 +183,27 @@ const HABIT_RATIOS: Record<string, Record<string, { base: number; wash: number; 
   },
 };
 
-function floorFor(pair: string, theme: string, fallback = 4.5): number {
-  const e = EXCEPTIONS.find((x) => x.pair === pair && x.themes.includes(theme));
-  return e ? e.floor : fallback;
-}
+/**
+ * Every pairing whose subject is a graphical object rather than text — an icon glyph, a
+ * check mark, a habit's border swatch. WCAG 1.4.11 puts those at 3:1, not 1.4.3's 4.5:1,
+ * so this is the floor they are held to and the floor `EXCEPTIONS` rows for them are
+ * checked as still-needed against.
+ */
+const NON_TEXT_PAIRS = new Set([
+  'habitAccent.base/surface',
+  'onAccent/accentSoft',
+  'onAccent/habitAccent.base',
+  'accent/accentWash',
+]);
 
 /** The floor a pair would face if it were not excepted. */
 function defaultFloorFor(pair: string): number {
-  return pair === 'habitAccent.base/surface' ? 3 : 4.5;
+  return NON_TEXT_PAIRS.has(pair) ? 3 : 4.5;
+}
+
+function floorFor(pair: string, theme: string, fallback = defaultFloorFor(pair)): number {
+  const e = EXCEPTIONS.find((x) => x.pair === pair && x.themes.includes(theme));
+  return e ? e.floor : fallback;
 }
 
 /** The ratio a recorded pair actually measures, so the list can be checked against reality. */
@@ -162,6 +219,15 @@ function measure(pair: string, t: Theme): number {
   }
 
   const [fg, bg] = pair.split('/') as [string, string];
+
+  // `<fg>/habitAccent.<field>` — a fixed foreground on each of the eight per-habit fills.
+  // Same "worst of the eight is what the floor means" rule as the grouped rows above, but
+  // the group is on the BACKGROUND side here, so it needs its own branch.
+  if (bg.startsWith('habitAccent.')) {
+    const field = bg.slice('habitAccent.'.length) as 'base' | 'text' | 'wash';
+    return Math.min(...Object.values(t.habitAccents).map((a) => contrastRatio(colour(fg), a[field])));
+  }
+
   return contrastRatio(colour(fg), colour(bg));
 }
 
@@ -196,6 +262,47 @@ describe.each(THEMES)('%s theme contrast', (name, t) => {
     // so whatever sits on `accent` has to survive the press.
     const ratio = contrastRatio(t.onAccent, t.accentDeep);
     expect(ratio).toBeGreaterThanOrEqual(floorFor('onAccent/accentDeep', name));
+  });
+
+  // ── The three non-text pairings that actually ship ──────────────────────────────────
+  // These exist because the matrix above measures tokens against SURFACES, and none of
+  // these three is a token on a surface: each is a glyph on a tinted or filled ground.
+  // Without them a regression in any one fails nothing.
+
+  it('onAccent is perceptible on accentSoft — the EmptyState icon circle', () => {
+    // primitives.tsx `emptyIcon`: a 72px `accentSoft` disc with an `onAccent` glyph in it.
+    // The app's day-one first impression on eleven screens.
+    expect(contrastRatio(t.onAccent, t.accentSoft)).toBeGreaterThanOrEqual(
+      floorFor('onAccent/accentSoft', name),
+    );
+  });
+
+  it('onAccent is perceptible on every filled habit accent — the completion check', () => {
+    // HabitCard's `Check` sits on `accent.base`, per habit. Held individually rather than
+    // on the worst, so seven of the eight cannot drift behind the excepted one.
+    const floor = floorFor('onAccent/habitAccent.base', name);
+    for (const [color, accent] of Object.entries(t.habitAccents)) {
+      expect(contrastRatio(t.onAccent, accent.base), `habit accent ${color}`).toBeGreaterThanOrEqual(
+        floor,
+      );
+    }
+  });
+
+  it('accent is perceptible on accentWash — the tinted ground it exists for', () => {
+    // `accentWash`'s documented role in theme.ts is "a tinted ground behind an accent
+    // icon", and onboarding.tsx / profile.tsx draw exactly that. If this pair collapses,
+    // the token has stopped doing the only job it is defined to do.
+    expect(contrastRatio(t.accent, t.accentWash)).toBeGreaterThanOrEqual(
+      floorFor('accent/accentWash', name),
+    );
+  });
+
+  it('surface separates from bg', () => {
+    // The depth model's tightest step, and nothing else asserted it. Light is 1.0000 by
+    // design — cards and screens are both bone there and separate with a shadow instead —
+    // so this only binds in dark, where shadows resolve to `shadow.none` and this step is
+    // the ONLY thing making a card read as raised. Dark measures 1.0618.
+    if (name === 'dark') expect(contrastRatio(t.surface, t.bg)).toBeGreaterThan(1.05);
   });
 
   // `danger` and `warning` are body text, not decoration — field errors, destructive
@@ -307,6 +414,24 @@ describe('dark textFaint', () => {
     for (const s of [darkTheme.bg, darkTheme.surface, darkTheme.surfaceRaised]) {
       expect(contrastRatio(darkTheme.textFaint, s), s).toBeGreaterThanOrEqual(3);
     }
+  });
+});
+
+describe('dark onAccent is dark bg', () => {
+  it('holds the equality DateField depends on', () => {
+    // `DateField.tsx` colours the SELECTED day's numeral `t.bg`, not `t.onAccent`, even
+    // though that numeral sits on a filled `t.accent` circle. It is only correct because
+    // dark's `onAccent` IS dark's `bg` (see theme.ts: `onAccent: darkPalette.bg`), which
+    // makes the two tokens interchangeable there — while in light `t.bg` is bone `#FBF9F6`
+    // and `t.onAccent` is pure white, a deliberate difference that keeps the converted file
+    // byte-identical to its pre-conversion `palette.bone`.
+    //
+    // So this equality is load-bearing for a call site in another file, and nothing else
+    // asserts it. If someone ever gives dark `onAccent` its own value, DateField silently
+    // starts drawing the selected numeral in the wrong colour with no test failing — this
+    // is the test that fails instead, and this comment is the reason why.
+    expect(darkTheme.onAccent).toBe(darkTheme.bg);
+    expect(lightTheme.onAccent).not.toBe(lightTheme.bg);
   });
 });
 
