@@ -78,7 +78,7 @@ export async function registerHabitRoutes(app: FastifyInstance): Promise<void> {
         body: logHabitSchema,
       },
     },
-    async (req) => service.logHabit(req.user, req.params.id, req.body),
+    async (req) => service.logHabit(req.user, req.params.id, req.body, req.log),
   );
 
   api.get(

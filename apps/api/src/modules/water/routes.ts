@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { Types } from 'mongoose';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  awardsForWaterEntry,
   createWaterEntrySchema,
   localDateSchema,
   objectIdSchema,
@@ -16,6 +17,7 @@ import { UserPreferenceModel, WaterEntryModel, type WaterEntryDoc } from '../../
 import { invalidateDailySummary } from '../../context/aggregator.js';
 import { dedupeKey, emit, retractByRef } from '../../context/engine.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
+import { grantAwards } from '../xp/service.js';
 
 type WaterEntryWithId = WaterEntryDoc & { _id: Types.ObjectId };
 
@@ -63,6 +65,12 @@ async function totalMlOn(userId: string, localDate: LocalDate): Promise<number> 
 export async function createEntry(
   user: AuthedUser,
   input: CreateWaterEntryInput,
+  /**
+   * Optional so every direct caller in this codebase's tests keeps compiling
+   * unchanged; the real route passes `req.log`, the same facility `today/routes.ts`
+   * already uses for "this must not take down the main write" failures.
+   */
+  logger?: Pick<FastifyBaseLogger, 'warn'>,
 ): Promise<{ entry: WaterEntryWithId; totalMl: number; targetMl: number }> {
   const loggedAt = input.loggedAt ?? new Date();
 
@@ -102,6 +110,24 @@ export async function createEntry(
   // Invalidate before the emit, not after: the water row has already landed, and an
   // exception out of emit must not be able to suppress the invalidation.
   await invalidateDailySummary(user.id, entry.localDate as LocalDate);
+
+  /**
+   * XP is a nicety layered on top of a write that already landed — a ledger
+   * hiccup must never surface as a failed water log. Swallowed and logged, same
+   * contract as `habits/service.ts`'s habit-XP grant.
+   */
+  try {
+    await grantAwards(
+      user.id,
+      awardsForWaterEntry({ localDate: entry.localDate as LocalDate, totalMl, targetMl }),
+    );
+  } catch (error) {
+    // A caller with no logger (only this file's tests, never the real route) must
+    // still see this somewhere — grantAwards' own doc comment is explicit that a
+    // failure like "no User document for this id" is deliberately loud, and a
+    // silent swallow here would undo that.
+    (logger ?? console).warn({ err: error }, 'failed to grant water XP');
+  }
 
   await emit({
     userId: user.id,
@@ -145,7 +171,7 @@ export async function registerWaterRoutes(app: FastifyInstance): Promise<void> {
       schema: { body: createWaterEntrySchema },
     },
     async (req, reply) => {
-      const result = await createEntry(req.user, req.body);
+      const result = await createEntry(req.user, req.body, req.log);
       return reply.status(201).send(result);
     },
   );

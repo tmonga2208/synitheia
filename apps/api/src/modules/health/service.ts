@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import type { FastifyBaseLogger } from 'fastify';
 import {
   bodyInsight,
   calorieTargetFor,
@@ -22,7 +23,7 @@ import {
 import { AppError } from '../../core/errors.js';
 import { invalidateDailySummary } from '../../context/aggregator.js';
 import * as engine from '../../context/engine.js';
-import { recomputeStreak } from '../habits/service.js';
+import { grantHabitCompletionAwards, recomputeStreak } from '../habits/service.js';
 
 interface AuthedUser {
   id: string;
@@ -51,6 +52,12 @@ async function requireConsent(userId: Types.ObjectId): Promise<void> {
 export async function sync(
   user: AuthedUser,
   input: SyncHealthInput,
+  /**
+   * Optional so this file's tests keep compiling unchanged; the real route passes
+   * `req.log`, the same facility `habits/service.ts` and `water/routes.ts` already use
+   * for "this must not take down the main write" failures.
+   */
+  logger?: Pick<FastifyBaseLogger, 'warn'>,
 ): Promise<{ days: number; stepsApplied: number }> {
   const userId = new Types.ObjectId(user.id);
   await requireConsent(userId);
@@ -90,7 +97,7 @@ export async function sync(
     );
 
     await emitEvents(user, day);
-    stepsApplied += await applyStepsToHabits(user, userId, day);
+    stepsApplied += await applyStepsToHabits(user, userId, day, logger);
   }
 
   await DataSourceConnectionModel.updateOne(
@@ -175,6 +182,7 @@ async function applyStepsToHabits(
   user: AuthedUser,
   userId: Types.ObjectId,
   day: HealthSnapshot,
+  logger?: Pick<FastifyBaseLogger, 'warn'>,
 ): Promise<number> {
   if (day.steps == null || day.steps <= 0) return 0;
 
@@ -183,6 +191,7 @@ async function applyStepsToHabits(
 
   for (const habit of stepHabits) {
     const count = Math.min(day.steps, habit.targetCount * 10);
+    const complete = count >= habit.targetCount;
 
     await HabitLogModel.updateOne(
       { userId, habitId: habit._id, localDate: day.localDate },
@@ -190,7 +199,7 @@ async function applyStepsToHabits(
         $set: {
           count,
           targetCount: habit.targetCount,
-          completedAt: count >= habit.targetCount ? new Date() : null,
+          completedAt: complete ? new Date() : null,
           source: 'health',
         },
       },
@@ -203,7 +212,28 @@ async function applyStepsToHabits(
     // must not be left stale behind that exception.
     await invalidateDailySummary(user.id, day.localDate as LocalDate);
 
-    await recomputeStreak(user.id, String(habit._id), user.timezone);
+    const updated = await recomputeStreak(user.id, String(habit._id), user.timezone);
+
+    /**
+     * A step-filled habit is a completed habit and earns exactly what a tapped one
+     * does. This is the fourth completion path in the app and the only one that does
+     * not route through `logHabit` — without this, a user whose habits are
+     * step-measured and who connected Health completes them every day, earns nothing,
+     * and never reaches a streak milestone. The same helper `logHabit` uses, so the
+     * two can never quietly disagree about what a completion is worth.
+     *
+     * After `recomputeStreak`, because the milestone awards are scored against the
+     * post-recompute streak.
+     */
+    if (complete) {
+      await grantHabitCompletionAwards({
+        userId: user.id,
+        habitId: habit._id,
+        localDate: day.localDate as LocalDate,
+        currentStreak: updated.currentStreak,
+        logger,
+      });
+    }
   }
 
   return stepHabits.length;

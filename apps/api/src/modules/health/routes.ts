@@ -17,7 +17,7 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
   api.post(
     '/health/sync',
     { onRequest: [app.requireAuth], schema: { body: syncHealthSchema } },
-    async (req) => service.sync(req.user, req.body),
+    async (req) => service.sync(req.user, req.body, req.log),
   );
 
   /** BMI, BMR, TDEE, and what a calorie target WOULD be for each goal. Applies nothing. */

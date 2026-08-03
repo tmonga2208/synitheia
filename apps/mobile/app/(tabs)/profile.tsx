@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Image, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -69,7 +69,25 @@ export default function Profile() {
   const styles = useThemedStyles(makeStyles);
   const user = useAuth((s) => s.user);
   const signOut = useAuth((s) => s.signOut);
+  const refreshUser = useAuth((s) => s.refreshUser);
   const { preference, setPreference } = useThemePreference();
+
+  /**
+   * The XP chip below reads `user.xp` from the auth store, which is populated only at
+   * launch and at sign-in — so it froze at whatever the value was when the app started.
+   * A user could earn 50 XP and still read "Start collecting XP" until they force-quit.
+   * The Today chip never had this problem: it reads from the `['today']` query, which the
+   * habit and water mutations already invalidate.
+   *
+   * On focus rather than on mount, because the tab stays mounted once visited — a
+   * mount-only effect would fix the first visit and nothing after it, which is the same
+   * bug with extra steps.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      void refreshUser();
+    }, [refreshUser]),
+  );
 
   const [methodsOpen, setMethodsOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
