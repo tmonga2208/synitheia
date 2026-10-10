@@ -18,6 +18,18 @@ import * as SecureStore from 'expo-secure-store';
 
 const ACCESS_KEY = 'synitheia.access';
 const REFRESH_KEY = 'synitheia.refresh';
+const MIGRATED_KEY = 'synitheia.tokens.v2';
+
+/**
+ * Readable after the first unlock since boot, on this device only.
+ *
+ * The default (readable only while unlocked) made every background sync on a locked
+ * phone fail auth. This is the narrowest class that works in the background: the tokens
+ * still never leave the device and never reach iCloud Keychain.
+ */
+const TOKEN_OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+};
 
 const baseUrl: string =
   (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://localhost:4000';
@@ -47,9 +59,52 @@ export class ApiError extends Error {
 
 export async function setTokens(access: string, refresh: string): Promise<void> {
   await Promise.all([
-    SecureStore.setItemAsync(ACCESS_KEY, access),
-    SecureStore.setItemAsync(REFRESH_KEY, refresh),
+    SecureStore.setItemAsync(ACCESS_KEY, access, TOKEN_OPTIONS),
+    SecureStore.setItemAsync(REFRESH_KEY, refresh, TOKEN_OPTIONS),
   ]);
+}
+
+/**
+ * Move one keychain item to the background-readable class, keeping its value.
+ *
+ * Delete, then add — a plain re-save is NOT enough. Writing to a key that already exists
+ * is an update of its value only; the accessibility class is fixed when the item is
+ * created, so the old item would stay unreadable on a locked phone forever.
+ */
+async function restore(key: string, value: string): Promise<void> {
+  await SecureStore.deleteItemAsync(key);
+  try {
+    await SecureStore.setItemAsync(key, value, TOKEN_OPTIONS);
+  } catch {
+    // The item is gone and the new one was refused. Put the value back the old way
+    // rather than sign the user out over a storage-class upgrade.
+    await SecureStore.setItemAsync(key, value);
+    throw new Error('token accessibility upgrade failed');
+  }
+}
+
+/**
+ * Re-store tokens written before TOKEN_OPTIONS existed. Runs once, from the foreground,
+ * where the old items are still readable.
+ *
+ * Never throws. If the keychain cannot be read (a launch while locked) or a write is
+ * refused, the marker is not set and the next launch tries again.
+ */
+export async function migrateTokenAccessibility(): Promise<void> {
+  try {
+    if ((await SecureStore.getItemAsync(MIGRATED_KEY)) !== null) return;
+
+    const [access, refresh] = await Promise.all([
+      SecureStore.getItemAsync(ACCESS_KEY),
+      SecureStore.getItemAsync(REFRESH_KEY),
+    ]);
+    if (access !== null) await restore(ACCESS_KEY, access);
+    if (refresh !== null) await restore(REFRESH_KEY, refresh);
+
+    await SecureStore.setItemAsync(MIGRATED_KEY, '1', TOKEN_OPTIONS);
+  } catch {
+    // Tokens are still where they were; only the upgrade is deferred.
+  }
 }
 
 export async function clearTokens(): Promise<void> {
@@ -77,7 +132,18 @@ export function setSessionExpiredHandler(handler: () => void): void {
 /** The single-flight guard. Concurrent 401s all await this one promise. */
 let refreshInFlight: Promise<string | null> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+/**
+ * Whether any request waiting on the in-flight refresh came from the foreground.
+ *
+ * The refresh is shared, so "may a failure sign the user out?" cannot be the property of
+ * whichever caller happened to start it. If a background sync starts the refresh and a
+ * screen joins it, someone IS looking, and a dead session has to be handled now.
+ */
+let foregroundWaiting = false;
+
+async function refreshAccessToken(preserveSession = false): Promise<string | null> {
+  if (!preserveSession) foregroundWaiting = true;
+
   refreshInFlight ??= (async () => {
     try {
       const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
@@ -90,8 +156,12 @@ async function refreshAccessToken(): Promise<string | null> {
       });
 
       if (!res.ok) {
-        await clearTokens();
-        onSessionExpired?.();
+        // A background task must never sign the user out: they are not looking, and the
+        // next foreground request will find the same dead token and handle it properly.
+        if (foregroundWaiting) {
+          await clearTokens();
+          onSessionExpired?.();
+        }
         return null;
       }
 
@@ -100,6 +170,7 @@ async function refreshAccessToken(): Promise<string | null> {
       return data.accessToken;
     } finally {
       refreshInFlight = null;
+      foregroundWaiting = false;
     }
   })();
 
@@ -110,10 +181,12 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
   /** Set internally to stop a refreshed request from recursing forever. */
   _retried?: boolean;
+  /** Set by background sync. A failed refresh then leaves the stored session untouched. */
+  background?: boolean;
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, _retried, headers, ...rest } = options;
+  const { body, _retried, headers, background, ...rest } = options;
   const token = await getAccessToken();
 
   const isFormData = body instanceof FormData;
@@ -141,7 +214,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   });
 
   if (res.status === 401 && !_retried) {
-    const fresh = await refreshAccessToken();
+    const fresh = await refreshAccessToken(background === true);
     if (fresh) {
       return request<T>(path, { ...options, _retried: true });
     }
@@ -159,7 +232,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
+  post: <T>(path: string, body?: unknown, options?: { background?: boolean }) =>
+    request<T>(path, { method: 'POST', body, ...options }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   delete: <T>(path: string, body?: unknown) =>

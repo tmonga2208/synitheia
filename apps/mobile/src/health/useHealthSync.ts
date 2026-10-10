@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client.js';
-import { isAvailable, isSupported, readHealth, requestPermissions } from './healthkit.js';
+import { runHealthSync } from '../sync/runHealthSync.js';
+import { isAvailable, isSupported, requestPermissions } from './healthkit.js';
 
 /**
  * Keep Apple Health and Synítheia in step.
@@ -15,8 +15,6 @@ import { isAvailable, isSupported, readHealth, requestPermissions } from './heal
  * a red banner because a step count could not be fetched would be the app complaining about
  * a job the user never asked it to do.
  */
-
-const WINDOW_DAYS = 7;
 
 /**
  * `enabled` gates the AUTOMATIC sync only — the returned `sync()` always runs.
@@ -34,30 +32,17 @@ export function useHealthSync(enabled: boolean): { sync: () => Promise<void> } {
   const inFlight = useRef(false);
 
   const sync = useCallback(async () => {
-    if (!isSupported() || inFlight.current) return;
+    if (inFlight.current) return;
 
     inFlight.current = true;
     try {
-      const payload = await readHealth(WINDOW_DAYS);
-      if (!payload) return;
-
-      const hasAnything =
-        payload.days.some(
-          (d) => d.steps != null || d.activeEnergyKcal != null || d.sleepMinutes != null,
-        ) || Object.keys(payload.body ?? {}).length > 0;
-
-      // iOS never says "permission denied" for reads — it just returns nothing. Posting an
-      // empty week would blank out real data with nulls, so an empty read is a no-op.
-      if (!hasAnything) return;
-
-      await api.post('/health/sync', payload);
+      const result = await runHealthSync();
+      if (!result.ok || result.skipped) return;
 
       // Steps may have completed a step habit, which moves the ring and the timeline.
       await queryClient.invalidateQueries({ queryKey: ['today'] });
       await queryClient.invalidateQueries({ queryKey: ['habits'] });
       await queryClient.invalidateQueries({ queryKey: ['health-body'] });
-    } catch {
-      /* An assist that failed. The user did not ask for this; do not interrupt them. */
     } finally {
       inFlight.current = false;
     }

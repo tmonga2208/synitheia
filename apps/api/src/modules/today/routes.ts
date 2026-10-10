@@ -21,6 +21,7 @@ import {
   netMinor,
   startOfLocalWeek,
   todayLocalDate,
+  rankSuggestions,
   type LocalDate,
   type Participant,
 } from '@synitheia/shared';
@@ -36,7 +37,7 @@ import {
 } from '../../db/models.js';
 import { timelineFor } from '../../context/engine.js';
 import { flowInputOf, getDailySummary } from '../../context/aggregator.js';
-import { runDetectors } from '../../context/detectors.js';
+import { runDetectors } from '../../context/detectors/run.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 import * as habits from '../habits/service.js';
 import * as subscriptions from '../subscriptions/service.js';
@@ -66,6 +67,36 @@ import { grantAwards } from '../xp/service.js';
 function withId<T extends { _id: Types.ObjectId }>(doc: T): Omit<T, '_id'> & { id: string } {
   const { _id, ...rest } = doc;
   return { ...rest, id: _id.toString() };
+}
+
+/**
+ * The three suggestions Today has room for.
+ *
+ * Two queries, because the two kinds age differently. A question the user can answer
+ * ("did you have lunch?") is as true tomorrow morning as it was last night, so it lives
+ * out its 48-hour expiry. An observation is written in the present tense about one day
+ * ("Reading is usually done by now", "3,000 steps so far") and is simply false on the
+ * next one, so it is shown only on the day it was raised.
+ *
+ * Each is sorted before it is limited — an unsorted cut is arbitrary, and with a
+ * suggestion per habit there can be more pending rows than any fixed limit.
+ */
+async function pendingSuggestions(uid: Types.ObjectId, localDate: LocalDate) {
+  const pending = { userId: uid, status: 'pending', expiresAt: { $gt: new Date() } };
+
+  const [actionable, observations] = await Promise.all([
+    InferredContextModel.find({ ...pending, 'proposed.kind': { $ne: 'observation' } })
+      .sort({ confidence: -1 })
+      .limit(3)
+      .lean(),
+    InferredContextModel.find({ ...pending, 'proposed.kind': 'observation', localDate })
+      .sort({ confidence: -1 })
+      .limit(3)
+      .lean(),
+  ]);
+
+  // Actionable first, then confidence — see rankSuggestions.
+  return rankSuggestions([...actionable, ...observations]).slice(0, 3);
 }
 
 /**
@@ -154,9 +185,11 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
           req.log.warn({ err }, 'subscription posting failed; serving Today without it');
         });
 
-        await runDetectors(user.id, user.timezone, today).catch((err: unknown) => {
-          req.log.warn({ err }, 'detectors failed; serving Today without suggestions');
-        });
+        await runDetectors(user.id, user.timezone, today, { currency: user.currency }).catch(
+          (err: unknown) => {
+            req.log.warn({ err }, 'detectors failed; serving Today without suggestions');
+          },
+        );
 
         await awardMonthlyBudget(user, today).catch((err: unknown) => {
           req.log.warn({ err }, 'monthly budget award failed; serving Today without it');
@@ -197,14 +230,7 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
         DailyNutritionModel.findOne({ userId: uid, localDate }).lean(),
         WaterEntryModel.find({ userId: uid, localDate }, { amountMl: 1 }).lean(),
         timelineFor(user.id, localDate),
-        InferredContextModel.find({
-          userId: uid,
-          status: 'pending',
-          expiresAt: { $gt: new Date() },
-        })
-          .sort({ confidence: -1 })
-          .limit(3)
-          .lean(),
+        pendingSuggestions(uid, localDate),
         AIInsightModel.findOne({
           userId: uid,
           status: 'active',

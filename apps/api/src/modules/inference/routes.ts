@@ -2,11 +2,12 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { objectIdSchema, resolveInferenceSchema } from '@synitheia/shared';
+import { objectIdSchema, resolveInferenceSchema, type LocalDate } from '@synitheia/shared';
 import { ExpenseCategoryModel, InferredContextModel } from '../../db/models.js';
 import { AppError } from '../../core/errors.js';
 import * as expenses from '../expenses/service.js';
 import { createFoodEntry } from '../nutrition/service.js';
+import { confirmHabitSuggestion } from './service.js';
 
 /**
  * Resolving a suggestion — the "Confirm" half of Detect → Infer → Suggest → Confirm.
@@ -129,6 +130,20 @@ export async function registerInferenceRoutes(app: FastifyInstance): Promise<voi
             },
           },
           'inferred',
+        );
+      }
+
+      if (proposed.kind === 'habit') {
+        created = await confirmHabitSuggestion(
+          req.user,
+          {
+            localDate: inference.localDate as LocalDate,
+            proposed: {
+              habitId: String(proposed.habitId),
+              count: Number(proposed.count),
+            },
+          },
+          req.log,
         );
       }
 

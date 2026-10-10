@@ -12,6 +12,7 @@ import {
   type HealthSnapshot,
   type LocalDate,
   type SyncHealthInput,
+  type SyncSuggestion,
 } from '@synitheia/shared';
 import {
   DataSourceConnectionModel,
@@ -23,11 +24,13 @@ import {
 import { AppError } from '../../core/errors.js';
 import { invalidateDailySummary } from '../../context/aggregator.js';
 import * as engine from '../../context/engine.js';
+import { detectAfterSync } from '../../context/detectors/afterSync.js';
 import { grantHabitCompletionAwards, recomputeStreak } from '../habits/service.js';
 
 interface AuthedUser {
   id: string;
   timezone: string;
+  currency?: string;
 }
 
 /**
@@ -58,7 +61,7 @@ export async function sync(
    * for "this must not take down the main write" failures.
    */
   logger?: Pick<FastifyBaseLogger, 'warn'>,
-): Promise<{ days: number; stepsApplied: number }> {
+): Promise<{ days: number; stepsApplied: number; suggestions: SyncSuggestion[] }> {
   const userId = new Types.ObjectId(user.id);
   await requireConsent(userId);
 
@@ -105,7 +108,11 @@ export async function sync(
     { $set: { lastSyncedAt: new Date(), lastSyncError: null } },
   );
 
-  return { days: input.days.length, stepsApplied };
+  // After the consent row is stamped, so a detector failure cannot leave "last synced"
+  // stale for a sync that did store its data.
+  const suggestions = await detectAfterSync(user, logger);
+
+  return { days: input.days.length, stepsApplied, suggestions };
 }
 
 /**

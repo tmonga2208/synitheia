@@ -113,7 +113,8 @@
         {
           "locationWhenInUsePermission": "Synítheia uses your approximate area to add the day's weather and to recognise places you visit often, so it can suggest an expense or a meal instead of asking you to type it."
         }
-      ]
+      ],
+      "expo-background-task"
     ],
     "extra": {
       "apiUrl": "https://api-production-ee61.up.railway.app",

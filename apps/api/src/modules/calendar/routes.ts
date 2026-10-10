@@ -16,6 +16,6 @@ export async function registerCalendarRoutes(app: FastifyInstance): Promise<void
   api.post(
     '/calendar/sync',
     { onRequest: [app.requireAuth], schema: { body: syncCalendarSchema } },
-    async (req) => service.sync(req.user, req.body),
+    async (req) => service.sync(req.user, req.body, req.log),
   );
 }

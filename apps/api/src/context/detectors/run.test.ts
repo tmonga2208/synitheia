@@ -3,12 +3,14 @@ import mongoose, { Types } from 'mongoose';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { asLocalDate } from '@synitheia/shared';
 import {
+  HabitLogModel,
+  HabitModel,
   InferredContextModel,
   PersonalEventModel,
   UserPreferenceModel,
-} from '../db/models.js';
-import { dedupeKey, emit } from './engine.js';
-import { runDetectors } from './detectors.js';
+} from '../../db/models.js';
+import { dedupeKey, emit } from '../engine.js';
+import { runDetectors } from './run.js';
 
 let mongo: MongoMemoryReplSet;
 
@@ -19,6 +21,8 @@ beforeAll(async () => {
     PersonalEventModel.syncIndexes(),
     InferredContextModel.syncIndexes(),
     UserPreferenceModel.syncIndexes(),
+    HabitModel.syncIndexes(),
+    HabitLogModel.syncIndexes(),
   ]);
 }, 120_000);
 
@@ -34,6 +38,8 @@ afterEach(async () => {
     PersonalEventModel.deleteMany({}),
     InferredContextModel.deleteMany({}),
     UserPreferenceModel.deleteMany({}),
+    HabitModel.deleteMany({}),
+    HabitLogModel.deleteMany({}),
   ]);
 });
 
@@ -78,7 +84,7 @@ describe('possible_meal detector', () => {
     const userId = freshUser();
     await foodExpense(userId, at('13:04'));
 
-    expect(await runDetectors(userId, IST, TODAY)).toBe(1);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(1);
 
     const suggestion = await InferredContextModel.findOne({ userId }).lean();
     expect(suggestion).toBeTruthy();
@@ -163,14 +169,14 @@ describe('possible_meal detector', () => {
       },
     });
 
-    expect(await runDetectors(userId, IST, TODAY)).toBe(0);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(0);
   });
 
   it('stays silent for a food expense outside any meal window', async () => {
     const userId = freshUser();
     await foodExpense(userId, at('16:30')); // mid-afternoon — not a meal window
 
-    expect(await runDetectors(userId, IST, TODAY)).toBe(0);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(0);
   });
 
   it('stays silent for a non-food expense', async () => {
@@ -192,7 +198,7 @@ describe('possible_meal detector', () => {
       },
     });
 
-    expect(await runDetectors(userId, IST, TODAY)).toBe(0);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(0);
   });
 
   /**
@@ -205,9 +211,9 @@ describe('possible_meal detector', () => {
     const userId = freshUser();
     await foodExpense(userId, at('13:04'));
 
-    expect(await runDetectors(userId, IST, TODAY)).toBe(1);
-    expect(await runDetectors(userId, IST, TODAY)).toBe(0);
-    expect(await runDetectors(userId, IST, TODAY)).toBe(0);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(1);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(0);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(0);
 
     expect(await InferredContextModel.countDocuments({ userId })).toBe(1);
   });
@@ -229,6 +235,19 @@ describe('possible_meal detector', () => {
       type: 'food.logged',
     });
     expect(foodEvents).toBe(0);
+  });
+
+  it('returns what it created, and nothing on a second run', async () => {
+    const userId = freshUser();
+    await foodExpense(userId, at('13:04'));
+
+    const first = await runDetectors(userId, IST, TODAY);
+    expect(first).toEqual([
+      expect.objectContaining({ type: 'possible_meal', actionable: true }),
+    ]);
+    expect(first[0]!.id).toMatch(/^[a-f\d]{24}$/);
+
+    expect(await runDetectors(userId, IST, TODAY)).toEqual([]);
   });
 });
 
@@ -316,6 +335,149 @@ describe('low_water detector', () => {
 
     expect(
       await InferredContextModel.countDocuments({ userId, type: 'low_water' }),
+    ).toBe(0);
+  });
+});
+
+describe('workout → habit, through the runner', () => {
+  async function runHabit(userId: string) {
+    return HabitModel.create({
+      userId: new Types.ObjectId(userId),
+      name: 'Morning run',
+      icon: 'activity',
+      color: '#7D927D',
+      frequency: 'daily',
+      measure: 'check',
+      targetCount: 1,
+      // Before TODAY: `scheduledOn` rightly ignores a habit that did not exist yet on the
+      // day being evaluated, and the wall clock is months past this file's fixture dates.
+      createdAt: at('08:00', '2026-07-01'),
+    });
+  }
+
+  async function workout(userId: string) {
+    return emit({
+      userId,
+      source: 'health',
+      timestamp: at('12:00'),
+      timezone: IST,
+      dedupeKey: dedupeKey('health', 'workout', `${TODAY}:0`),
+      metadata: { type: 'workout.detected', activity: 'running', durationMin: 32, calories: 300 },
+    });
+  }
+
+  it('creates one actionable suggestion for the matching habit', async () => {
+    const userId = freshUser();
+    const habit = await runHabit(userId);
+    await workout(userId);
+
+    const created = await runDetectors(userId, IST, TODAY, { now: at('13:00') });
+
+    expect(created).toEqual([
+      expect.objectContaining({
+        type: 'possible_habit_completion',
+        title: 'Mark Morning run done?',
+        actionable: true,
+      }),
+    ]);
+    const stored = await InferredContextModel.findOne({ userId }).lean();
+    expect(stored!.proposed).toEqual({ kind: 'habit', habitId: habit._id.toString(), count: 1 });
+  });
+
+  it('stays silent on later days once the user has rejected it for that habit', async () => {
+    const userId = freshUser();
+    const habit = await runHabit(userId);
+
+    // Yesterday's suggestion, rejected.
+    await InferredContextModel.create({
+      userId: new Types.ObjectId(userId),
+      type: 'possible_habit_completion',
+      confidence: 0.8,
+      detector: `workout_habit:${habit._id.toString()}`,
+      title: 'Mark Morning run done?',
+      proposed: { kind: 'habit', habitId: habit._id.toString(), count: 1 },
+      status: 'rejected',
+      localDate: '2026-07-11',
+      expiresAt: at('12:00'),
+      resolvedAt: at('12:00', '2026-07-11'),
+    });
+
+    await workout(userId);
+
+    expect(await runDetectors(userId, IST, TODAY, { now: at('13:00') })).toEqual([]);
+  });
+});
+
+describe('suggestions whose premise has ended', () => {
+  async function seed(detectorPrefix: string, type: string) {
+    const userId = freshUser();
+    const habit = await HabitModel.create({
+      userId: new Types.ObjectId(userId),
+      name: 'Morning run',
+      icon: 'activity',
+      color: '#7D927D',
+      frequency: 'daily',
+      measure: 'check',
+      targetCount: 1,
+      createdAt: at('08:00', '2026-07-01'),
+    });
+    const suggestion = await InferredContextModel.create({
+      userId: new Types.ObjectId(userId),
+      type,
+      confidence: 0.8,
+      detector: `${detectorPrefix}:${habit._id.toString()}`,
+      title: 'Mark Morning run done?',
+      proposed: { kind: 'habit', habitId: habit._id.toString(), count: 1 },
+      status: 'pending',
+      localDate: TODAY,
+      expiresAt: at('12:00', '2026-07-14'),
+    });
+    return { userId, habit, suggestion };
+  }
+
+  async function complete(userId: string, habitId: Types.ObjectId) {
+    await HabitLogModel.create({
+      userId: new Types.ObjectId(userId),
+      habitId,
+      localDate: TODAY,
+      count: 1,
+      targetCount: 1,
+      completedAt: at('09:00'),
+    });
+  }
+
+  it.each([
+    ['workout_habit', 'possible_habit_completion'],
+    ['habit_slipping', 'missed_habit'],
+  ])('withdraws a pending %s card once the habit is done', async (prefix, type) => {
+    // Otherwise the only way to clear "Mark Morning run done?" after ticking the habit by
+    // hand is Dismiss — and a dismissal silences that habit's suggestions for good.
+    const { userId, habit, suggestion } = await seed(prefix, type);
+    await complete(userId, habit._id);
+
+    await runDetectors(userId, IST, TODAY, { now: at('13:00') });
+
+    const after = await InferredContextModel.findById(suggestion._id).lean();
+    expect(after!.status).toBe('expired');
+    expect(after!.resolvedAt).toBeTruthy();
+  });
+
+  it('leaves the card alone while the habit is still open', async () => {
+    const { userId, suggestion } = await seed('workout_habit', 'possible_habit_completion');
+
+    await runDetectors(userId, IST, TODAY, { now: at('13:00') });
+
+    const after = await InferredContextModel.findById(suggestion._id).lean();
+    expect(after!.status).toBe('pending');
+  });
+
+  it('does not count a withdrawn card as a rejection', async () => {
+    const { userId, habit } = await seed('workout_habit', 'possible_habit_completion');
+    await complete(userId, habit._id);
+    await runDetectors(userId, IST, TODAY, { now: at('13:00') });
+
+    expect(
+      await InferredContextModel.countDocuments({ userId, status: 'rejected' }),
     ).toBe(0);
   });
 });

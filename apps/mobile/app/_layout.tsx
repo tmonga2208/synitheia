@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,8 +13,14 @@ import {
   Manrope_700Bold,
   useFonts,
 } from '@expo-google-fonts/manrope';
+import * as Notifications from 'expo-notifications';
+import { migrateTokenAccessibility } from '../src/api/client.js';
 import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
 import { useAuth } from '../src/store/auth.js';
+// Imported for its side effect too: this is what defines the background task.
+import { syncBackgroundRegistration } from '../src/sync/backgroundTask.js';
+import { shouldDeferHydrate } from '../src/sync/launch.js';
+import { clearSourcePrefs } from '../src/sync/sourcePrefs.js';
 import { ThemeProvider, useTheme, useThemeHydrated } from '../src/theme/ThemeProvider.js';
 
 void SplashScreen.preventAutoHideAsync();
@@ -50,7 +57,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     init();
-    void hydrate();
+
+    // Before hydrate: tokens stored by an older build must be re-stored where a
+    // background task can read them, and hydrate is the first thing that reads them.
+    const start = () => void migrateTokenAccessibility().then(() => hydrate());
+
+    if (!shouldDeferHydrate(AppState.currentState)) {
+      start();
+      return;
+    }
+
+    // Launched by the OS for the background task, with nobody looking. See
+    // shouldDeferHydrate: the session check waits until the app is on screen.
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      subscription.remove();
+      start();
+    });
+    return () => subscription.remove();
   }, [hydrate, init]);
 
   useEffect(() => {
@@ -86,6 +110,26 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace('/');
     }
   }, [status, segments, router, user?.onboardedAt]);
+
+  useEffect(() => {
+    if (status === 'loading') return;
+
+    // Signed out: the mirror must not outlive the session, or the next account on this
+    // phone would inherit the last one's "connected" sources.
+    const settle = status === 'anon' ? clearSourcePrefs() : Promise.resolve();
+    void settle.then(() => syncBackgroundRegistration());
+  }, [status]);
+
+  useEffect(() => {
+    // A tap on a suggestion notification lands on Today, where its card already is.
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as
+        | { suggestionId?: unknown }
+        | undefined;
+      if (typeof data?.suggestionId === 'string') router.replace('/');
+    });
+    return () => subscription.remove();
+  }, [router]);
 
   return <>{children}</>;
 }

@@ -37,6 +37,8 @@ import { HabitCard, type TodayHabit } from '../../src/components/HabitCard.js';
 import { WeeklyChart } from '../../src/components/WeeklyChart.js';
 import { Timeline } from '../../src/components/Timeline.js';
 import { ApiError, api } from '../../src/api/client.js';
+import { useCalendarSync } from '../../src/calendar/useCalendarSync.js';
+import { useSourcePrefsMirror } from '../../src/sync/useSourcePrefsMirror.js';
 import { useHealthSync } from '../../src/health/useHealthSync.js';
 import { useAuth } from '../../src/store/auth.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
@@ -82,7 +84,16 @@ export default function Today() {
     healthSources.data?.items.some((s) => s.source === 'health' && s.status === 'connected') ??
     false;
 
+  useSourcePrefsMirror(healthSources.data?.items);
+
+  const calendarConnected =
+    healthSources.data?.items.some((s) => s.source === 'calendar' && s.status === 'connected') ??
+    false;
+
   useHealthSync(healthConnected);
+  // The same runner the background task uses. A connected calendar had no reason to be
+  // stale in the foreground; it was only ever read when the source was switched on.
+  useCalendarSync(calendarConnected);
 
   const user = useAuth((s) => s.user);
   const queryClient = useQueryClient();
