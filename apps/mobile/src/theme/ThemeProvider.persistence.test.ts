@@ -131,11 +131,18 @@ describe('hydrate', () => {
 });
 
 describe('setPreference', () => {
-  it('applies the choice to memory immediately', () => {
+  it('applies the choice to memory immediately', async () => {
     usePreferenceStore.getState().setPreference('dark');
     // Synchronous on purpose: the theme must flip on the very next render, not once a
     // device write has come back.
     expect(usePreferenceStore.getState().preference).toBe('dark');
+
+    // Not part of the assertion — it keeps the unawaited write from outliving this test.
+    // The `beforeEach` drain is one macrotask, and on a loaded CI runner the store's
+    // `await import()` takes longer than that. Left in flight it overlaps the next test's
+    // import, and Vitest then resolves that second import to the REAL async-storage
+    // module (`window is not defined`, swallowed by the store), so its write never happens.
+    await vi.waitFor(() => expect(setItem).toHaveBeenCalledWith(STORAGE_KEY, 'dark'));
   });
 
   it('persists the choice under the documented key', async () => {
