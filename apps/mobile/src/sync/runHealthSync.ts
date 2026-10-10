@@ -44,9 +44,11 @@ export async function runHealthSync(
       ) || Object.keys(payload.body ?? {}).length > 0;
 
     // Neither platform reliably says "you may not read this". iOS never reports a denied
-    // read, and returns nothing while the phone is locked; Health Connect refuses every
-    // read from the background unless background access was granted. Posting an empty
-    // week would blank out real data with nulls, so an empty read is a no-op.
+    // read, and returns nothing while the phone is locked. Health Connect, for an app in
+    // the background without background access, refuses some reads and answers others
+    // with nothing; the Android reader does not ask at all then, and hands back null
+    // above. Posting an empty week would blank out real data with nulls, so an empty read
+    // is a no-op.
     //
     // Every field counts, not just steps: on Android a user can grant workouts alone, and
     // a test that only looked at steps, energy and sleep would never sync them.

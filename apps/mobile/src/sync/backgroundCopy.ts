@@ -8,8 +8,8 @@
  *     and "keeps Calendar up to date" over a calendar that is switched off is false.
  *   - On Android, health comes with its condition. A background task may only read Health
  *     Connect once the user has allowed background access there, and Health Connect does
- *     not offer that on every phone. Without it every background read is refused and the
- *     task sends nothing — so the sentence must not promise more than "if".
+ *     not offer that on every phone. Without it the reader does not read in the background
+ *     at all and the task sends nothing — so the sentence must not promise more than "if".
  */
 export function backgroundSyncCopy(
   os: string,

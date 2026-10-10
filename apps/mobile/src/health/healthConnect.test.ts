@@ -21,7 +21,13 @@ const lib = {
     >(),
 };
 
-vi.mock('react-native', () => ({ TurboModuleRegistry: { get: () => ({}) } }));
+/** What React Native reports about the app being on screen. Tests move it. */
+const appState = vi.hoisted(() => ({ currentState: 'active' }));
+
+vi.mock('react-native', () => ({
+  AppState: appState,
+  TurboModuleRegistry: { get: () => ({}) },
+}));
 vi.mock('react-native-health-connect', () => lib);
 
 const { healthConnectReader } = await import('./healthConnect.js');
@@ -61,6 +67,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(2026, 6, 12, 15, 0));
 
+  appState.currentState = 'active';
   for (const fn of Object.values(lib)) fn.mockReset();
   lib.getSdkStatus.mockResolvedValue(3);
   lib.initialize.mockResolvedValue(true);
@@ -342,5 +349,54 @@ describe('readHealth', () => {
 
     const heightCall = lib.readRecords.mock.calls.find(([type]) => type === 'Height')!;
     expect(heightCall[1]).toMatchObject({ ascendingOrder: false, pageSize: 1 });
+  });
+});
+
+describe('readHealth, when the app is not on screen', () => {
+  it('asks for nothing in the background without background access', async () => {
+    // Health Connect does not simply refuse such a read. On Android 14 an aggregate is
+    // refused, but a plain record read is quietly narrowed to what the app itself wrote,
+    // which for an app that only reads is nothing. Answers like that cannot be told from
+    // "no data", so none is asked for.
+    appState.currentState = 'background';
+
+    expect(await healthConnectReader.readHealth(7)).toBeNull();
+    expect(lib.aggregateRecord).not.toHaveBeenCalled();
+    expect(lib.readRecords).not.toHaveBeenCalled();
+  });
+
+  it('reads in the background once background access has been granted', async () => {
+    appState.currentState = 'background';
+    lib.getGrantedPermissions.mockResolvedValue([
+      ...ALL_GRANTED,
+      read('BackgroundAccessPermission'),
+    ]);
+    lib.aggregateRecord.mockResolvedValue(STEPS_4321);
+
+    const result = await healthConnectReader.readHealth(2);
+
+    expect(result!.days.map((d) => d.steps)).toEqual([4321, 4321]);
+  });
+
+  it('does not send the day it was reading when the app left the screen', async () => {
+    // Only sleep is granted, so no refused aggregate gives the interruption away: from
+    // the moment the app is in the background, Health Connect just answers "no sleep".
+    // Sent as it stands, that would erase the night the server already holds.
+    lib.getGrantedPermissions.mockResolvedValue([read('SleepSession')]);
+
+    let reads = 0;
+    lib.readRecords.mockImplementation(async () => {
+      reads += 1;
+      if (reads === 1) return { records: [{ startTime: at(11, 23), endTime: at(12, 7) }] };
+      appState.currentState = 'background';
+      return { records: [] };
+    });
+
+    const result = await healthConnectReader.readHealth(7);
+
+    expect(result!.days.map((d) => d.localDate)).toEqual(['2026-07-12']);
+    expect(result!.days[0]!.sleepMinutes).toBe(480);
+    // And it stops there, rather than collecting five more days of the same non-answer.
+    expect(reads).toBe(2);
   });
 });

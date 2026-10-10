@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 const libraryImports = vi.hoisted(() => ({ count: 0 }));
 
 // A build the library's native module did not link into: the registry has no such module.
-vi.mock('react-native', () => ({ TurboModuleRegistry: { get: () => null } }));
+vi.mock('react-native', () => ({
+  AppState: { currentState: 'active' },
+  TurboModuleRegistry: { get: () => null },
+}));
 
 // What evaluating the library does on such a build. Under Metro this throw is NOT a
 // rejected import: Metro's module guard catches it, reports a FATAL error — a crash in a

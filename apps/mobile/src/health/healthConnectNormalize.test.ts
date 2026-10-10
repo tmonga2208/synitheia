@@ -9,6 +9,7 @@ import {
   bodyFromLatest,
   grantOutcome,
   grantedReadTypes,
+  hasBackgroundAccess,
   sessionsStartingIn,
   sleepForDay,
   snapshotForDay,
@@ -93,6 +94,19 @@ describe('grantedReadTypes', () => {
 
   it('is empty when nothing was granted', () => {
     expect(grantedReadTypes([]).size).toBe(0);
+  });
+});
+
+describe('hasBackgroundAccess', () => {
+  it('is true only when background access itself was granted', () => {
+    expect(
+      hasBackgroundAccess([
+        { accessType: 'read', recordType: 'Steps' },
+        { accessType: 'read', recordType: 'BackgroundAccessPermission' },
+      ]),
+    ).toBe(true);
+    expect(hasBackgroundAccess([{ accessType: 'read', recordType: 'Steps' }])).toBe(false);
+    expect(hasBackgroundAccess([])).toBe(false);
   });
 });
 

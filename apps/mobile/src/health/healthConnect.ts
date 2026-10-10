@@ -1,15 +1,17 @@
-import { TurboModuleRegistry } from 'react-native';
+import { AppState, TurboModuleRegistry } from 'react-native';
 import type { HealthSnapshot, SyncHealthInput } from '@synitheia/shared';
 import type * as HealthConnect from 'react-native-health-connect';
 import type { AggregateResult, AggregateResultRecordType } from 'react-native-health-connect';
 import { dayBounds, type DayBounds } from './dayBounds.js';
 import {
+  BACKGROUND_RECORD_TYPE,
   READ_RECORD_TYPES,
   aggregateValue,
   availabilityOf,
   bodyFromLatest,
   grantOutcome,
   grantedReadTypes,
+  hasBackgroundAccess,
   sessionsStartingIn,
   snapshotForDay,
   workoutFromSession,
@@ -270,7 +272,7 @@ async function connect(): Promise<HealthConnectResult> {
     try {
       await library.requestPermission([
         ...reads,
-        { accessType: 'read', recordType: 'BackgroundAccessPermission' },
+        { accessType: 'read', recordType: BACKGROUND_RECORD_TYPE },
       ]);
     } catch {
       // A Health Connect too old to know about background access rejects the whole
@@ -291,29 +293,47 @@ async function connect(): Promise<HealthConnectResult> {
  * The whole window, every time, with no cursor — for the same reason as the iPhone reader:
  * health is not append-only, a watch that syncs late rewrites yesterday, and the server
  * upserts by day, so re-sending is free and always correct.
+ *
+ * Only while the answers can be trusted. Unless the user has granted background access,
+ * Health Connect treats an app that is not on screen differently, and not in one way: on
+ * Android 14 an aggregate is refused, but a plain record read is quietly narrowed to the
+ * records the app itself wrote. Synítheia writes none, so a night of sleep comes back as
+ * "no sleep", with no error to catch. So a day is kept only if the app was on screen both
+ * before its reads and after them, and reading stops the moment it is not. Checking
+ * afterwards is safe because React Native hears that the app left the screen before
+ * Health Connect starts answering differently: Android goes on treating the app as in
+ * front for a few seconds (on an Android 14 emulator, a sync begun three seconds after
+ * leaving the app was still answered in full; one begun minutes later was not).
  */
 async function readHealth(days: number): Promise<SyncHealthInput | null> {
   const library = await ready();
   if (!library) return null;
 
   let granted: ReadonlySet<ReadRecordType>;
+  let backgroundAccess: boolean;
   try {
-    granted = grantedReadTypes(await library.getGrantedPermissions());
+    const grants = await library.getGrantedPermissions();
+    granted = grantedReadTypes(grants);
+    backgroundAccess = hasBackgroundAccess(grants);
   } catch {
     return null;
   }
   // Nothing readable is nothing to send.
   if (granted.size === 0) return null;
 
+  const answersCanBeTrusted = () => backgroundAccess || AppState.currentState === 'active';
+
   const snapshots: HealthSnapshot[] = [];
   // One day at a time. Health Connect rate-limits callers, and far more tightly in the
   // background; forty-odd calls in one burst is how a sync gets itself throttled.
   for (let i = 0; i < days; i += 1) {
+    if (!answersCanBeTrusted()) break;
     const snapshot = await readDay(library, dayBounds(i), granted);
+    if (!answersCanBeTrusted()) break;
     if (snapshot) snapshots.push(snapshot);
   }
 
-  // Every day failed: a background run without background access, most likely.
+  // No day could be read whole: a background run without background access, most likely.
   if (snapshots.length === 0) return null;
 
   return { body: await readBody(library, granted), days: snapshots };

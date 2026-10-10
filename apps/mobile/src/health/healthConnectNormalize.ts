@@ -76,6 +76,16 @@ export function grantedReadTypes(
   );
 }
 
+/** The library's name for `BACKGROUND_PERMISSION`, as a permission it reports granted. */
+export const BACKGROUND_RECORD_TYPE = 'BackgroundAccessPermission';
+
+/** Whether the user has let the app read while it is not on screen. */
+export function hasBackgroundAccess(
+  granted: readonly { accessType: string; recordType: string }[],
+): boolean {
+  return granted.some((p) => p.accessType === 'read' && p.recordType === BACKGROUND_RECORD_TYPE);
+}
+
 /**
  * An aggregate's value, or null when no app contributed to it.
  *
