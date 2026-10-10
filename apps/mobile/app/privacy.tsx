@@ -32,6 +32,7 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonList } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
+import { nothingAllowedAlert } from '../src/health/healthCopy.js';
 import { connectHealth, healthSourceName } from '../src/health/healthStore.js';
 import { useHealthSync } from '../src/health/useHealthSync.js';
 import { connectCalendar, useCalendarSync } from '../src/calendar/useCalendarSync.js';
@@ -43,7 +44,9 @@ import type {
   InsightAvailability,
   ListResponse,
 } from '../src/api/types.js';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useAuth } from '../src/store/auth.js';
+import { backgroundSyncCopy } from '../src/sync/backgroundCopy.js';
 import { syncBackgroundRegistration } from '../src/sync/backgroundTask.js';
 import { readSourcePrefs, writeSourcePrefs } from '../src/sync/sourcePrefs.js';
 import { useSourcePrefsMirror } from '../src/sync/useSourcePrefsMirror.js';
@@ -213,15 +216,20 @@ export default function Privacy() {
           );
           throw new AlreadyExplained();
         }
+        if (result === 'unauthorized' && Platform.OS !== 'ios') {
+          // Android reports what was granted, and nothing was. That is not an error and
+          // must not read like one — see nothingAllowedAlert for the ways a user gets here.
+          const { title, message } = nothingAllowedAlert(healthSourceName());
+          Alert.alert(title, message);
+          throw new AlreadyExplained();
+        }
         if (result === 'unauthorized') {
           // The store exists but the request failed. On a real iPhone this is the HealthKit
           // entitlement, which Apple only issues to a paid developer account — a free-Apple-ID
           // build reads Health fine in the Simulator but not on device. Say so, because no
           // amount of retrying or toggling Settings fixes a stripped entitlement.
           throw new Error(
-            Platform.OS === 'ios'
-              ? "Couldn't connect Apple Health. On a real device this needs the app signed with a paid Apple Developer account — a free Apple ID removes the Health entitlement. It works in the Simulator. If you're signed in with a paid account, check Health access for Synítheia in Settings."
-              : `${healthSourceName()} didn't give Synítheia access to anything. Turn this on again and allow at least one kind of data, or change it later in the ${healthSourceName()} app.`,
+            "Couldn't connect Apple Health. On a real device this needs the app signed with a paid Apple Developer account — a free Apple ID removes the Health entitlement. It works in the Simulator. If you're signed in with a paid account, check Health access for Synítheia in Settings.",
           );
         }
       }
@@ -340,7 +348,8 @@ export default function Privacy() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
       haptic={false}
-      onPress={() => router.back()}
+      // Not router.back(): this screen can be the only one in the stack. See goBackOrHome.
+      onPress={() => goBackOrHome(router)}
     >
       <ArrowLeft size={22} color={t.textPrimary} />
     </Touchable>
@@ -500,9 +509,10 @@ export default function Privacy() {
               <View style={styles.aiCopy}>
                 <Text variant="cardTitle">Sync in the background</Text>
                 <Text variant="caption" color={t.textMuted}>
-                  {Platform.OS === 'ios'
-                    ? 'Keeps Health and Calendar up to date when your phone allows it. This is best-effort: iOS decides when it runs, and it stops if you force-quit the app.'
-                    : 'Keeps Calendar up to date when your phone allows it. This is best-effort: Android decides when it runs.'}
+                  {backgroundSyncCopy(Platform.OS, {
+                    health: backgroundSources.some((s) => s.source === 'health'),
+                    calendar: backgroundSources.some((s) => s.source === 'calendar'),
+                  })}
                 </Text>
               </View>
 
