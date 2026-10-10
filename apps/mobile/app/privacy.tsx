@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -51,6 +52,32 @@ import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
 
 const SOURCES_KEY = ['data-sources'] as const;
+
+
+/**
+ * Ends a mutation whose failure the user has already been shown.
+ *
+ * The mutation's `onError` puts up a generic "Could not update" alert. When a branch has
+ * something better to say — an alert with a way forward — it shows that and throws this,
+ * so the generic one does not land on top of it.
+ */
+class AlreadyExplained extends Error {}
+
+const HEALTH_CONNECT_PACKAGE = 'com.google.android.apps.healthdata';
+
+/** Health Connect's Play Store page. The `market:` form opens the store app directly. */
+async function openHealthConnectInStore(): Promise<void> {
+  try {
+    await Linking.openURL(
+      `market://details?id=${HEALTH_CONNECT_PACKAGE}&url=healthconnect%3A%2F%2Fonboarding`,
+    );
+  } catch {
+    // No Play Store on this phone. The web page at least says what to look for.
+    await Linking.openURL(
+      `https://play.google.com/store/apps/details?id=${HEALTH_CONNECT_PACKAGE}`,
+    ).catch(() => undefined);
+  }
+}
 const AVAILABILITY_KEY = ['insights', 'availability'] as const;
 
 const STATUS_LABEL: Record<DataSourceStatus, string> = {
@@ -172,6 +199,20 @@ export default function Privacy() {
             `${healthSourceName()} isn't available on this device.`,
           );
         }
+        if (result === 'update_required') {
+          // Android 9 to 13, where Health Connect is a separate app that is missing or too
+          // old. "Could not update" would leave the user with nowhere to go, so this alert
+          // carries the way forward and the mutation ends quietly behind it.
+          Alert.alert(
+            'Health Connect needed',
+            'Health Connect is missing or out of date on this phone. Install or update it from the Play Store, then turn this on again.',
+            [
+              { text: 'Not now', style: 'cancel' },
+              { text: 'Open Play Store', onPress: () => void openHealthConnectInStore() },
+            ],
+          );
+          throw new AlreadyExplained();
+        }
         if (result === 'unauthorized') {
           // The store exists but the request failed. On a real iPhone this is the HealthKit
           // entitlement, which Apple only issues to a paid developer account — a free-Apple-ID
@@ -180,7 +221,7 @@ export default function Privacy() {
           throw new Error(
             Platform.OS === 'ios'
               ? "Couldn't connect Apple Health. On a real device this needs the app signed with a paid Apple Developer account — a free Apple ID removes the Health entitlement. It works in the Simulator. If you're signed in with a paid account, check Health access for Synítheia in Settings."
-              : `Couldn't connect ${healthSourceName()}. Check its permission in Settings and try again.`,
+              : `${healthSourceName()} didn't give Synítheia access to anything. Turn this on again and allow at least one kind of data, or change it later in the ${healthSourceName()} app.`,
           );
         }
       }
@@ -241,6 +282,8 @@ export default function Privacy() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: SOURCES_KEY }),
 
     onError: (error: unknown) => {
+      if (error instanceof AlreadyExplained) return;
+
       Alert.alert(
         'Could not update',
         error instanceof Error ? error.message : 'Please try again.',
