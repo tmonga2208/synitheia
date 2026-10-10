@@ -13,6 +13,7 @@ import {
   UserPreferenceModel,
 } from '../../db/models.js';
 import { scheduledOn } from '../../modules/habits/service.js';
+import { detectLowActivity } from './lowActivity.js';
 import { detectLowWater } from './lowWater.js';
 import { detectPossibleMeal } from './possibleMeal.js';
 import { detectUnusualSpending } from './unusualSpending.js';
@@ -38,6 +39,7 @@ export const DETECTORS: Detector[] = [
   detectPossibleMeal,
   detectLowWater,
   detectUnusualSpending,
+  detectLowActivity,
 ];
 
 export interface RunOptions {
