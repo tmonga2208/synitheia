@@ -202,6 +202,11 @@ export async function logHabit(
    * already uses for "this must not take down the main write" failures.
    */
   logger?: Pick<FastifyBaseLogger, 'warn'>,
+  /**
+   * `'inferred'` when a confirmed suggestion is doing the logging. Recorded on the log
+   * forever, so the app can always say what the user entered and what it proposed.
+   */
+  source: 'manual' | 'inferred' = 'manual',
 ): Promise<{ log: HabitLogDoc; habit: HabitHydrated }> {
   const habit = await HabitModel.findOne({
     _id: new Types.ObjectId(habitId),
@@ -241,7 +246,7 @@ export async function logHabit(
         count: nextCount,
         targetCount: habit.targetCount,
         completedAt: complete ? (existing?.completedAt ?? new Date()) : null,
-        source: 'manual',
+        source,
       },
     },
     { upsert: true, new: true },
