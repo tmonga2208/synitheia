@@ -3,12 +3,14 @@ import mongoose, { Types } from 'mongoose';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { asLocalDate } from '@synitheia/shared';
 import {
+  HabitLogModel,
+  HabitModel,
   InferredContextModel,
   PersonalEventModel,
   UserPreferenceModel,
-} from '../db/models.js';
-import { dedupeKey, emit } from './engine.js';
-import { runDetectors } from './detectors.js';
+} from '../../db/models.js';
+import { dedupeKey, emit } from '../engine.js';
+import { runDetectors } from './run.js';
 
 let mongo: MongoMemoryReplSet;
 
@@ -19,6 +21,8 @@ beforeAll(async () => {
     PersonalEventModel.syncIndexes(),
     InferredContextModel.syncIndexes(),
     UserPreferenceModel.syncIndexes(),
+    HabitModel.syncIndexes(),
+    HabitLogModel.syncIndexes(),
   ]);
 }, 120_000);
 
@@ -34,6 +38,8 @@ afterEach(async () => {
     PersonalEventModel.deleteMany({}),
     InferredContextModel.deleteMany({}),
     UserPreferenceModel.deleteMany({}),
+    HabitModel.deleteMany({}),
+    HabitLogModel.deleteMany({}),
   ]);
 });
 
@@ -78,7 +84,7 @@ describe('possible_meal detector', () => {
     const userId = freshUser();
     await foodExpense(userId, at('13:04'));
 
-    expect(await runDetectors(userId, IST, TODAY)).toBe(1);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(1);
 
     const suggestion = await InferredContextModel.findOne({ userId }).lean();
     expect(suggestion).toBeTruthy();
@@ -163,14 +169,14 @@ describe('possible_meal detector', () => {
       },
     });
 
-    expect(await runDetectors(userId, IST, TODAY)).toBe(0);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(0);
   });
 
   it('stays silent for a food expense outside any meal window', async () => {
     const userId = freshUser();
     await foodExpense(userId, at('16:30')); // mid-afternoon — not a meal window
 
-    expect(await runDetectors(userId, IST, TODAY)).toBe(0);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(0);
   });
 
   it('stays silent for a non-food expense', async () => {
@@ -192,7 +198,7 @@ describe('possible_meal detector', () => {
       },
     });
 
-    expect(await runDetectors(userId, IST, TODAY)).toBe(0);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(0);
   });
 
   /**
@@ -205,9 +211,9 @@ describe('possible_meal detector', () => {
     const userId = freshUser();
     await foodExpense(userId, at('13:04'));
 
-    expect(await runDetectors(userId, IST, TODAY)).toBe(1);
-    expect(await runDetectors(userId, IST, TODAY)).toBe(0);
-    expect(await runDetectors(userId, IST, TODAY)).toBe(0);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(1);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(0);
+    expect(await runDetectors(userId, IST, TODAY)).toHaveLength(0);
 
     expect(await InferredContextModel.countDocuments({ userId })).toBe(1);
   });
@@ -229,6 +235,19 @@ describe('possible_meal detector', () => {
       type: 'food.logged',
     });
     expect(foodEvents).toBe(0);
+  });
+
+  it('returns what it created, and nothing on a second run', async () => {
+    const userId = freshUser();
+    await foodExpense(userId, at('13:04'));
+
+    const first = await runDetectors(userId, IST, TODAY);
+    expect(first).toEqual([
+      expect.objectContaining({ type: 'possible_meal', actionable: true }),
+    ]);
+    expect(first[0]!.id).toMatch(/^[a-f\d]{24}$/);
+
+    expect(await runDetectors(userId, IST, TODAY)).toEqual([]);
   });
 });
 
