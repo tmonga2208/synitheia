@@ -4,7 +4,7 @@ const isSupported = vi.fn<() => boolean>();
 const readHealth = vi.fn();
 const post = vi.fn();
 
-vi.mock('../health/healthkit.js', () => ({ isSupported, readHealth }));
+vi.mock('../health/healthStore.js', () => ({ isSupported, readHealth }));
 vi.mock('../api/client.js', () => ({ api: { post } }));
 
 const { runHealthSync } = await import('./runHealthSync.js');
@@ -69,6 +69,28 @@ describe('runHealthSync', () => {
   it('still posts when only body metrics came back', async () => {
     readHealth.mockResolvedValue({ days: [day({ steps: null })], body: { weightKg: 70 } });
     post.mockResolvedValue({ days: 1, stepsApplied: 0 });
+    expect((await runHealthSync()).skipped).toBe(false);
+  });
+
+  it('syncs a day that has only a workout — a partial grant is still a connection', async () => {
+    // On Android the user can allow workouts and nothing else. Steps, energy and sleep
+    // are then null every day, and the old "nothing to send" test would never sync.
+    readHealth.mockResolvedValue({
+      days: [day({ steps: null, workouts: [{ kind: 'running', minutes: 30, energyKcal: null }] })],
+    });
+    post.mockResolvedValue({ days: 1, stepsApplied: 0 });
+
+    expect((await runHealthSync()).skipped).toBe(false);
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['exercise minutes', { exerciseMinutes: 30 }],
+    ['a resting heart rate', { restingHeartRate: 57 }],
+  ])('syncs a day that has only %s', async (_label, fields) => {
+    readHealth.mockResolvedValue({ days: [day({ steps: null, ...fields })] });
+    post.mockResolvedValue({ days: 1, stepsApplied: 0 });
+
     expect((await runHealthSync()).skipped).toBe(false);
   });
 

@@ -31,8 +31,8 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonList } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
-import { healthSourceName } from '../src/health/healthkit.js';
-import { connectHealth, useHealthSync } from '../src/health/useHealthSync.js';
+import { connectHealth, healthSourceName } from '../src/health/healthStore.js';
+import { useHealthSync } from '../src/health/useHealthSync.js';
 import { connectCalendar, useCalendarSync } from '../src/calendar/useCalendarSync.js';
 import { connectWeather, useWeatherSync } from '../src/weather/useWeatherSync.js';
 import { connectLocation, useLocationSync } from '../src/location/useLocationSync.js';
