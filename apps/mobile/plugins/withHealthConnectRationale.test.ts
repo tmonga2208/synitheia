@@ -23,8 +23,37 @@ interface Manifest {
 // here the same way, so the test exercises the file exactly as prebuild will.
 const plugin = createRequire(import.meta.url)('./withHealthConnectRationale.js') as {
   applyRationale: (manifest: Manifest) => Manifest;
+  applyKeepLatestIntent: (source: string) => string;
   rationaleActivitySource: (packageName: string, deepLink: string) => string;
 };
+
+/** The MainActivity Expo generates, cut down to its shape. */
+const MAIN_ACTIVITY = `package com.synitheia.app
+
+import android.os.Build
+import android.os.Bundle
+
+import com.facebook.react.ReactActivity
+
+class MainActivity : ReactActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    setTheme(R.style.AppTheme);
+    super.onCreate(null)
+  }
+
+  override fun getMainComponentName(): String = "main"
+
+  override fun invokeDefaultOnBackPressed() {
+      if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+          if (!moveTaskToBack(false)) {
+              super.invokeDefaultOnBackPressed()
+          }
+          return
+      }
+      super.invokeDefaultOnBackPressed()
+  }
+}
+`;
 
 function manifest(): Manifest {
   return {
@@ -114,5 +143,59 @@ describe('rationaleActivitySource', () => {
     expect(source).toContain('Uri.parse("synitheia://privacy")');
     expect(source).toContain('setPackage(packageName)');
     expect(source).toContain('finish()');
+  });
+});
+
+describe('applyKeepLatestIntent', () => {
+  it('makes MainActivity keep the newest intent it is handed', () => {
+    // A link that reaches the activity while the app is still starting is dropped by both
+    // Expo and React Native. Kept as the activity's intent, the router finds it once
+    // JavaScript is running — otherwise Health Connect's policy link opens Today.
+    const result = plugin.applyKeepLatestIntent(MAIN_ACTIVITY);
+
+    expect(result).toContain('override fun onNewIntent(intent: Intent) {');
+    expect(result).toContain('super.onNewIntent(intent)');
+    expect(result).toContain('setIntent(intent)');
+  });
+
+  it('imports Intent, once', () => {
+    const result = plugin.applyKeepLatestIntent(MAIN_ACTIVITY);
+    expect(result.match(/^import android\.content\.Intent$/gm)).toHaveLength(1);
+
+    const already = MAIN_ACTIVITY.replace(
+      'import android.os.Build',
+      'import android.content.Intent\nimport android.os.Build',
+    );
+    expect(
+      plugin.applyKeepLatestIntent(already).match(/^import android\.content\.Intent$/gm),
+    ).toHaveLength(1);
+  });
+
+  it('puts the override inside the class and leaves the rest alone', () => {
+    const result = plugin.applyKeepLatestIntent(MAIN_ACTIVITY);
+
+    // Everything that was there still is, in order.
+    expect(result).toContain('override fun getMainComponentName(): String = "main"');
+    expect(result.indexOf('override fun invokeDefaultOnBackPressed()')).toBeLessThan(
+      result.indexOf('override fun onNewIntent'),
+    );
+    // The class still closes after the new method, and braces still balance.
+    expect(result.trimEnd().endsWith('}')).toBe(true);
+    expect(result.split('{').length).toBe(result.split('}').length);
+    expect(result.startsWith('package com.synitheia.app\n')).toBe(true);
+  });
+
+  it('is safe to apply twice', () => {
+    const once = plugin.applyKeepLatestIntent(MAIN_ACTIVITY);
+    expect(plugin.applyKeepLatestIntent(once)).toBe(once);
+  });
+
+  it('refuses to guess when MainActivity already handles new intents', () => {
+    // Two overrides of one method do not compile; merging them is a human's call.
+    const custom = MAIN_ACTIVITY.replace(
+      '  override fun getMainComponentName(): String = "main"',
+      '  override fun onNewIntent(intent: Intent) {\n    super.onNewIntent(intent)\n  }',
+    );
+    expect(() => plugin.applyKeepLatestIntent(custom)).toThrow(/onNewIntent/);
   });
 });

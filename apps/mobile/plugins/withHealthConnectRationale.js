@@ -5,6 +5,7 @@ const {
   createRunOncePlugin,
   withAndroidManifest,
   withDangerousMod,
+  withMainActivity,
 } = require('expo/config-plugins');
 
 /**
@@ -20,6 +21,10 @@ const {
  * both forms of the intent: the action Health Connect uses through Android 13, and the
  * activity-alias Android 14+ requires. Doing all of it here, rather than patching the
  * other plugin's output, keeps this independent of the order plugins run in.
+ *
+ * It also teaches MainActivity to keep the newest intent it is handed: see
+ * applyKeepLatestIntent. Without that, the deep link is lost in the most ordinary case
+ * there is — the app still in the recents list, its process long since reclaimed.
  */
 
 const ACTIVITY = 'HealthRationaleActivity';
@@ -56,6 +61,60 @@ class ${ACTIVITY} : Activity() {
   }
 }
 `;
+}
+
+const KEEP_INTENT_MARKER = 'synitheia:keep-latest-intent';
+
+/**
+ * MainActivity source, changed so the activity keeps the newest intent it is handed.
+ *
+ * Why the generated activity is not enough. When the app is in the recents list but its
+ * process has been reclaimed, tapping the policy link brings the old task forward. Android
+ * re-creates MainActivity from its ORIGINAL intent and then hands it the deep link as a
+ * "new intent" — a few milliseconds later, long before any JavaScript runs. Expo ignores
+ * a new intent while the app is loading, React Native ignores one before its context is
+ * ready, and the router only ever asks what the activity's intent is. So the link
+ * vanished and the app opened on Today (seen on an Android 14 emulator).
+ *
+ * `setIntent` makes the activity's intent the newest one, which is where the router looks
+ * once it is running. It is the standard Android idiom for a singleTask activity.
+ *
+ * Pure — source in, source out — so it can be tested without running a prebuild. Safe to
+ * apply twice. Throws rather than guess if the activity already overrides onNewIntent:
+ * two overrides would not compile, and silently skipping would bring the bug back.
+ */
+function applyKeepLatestIntent(source) {
+  if (source.includes(KEEP_INTENT_MARKER)) return source;
+
+  if (/override\s+fun\s+onNewIntent\s*\(/.test(source)) {
+    throw new Error(
+      'withHealthConnectRationale: MainActivity already overrides onNewIntent. ' +
+        'Add setIntent(intent) to it by hand and remove this step.',
+    );
+  }
+
+  const classEnd = source.lastIndexOf('}');
+  if (classEnd === -1 || !/^package\s+\S+\s*$/m.test(source)) {
+    throw new Error('withHealthConnectRationale: MainActivity is not the Kotlin class expected.');
+  }
+
+  const method = [
+    '',
+    `  // ${KEEP_INTENT_MARKER} (plugins/withHealthConnectRationale.js)`,
+    '  // A link that arrives while the app is still starting is dropped by React Native.',
+    '  // Kept as the intent, the router finds it once JavaScript is running.',
+    '  override fun onNewIntent(intent: Intent) {',
+    '    super.onNewIntent(intent)',
+    '    setIntent(intent)',
+    '  }',
+    '}',
+  ].join('\n');
+
+  const withMethod = source.slice(0, classEnd).replace(/\s*$/, '\n') + method + source.slice(classEnd + 1);
+
+  return /^import android\.content\.Intent$/m.test(withMethod)
+    ? withMethod
+    : withMethod.replace(/^(package\s+\S+\s*\n)/m, '$1\nimport android.content.Intent\n');
 }
 
 /** Adds the activity and the alias to a parsed AndroidManifest. Safe to apply twice. */
@@ -112,6 +171,14 @@ const withHealthConnectRationale = (config, props = {}) => {
     return manifestConfig;
   });
 
+  config = withMainActivity(config, (activityConfig) => {
+    if (activityConfig.modResults.language !== 'kt') {
+      throw new Error('withHealthConnectRationale: expected a Kotlin MainActivity');
+    }
+    activityConfig.modResults.contents = applyKeepLatestIntent(activityConfig.modResults.contents);
+    return activityConfig;
+  });
+
   return withDangerousMod(config, [
     'android',
     async (modConfig) => {
@@ -137,5 +204,6 @@ const withHealthConnectRationale = (config, props = {}) => {
 };
 
 module.exports = createRunOncePlugin(withHealthConnectRationale, 'with-health-connect-rationale', '1.0.0');
+module.exports.applyKeepLatestIntent = applyKeepLatestIntent;
 module.exports.applyRationale = applyRationale;
 module.exports.rationaleActivitySource = rationaleActivitySource;

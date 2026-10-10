@@ -1,6 +1,5 @@
 import {
   KeyboardAvoidingView,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -118,11 +117,14 @@ export default function Body() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      {/* The screen holds text fields now, some of them well down the page. */}
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {/*
+        The screen holds text fields now, some of them well down the page. Padding on
+        Android too, unlike the app's older forms: the app draws edge to edge, so Android
+        no longer shrinks the window for the keyboard, and on the emulator the field being
+        typed in and the Save button sat underneath it. Where a window does shrink, the
+        overlap this pads by is already zero.
+      */}
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <ScrollView
           contentContainerStyle={styles.content}
           // Without this the first tap on Save only puts the keyboard away.
