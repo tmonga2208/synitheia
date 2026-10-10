@@ -35,7 +35,7 @@ describe('workout → habit', () => {
     expect(d!.type).toBe('possible_habit_completion');
     expect(d!.title).toBe('Mark Morning run done?');
     expect(d!.proposed).toEqual({ kind: 'habit', habitId: RUN_ID, count: 1 });
-    expect(d!.evidence[0]!.label).toBe('Running, 32 min, from Apple Health');
+    expect(d!.evidence[0]!.label).toBe('Running, 32 min, from your health data');
     expect(d!.supportingEventIds).toEqual([event._id]);
     expect(d!.confidence).toBeCloseTo(0.8);
   });
@@ -124,6 +124,6 @@ describe('workout → habit', () => {
 
   it('labels an old numeric activity by its name', () => {
     const [d] = detectWorkoutHabit(baseCtx({ events: [workout('37')], habits: [habit()] }));
-    expect(d!.evidence[0]!.label).toBe('Running, 32 min, from Apple Health');
+    expect(d!.evidence[0]!.label).toBe('Running, 32 min, from your health data');
   });
 });
