@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image as ImageIcon,
+import { Image as ImageIcon, RefreshCw,
   ArrowLeft,
   Ban,
   Check,
@@ -43,6 +43,9 @@ import type {
   ListResponse,
 } from '../src/api/types.js';
 import { useAuth } from '../src/store/auth.js';
+import { syncBackgroundRegistration } from '../src/sync/backgroundTask.js';
+import { readSourcePrefs, writeSourcePrefs } from '../src/sync/sourcePrefs.js';
+import { useSourcePrefsMirror } from '../src/sync/useSourcePrefsMirror.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -108,6 +111,21 @@ export default function Privacy() {
     queryKey: SOURCES_KEY,
     queryFn: () => api.get<ListResponse<DataSourceItem>>('/data-sources'),
   });
+
+  // Connecting a source here must reach the background task without a trip via Today.
+  useSourcePrefsMirror(sources.data?.items);
+
+  const [backgroundSync, setBackgroundSync] = useState(true);
+
+  useEffect(() => {
+    void readSourcePrefs().then((prefs) => setBackgroundSync(prefs.background));
+  }, []);
+
+  const onBackgroundSyncChange = (value: boolean) => {
+    // Optimistic: this is a local preference, and the write cannot meaningfully fail.
+    setBackgroundSync(value);
+    void writeSourcePrefs({ background: value }).then(() => syncBackgroundRegistration());
+  };
 
   const availability = useQuery({
     queryKey: AVAILABILITY_KEY,
@@ -312,6 +330,9 @@ export default function Privacy() {
   }
 
   const aiEnabled = availability.data?.enabled ?? false;
+  const backgroundSources = sources.data.items.filter(
+    (s) => (s.source === 'health' || s.source === 'calendar') && s.status === 'connected',
+  );
   const storeReceipts = me.data?.preferences?.storeReceipts ?? false;
   const aiConfigured = availability.data?.configured ?? false;
 
@@ -422,6 +443,37 @@ export default function Privacy() {
             />
           ))}
         </View>
+
+        {/* ─── Background sync ─────────────────────────────────────────────────
+            Only when there is something it would sync. A switch for a task that cannot
+            run is the same non-choice as a switch on an unavailable source. */}
+        {backgroundSources.length > 0 ? (
+          <Card style={styles.aiCard}>
+            <View style={styles.aiHeader}>
+              <View style={styles.aiIcon}>
+                <RefreshCw size={20} color={t.accent} strokeWidth={1.6} />
+              </View>
+
+              <View style={styles.aiCopy}>
+                <Text variant="cardTitle">Sync in the background</Text>
+                <Text variant="caption" color={t.textMuted}>
+                  {Platform.OS === 'ios'
+                    ? 'Keeps Health and Calendar up to date when your phone allows it. This is best-effort: iOS decides when it runs, and it stops if you force-quit the app.'
+                    : 'Keeps Calendar up to date when your phone allows it. This is best-effort: Android decides when it runs.'}
+                </Text>
+              </View>
+
+              <Switch
+                value={backgroundSync}
+                onValueChange={onBackgroundSyncChange}
+                accessibilityLabel="Sync in the background"
+                trackColor={{ false: t.border, true: t.accent }}
+                thumbColor={t.onAccent}
+                ios_backgroundColor={t.border}
+              />
+            </View>
+          </Card>
+        ) : null}
 
         {/* ─── Your data ───────────────────────────────────────────────────── */}
         <Card style={styles.dataCard}>
