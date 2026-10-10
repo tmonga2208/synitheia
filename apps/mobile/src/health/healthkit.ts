@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import {
   CategoryValueSleepAnalysis,
+  WorkoutActivityType,
   getBiologicalSexAsync,
   getDateOfBirthAsync,
   getMostRecentQuantitySample,
@@ -222,7 +223,10 @@ async function readWorkouts(start: Date, end: Date): Promise<HealthSnapshot['wor
     });
 
     return workouts.map((w) => ({
-      kind: String(w.workoutActivityType ?? 'workout'),
+      // The enum is numeric, so `String()` of it is "37". Reverse-map to the name the
+      // schema promises ("running"); the server still understands the old numbers for
+      // events already stored.
+      kind: WorkoutActivityType[w.workoutActivityType] ?? 'workout',
       // `duration` is now a Quantity in seconds, not a bare number of seconds.
       minutes: Math.round((w.duration?.quantity ?? 0) / 60),
       energyKcal: w.totalEnergyBurned?.quantity ?? null,
