@@ -1,12 +1,15 @@
 import { Types } from 'mongoose';
-import type { SyncCalendarInput } from '@synitheia/shared';
+import type { FastifyBaseLogger } from 'fastify';
+import type { SyncCalendarInput, SyncSuggestion } from '@synitheia/shared';
 import { DataSourceConnectionModel } from '../../db/models.js';
 import { AppError } from '../../core/errors.js';
 import * as engine from '../../context/engine.js';
+import { detectAfterSync } from '../../context/detectors/afterSync.js';
 
 interface AuthedUser {
   id: string;
   timezone: string;
+  currency?: string;
 }
 
 /**
@@ -31,7 +34,8 @@ async function requireConsent(userId: Types.ObjectId): Promise<void> {
 export async function sync(
   user: AuthedUser,
   input: SyncCalendarInput,
-): Promise<{ events: number; added: number }> {
+  logger?: Pick<FastifyBaseLogger, 'warn'>,
+): Promise<{ events: number; added: number; suggestions: SyncSuggestion[] }> {
   const userId = new Types.ObjectId(user.id);
   await requireConsent(userId);
 
@@ -74,5 +78,7 @@ export async function sync(
     },
   );
 
-  return { events: input.events.length, added };
+  const suggestions = await detectAfterSync(user, logger);
+
+  return { events: input.events.length, added, suggestions };
 }

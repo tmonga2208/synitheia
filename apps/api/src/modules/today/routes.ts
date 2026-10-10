@@ -21,6 +21,7 @@ import {
   netMinor,
   startOfLocalWeek,
   todayLocalDate,
+  rankSuggestions,
   type LocalDate,
   type Participant,
 } from '@synitheia/shared';
@@ -154,9 +155,11 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
           req.log.warn({ err }, 'subscription posting failed; serving Today without it');
         });
 
-        await runDetectors(user.id, user.timezone, today).catch((err: unknown) => {
-          req.log.warn({ err }, 'detectors failed; serving Today without suggestions');
-        });
+        await runDetectors(user.id, user.timezone, today, { currency: user.currency }).catch(
+          (err: unknown) => {
+            req.log.warn({ err }, 'detectors failed; serving Today without suggestions');
+          },
+        );
 
         await awardMonthlyBudget(user, today).catch((err: unknown) => {
           req.log.warn({ err }, 'monthly budget award failed; serving Today without it');
@@ -202,8 +205,8 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
           status: 'pending',
           expiresAt: { $gt: new Date() },
         })
-          .sort({ confidence: -1 })
-          .limit(3)
+          // Ranked in code below. 20 is far more than six detectors can have pending.
+          .limit(20)
           .lean(),
         AIInsightModel.findOne({
           userId: uid,
@@ -362,7 +365,8 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
         },
         water: { totalMl: waterTotal, targetMl: waterTargetMl },
         timeline,
-        suggestions: suggestions.map(withId),
+        // Actionable first, then confidence — see rankSuggestions.
+        suggestions: rankSuggestions(suggestions).slice(0, 3).map(withId),
         featuredInsight: insight ? withId(insight) : null,
         weeklyFlow,
       };
