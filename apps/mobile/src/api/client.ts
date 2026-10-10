@@ -18,6 +18,18 @@ import * as SecureStore from 'expo-secure-store';
 
 const ACCESS_KEY = 'synitheia.access';
 const REFRESH_KEY = 'synitheia.refresh';
+const MIGRATED_KEY = 'synitheia.tokens.v2';
+
+/**
+ * Readable after the first unlock since boot, on this device only.
+ *
+ * The default (readable only while unlocked) made every background sync on a locked
+ * phone fail auth. This is the narrowest class that works in the background: the tokens
+ * still never leave the device and never reach iCloud Keychain.
+ */
+const TOKEN_OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+};
 
 const baseUrl: string =
   (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://localhost:4000';
@@ -47,9 +59,25 @@ export class ApiError extends Error {
 
 export async function setTokens(access: string, refresh: string): Promise<void> {
   await Promise.all([
-    SecureStore.setItemAsync(ACCESS_KEY, access),
-    SecureStore.setItemAsync(REFRESH_KEY, refresh),
+    SecureStore.setItemAsync(ACCESS_KEY, access, TOKEN_OPTIONS),
+    SecureStore.setItemAsync(REFRESH_KEY, refresh, TOKEN_OPTIONS),
   ]);
+}
+
+/**
+ * Re-store tokens written before TOKEN_OPTIONS existed. Runs once, from the foreground,
+ * where the old items are still readable.
+ */
+export async function migrateTokenAccessibility(): Promise<void> {
+  if ((await SecureStore.getItemAsync(MIGRATED_KEY)) !== null) return;
+
+  const [access, refresh] = await Promise.all([
+    SecureStore.getItemAsync(ACCESS_KEY),
+    SecureStore.getItemAsync(REFRESH_KEY),
+  ]);
+  if (access !== null && refresh !== null) await setTokens(access, refresh);
+
+  await SecureStore.setItemAsync(MIGRATED_KEY, '1', TOKEN_OPTIONS);
 }
 
 export async function clearTokens(): Promise<void> {
@@ -77,7 +105,7 @@ export function setSessionExpiredHandler(handler: () => void): void {
 /** The single-flight guard. Concurrent 401s all await this one promise. */
 let refreshInFlight: Promise<string | null> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+async function refreshAccessToken(preserveSession = false): Promise<string | null> {
   refreshInFlight ??= (async () => {
     try {
       const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
@@ -90,8 +118,12 @@ async function refreshAccessToken(): Promise<string | null> {
       });
 
       if (!res.ok) {
-        await clearTokens();
-        onSessionExpired?.();
+        // A background task must never sign the user out: they are not looking, and the
+        // next foreground request will find the same dead token and handle it properly.
+        if (!preserveSession) {
+          await clearTokens();
+          onSessionExpired?.();
+        }
         return null;
       }
 
@@ -110,10 +142,12 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
   /** Set internally to stop a refreshed request from recursing forever. */
   _retried?: boolean;
+  /** Set by background sync. A failed refresh then leaves the stored session untouched. */
+  background?: boolean;
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, _retried, headers, ...rest } = options;
+  const { body, _retried, headers, background, ...rest } = options;
   const token = await getAccessToken();
 
   const isFormData = body instanceof FormData;
@@ -141,7 +175,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   });
 
   if (res.status === 401 && !_retried) {
-    const fresh = await refreshAccessToken();
+    const fresh = await refreshAccessToken(background === true);
     if (fresh) {
       return request<T>(path, { ...options, _retried: true });
     }
@@ -159,7 +193,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
+  post: <T>(path: string, body?: unknown, options?: { background?: boolean }) =>
+    request<T>(path, { method: 'POST', body, ...options }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   delete: <T>(path: string, body?: unknown) =>
