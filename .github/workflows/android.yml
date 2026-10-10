@@ -52,8 +52,19 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-          # Caches ~/.gradle so the toolchain and dependencies are not re-downloaded every run.
-          cache: gradle
+
+      # Caches ~/.gradle so the toolchain and dependencies are not re-downloaded every run.
+      # Not setup-java's `cache: gradle`: that hashes *.gradle files at setup time, and
+      # android/ does not exist until prebuild, so it fails the job before anything builds.
+      # The lockfile and app.json are what actually decide the native dependency set.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/mobile/app.json') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
