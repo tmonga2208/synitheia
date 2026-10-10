@@ -205,12 +205,13 @@ export type UpdateExpenseInput = z.infer<typeof updateExpenseSchema>;
 // Every channel produces a DRAFT with a confidence score. A draft is never an
 // expense until the user confirms it: Detect → Infer → Suggest → Confirm.
 
-export const ingestionChannelSchema = z.enum(['screenshot', 'text', 'pdf', 'csv']);
+export const ingestionChannelSchema = z.enum(['screenshot', 'text', 'pdf', 'csv', 'email']);
 export type IngestionChannel = z.infer<typeof ingestionChannelSchema>;
 
 export const ingestionStatusSchema = z.enum([
   'parsing',
   'needs_review', //  parsed; waiting for the user
+  'needs_password', // a locked statement arrived; user must open it in-app to import
   'confirmed',
   'rejected',
   'failed',

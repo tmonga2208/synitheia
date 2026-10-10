@@ -13,6 +13,7 @@ import { loadEnv } from '../../config/env.js';
 import * as service from './service.js';
 import * as ingestion from './ingestion.js';
 import * as receipts from './receipts.js';
+import * as inbox_service from './inbox.js';
 
 export async function registerExpenseRoutes(app: FastifyInstance): Promise<void> {
   const api = app.withTypeProvider<ZodTypeProvider>();
@@ -198,6 +199,17 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
 
   api.get('/expenses/ingestions', { onRequest: [app.requireAuth] }, async (req) => ({
     items: await ingestion.listPendingIngestions(req.user.id),
+  }));
+
+  // ─── Statement inbox ──────────────────────────────────────────────────────
+
+  api.post('/expenses/inbox', { onRequest: [app.requireAuth] }, async (req, reply) => {
+    const inbox = await inbox_service.getOrCreateInbox(env, req.user.id);
+    return reply.status(201).send({ inbox });
+  });
+
+  api.get('/expenses/inbox', { onRequest: [app.requireAuth] }, async (req) => ({
+    inbox: await inbox_service.getInbox(env, req.user.id),
   }));
 
   api.get(

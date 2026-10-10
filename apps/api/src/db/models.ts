@@ -36,6 +36,13 @@ const userSchema = new Schema(
     googleSub: { type: String, default: null },
 
     onboardedAt: { type: Date, default: null },
+
+    /**
+     * Statement Inbox address token. High-entropy, secret, and never selected by default
+     * (a stray `.find()` must not hand it out). Null until the user enables the inbox.
+     */
+    inboundToken: { type: String, default: null, select: false },
+    inboundEnabledAt: { type: Date, default: null },
   },
   opts,
 );
@@ -59,6 +66,10 @@ userSchema.index(
 userSchema.index(
   { googleSub: 1 },
   { unique: true, partialFilterExpression: { googleSub: { $type: 'string' } } },
+);
+userSchema.index(
+  { inboundToken: 1 },
+  { unique: true, partialFilterExpression: { inboundToken: { $type: 'string' } } },
 );
 
 export type UserDoc = InferSchemaType<typeof userSchema>;
@@ -298,6 +309,10 @@ const expenseIngestionSchema = new Schema(
     status: { type: String, required: true, default: 'parsing' },
     drafts: { type: [Schema.Types.Mixed], required: true, default: [] },
     error: { type: String, default: null },
+    /** Provider Message-ID, for idempotency against retries. Null for non-email channels. */
+    messageId: { type: String, default: null },
+    /** Display metadata for email-sourced ingestions: { from, subject, receivedAt }. */
+    source: { type: Schema.Types.Mixed, default: null },
     expiresAt: { type: Date, required: true },
   },
   opts,
@@ -306,6 +321,10 @@ const expenseIngestionSchema = new Schema(
 expenseIngestionSchema.index({ userId: 1, status: 1, createdAt: -1 });
 // Unreviewed drafts are transient by design — a screenshot from three weeks ago is noise.
 expenseIngestionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+expenseIngestionSchema.index(
+  { userId: 1, messageId: 1 },
+  { unique: true, partialFilterExpression: { messageId: { $type: 'string' } } },
+);
 
 export type ExpenseIngestionDoc = InferSchemaType<typeof expenseIngestionSchema>;
 export const ExpenseIngestionModel = model(

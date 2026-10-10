@@ -65,6 +65,15 @@ const envSchema = z
 
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(200),
     RATE_LIMIT_WINDOW: z.string().default('1 minute'),
+
+    /**
+     * Statement Inbox — inbound email ingestion. Optional: absent, the inbox endpoints
+     * return 400 and the webhook no-ops. INBOUND_DOMAIN is the domain whose MX points at
+     * the inbound provider (e.g. "in.synitheia.app"); the secret authenticates the
+     * provider's webhook calls.
+     */
+    INBOUND_DOMAIN: z.string().optional(),
+    INBOUND_WEBHOOK_SECRET: z.string().min(16).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;
@@ -148,6 +157,10 @@ export function isImageKitConfigured(env: Env): boolean {
   return Boolean(
     env.IMAGEKIT_URL_ENDPOINT && env.IMAGEKIT_PUBLIC_KEY && env.IMAGEKIT_PRIVATE_KEY,
   );
+}
+
+export function isInboundConfigured(env: Env): boolean {
+  return Boolean(env.INBOUND_DOMAIN && env.INBOUND_WEBHOOK_SECRET);
 }
 
 export function isAiConfigured(env: Env): boolean {
