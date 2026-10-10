@@ -30,6 +30,7 @@ export const inferenceTypeSchema = z.enum([
   'unusual_spending',
   'missed_habit',
   'low_water',
+  'low_activity',
 ]);
 export type InferenceType = z.infer<typeof inferenceTypeSchema>;
 
@@ -127,3 +128,42 @@ export const resolveInferenceSchema = z.object({
   corrections: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
 });
 export type ResolveInferenceInput = z.infer<typeof resolveInferenceSchema>;
+
+/**
+ * What a sync route tells the client it just created.
+ *
+ * Deliberately only what a notification needs. The background task has no screen to
+ * render evidence on, and a suggestion's full body is one `GET /today` away.
+ */
+export const syncSuggestionSchema = z.object({
+  id: objectIdSchema,
+  type: inferenceTypeSchema,
+  title: z.string(),
+  /** True when confirming would write something. Observations are never actionable. */
+  actionable: z.boolean(),
+});
+export type SyncSuggestion = z.infer<typeof syncSuggestionSchema>;
+
+/**
+ * The part of a sync response the client parses. `passthrough` and the default exist so
+ * a client talking to an API one deploy behind still gets a valid, empty list.
+ */
+export const syncResultSchema = z
+  .object({ suggestions: z.array(syncSuggestionSchema).default([]) })
+  .passthrough();
+export type SyncResult = z.infer<typeof syncResultSchema>;
+
+/**
+ * Order suggestions for the three slots Today has.
+ *
+ * Something the user can confirm outranks something they can only read: with six
+ * detectors, a confident observation would otherwise push the one-tap card off the screen.
+ */
+export function rankSuggestions<T extends { confidence: number; proposed: { kind: string } }>(
+  items: readonly T[],
+): T[] {
+  const actionable = (item: T): number => (item.proposed.kind === 'observation' ? 0 : 1);
+  return [...items].sort(
+    (a, b) => actionable(b) - actionable(a) || b.confidence - a.confidence,
+  );
+}
