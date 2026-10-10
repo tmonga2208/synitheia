@@ -40,6 +40,17 @@ export function healthSourceName(): string {
   return 'your health app';
 }
 
+/**
+ * Whether this phone's health store has anywhere to keep the user's sex and date of birth.
+ *
+ * Apple Health does. Health Connect has no record type for either, so on Android they can
+ * only ever be typed into the app — and copy that says "add it in Health Connect" would
+ * send the user looking for a setting that does not exist.
+ */
+export function storeHoldsIdentity(): boolean {
+  return Platform.OS === 'ios';
+}
+
 export async function isAvailable(): Promise<boolean> {
   return (await reader()?.isAvailable()) ?? false;
 }

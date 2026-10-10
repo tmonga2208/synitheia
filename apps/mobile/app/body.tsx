@@ -15,6 +15,7 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
+import { BodyMissingForm } from '../src/health/BodyMissingForm.js';
 import { healthSourceName } from '../src/health/healthStore.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
@@ -141,9 +142,15 @@ export default function Body() {
             title="Not enough to work with"
             body={`${source} has not shared your ${insight.missing
               .map((m) => MISSING_LABEL[m])
-              .join(', ')}. Add it there, or connect Health in Connected Context.`}
+              .join(', ')}. Add ${insight.missing.length > 1 ? 'them' : 'it'} below.`}
           />
         ) : null}
+
+        {/*
+          The way out of the empty state. Not "add it in your health app": on Android that
+          is impossible for sex and date of birth, which Health Connect does not hold.
+        */}
+        {insight.missing.length > 0 ? <BodyMissingForm missing={insight.missing} /> : null}
 
         {insight.bmi !== null ? (
           <Card style={styles.card} accent={ACCENT.base}>

@@ -49,6 +49,10 @@ describe('on iPhone', () => {
   it('calls the store Apple Health', () => {
     expect(store.healthSourceName()).toBe('Apple Health');
   });
+
+  it('can hold the user\'s sex and date of birth', () => {
+    expect(store.storeHoldsIdentity()).toBe(true);
+  });
 });
 
 describe('on Android', () => {
@@ -71,6 +75,10 @@ describe('on Android', () => {
 
   it('calls the store Health Connect', () => {
     expect(store.healthSourceName()).toBe('Health Connect');
+  });
+
+  it('has nowhere to keep sex or date of birth — Health Connect has no such record', () => {
+    expect(store.storeHoldsIdentity()).toBe(false);
   });
 
   it('passes the reader\'s outcome through, including "update required"', async () => {
