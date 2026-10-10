@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { EXERCISE_NAMES, exerciseName } from './exerciseTypes.js';
 
@@ -38,5 +39,37 @@ describe('exerciseName', () => {
       expect(name.length).toBeGreaterThan(0);
       expect(name.length).toBeLessThanOrEqual(60);
     }
+  });
+});
+
+
+describe('the codes, against the library', () => {
+  // Loaded with Node's own loader: this is the library's compiled constants file, which
+  // is plain data, and it must not go through the React Native entry point.
+  const { ExerciseType } = createRequire(import.meta.url)(
+    'react-native-health-connect/lib/commonjs/constants',
+  ) as { ExerciseType: Record<string, number> };
+
+  it.each([
+    ['RUNNING', 'running'],
+    ['RUNNING_TREADMILL', 'running'],
+    ['WALKING', 'walking'],
+    ['BIKING', 'cycling'],
+    ['BIKING_STATIONARY', 'cycling'],
+    ['SWIMMING_POOL', 'swimming'],
+    ['SWIMMING_OPEN_WATER', 'swimming'],
+    ['YOGA', 'yoga'],
+    ['STRENGTH_TRAINING', 'traditionalStrengthTraining'],
+    ['WEIGHTLIFTING', 'traditionalStrengthTraining'],
+    ['HIKING', 'hiking'],
+    ['PILATES', 'pilates'],
+    ['DANCING', 'dance'],
+    ['HIGH_INTENSITY_INTERVAL_TRAINING', 'highIntensityIntervalTraining'],
+    ['ELLIPTICAL', 'elliptical'],
+    ['ROWING', 'rowing'],
+    ['ROWING_MACHINE', 'rowing'],
+  ])('ExerciseType.%s is %s', (constant, name) => {
+    expect(ExerciseType[constant]).toBeTypeOf('number');
+    expect(exerciseName(ExerciseType[constant])).toBe(name);
   });
 });
