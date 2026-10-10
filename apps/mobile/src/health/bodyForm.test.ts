@@ -1,8 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { bodyPatch, type BodyFormValues } from './bodyForm.js';
+import { asLocalDate, type BodyMetrics } from '@synitheia/shared';
+import {
+  bodyEdit,
+  bodyPatch,
+  formValuesFrom,
+  storedFields,
+  type BodyFormValues,
+} from './bodyForm.js';
 
 const TODAY = '2026-10-10';
 const blank: BodyFormValues = { heightCm: '', weightKg: '', sex: null, birthDate: '' };
+
+const stored: BodyMetrics = {
+  heightCm: 175,
+  weightKg: 70.3,
+  biologicalSex: 'male',
+  birthDate: asLocalDate('1994-03-07'),
+};
+const nothingStored: BodyMetrics = {
+  heightCm: null,
+  weightKg: null,
+  biologicalSex: null,
+  birthDate: null,
+};
 
 describe('bodyPatch', () => {
   it('sends sex and date of birth when those are what the health store lacks', () => {
@@ -87,5 +107,90 @@ describe('bodyPatch', () => {
     const result = bodyPatch([field], { ...blank, ...values }, TODAY);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.message.toLowerCase()).toContain(field);
+  });
+});
+
+describe('formValuesFrom', () => {
+  it('shows what is stored the way the user would type it', () => {
+    expect(formValuesFrom(stored)).toEqual({
+      heightCm: '175',
+      weightKg: '70.3',
+      sex: 'male',
+      birthDate: '1994-03-07',
+    });
+  });
+
+  it('leaves blank what is not stored', () => {
+    expect(formValuesFrom(nothingStored)).toEqual(blank);
+  });
+});
+
+describe('storedFields', () => {
+  it('lists what there is to correct', () => {
+    expect(storedFields(stored)).toEqual(['height', 'weight', 'sex', 'birthDate']);
+    expect(storedFields({ ...nothingStored, biologicalSex: 'other' })).toEqual(['sex']);
+    expect(storedFields(nothingStored)).toEqual([]);
+  });
+});
+
+describe('bodyEdit', () => {
+  const untouched = formValuesFrom(stored);
+
+  it('sends only the field that was corrected', () => {
+    // The Android case that had no way out: sex is only ever what the user typed, so a
+    // slip of the thumb used to be permanent.
+    expect(bodyEdit(stored, { ...untouched, sex: 'female' }, TODAY)).toEqual({
+      ok: true,
+      patch: { biologicalSex: 'female' },
+    });
+  });
+
+  it('corrects a mistyped date of birth', () => {
+    expect(bodyEdit(stored, { ...untouched, birthDate: '1994-07-03' }, TODAY)).toEqual({
+      ok: true,
+      patch: { birthDate: '1994-07-03' },
+    });
+  });
+
+  it('updates a weight that no scale app will ever update', () => {
+    expect(bodyEdit(stored, { ...untouched, weightKg: '72' }, TODAY)).toEqual({
+      ok: true,
+      patch: { weightKg: 72 },
+    });
+  });
+
+  it('says so when nothing was changed, rather than saving for show', () => {
+    expect(bodyEdit(stored, untouched, TODAY)).toEqual({
+      ok: false,
+      message: 'Nothing has changed.',
+    });
+  });
+
+  it('removes a value whose field was emptied', () => {
+    expect(bodyEdit(stored, { ...untouched, heightCm: '', birthDate: '  ' }, TODAY)).toEqual({
+      ok: true,
+      patch: { heightCm: null, birthDate: null },
+    });
+  });
+
+  it('holds a correction to the same limits as a first entry', () => {
+    const height = bodyEdit(stored, { ...untouched, heightCm: '17' }, TODAY);
+    expect(height.ok).toBe(false);
+    if (!height.ok) expect(height.message.toLowerCase()).toContain('height');
+
+    expect(bodyEdit(stored, { ...untouched, weightKg: 'heavy' }, TODAY).ok).toBe(false);
+    expect(bodyEdit(stored, { ...untouched, birthDate: '2026-10-11' }, TODAY).ok).toBe(false);
+  });
+
+  it('leaves alone what is not stored yet: adding it is the other form', () => {
+    const partly: BodyMetrics = { ...stored, biologicalSex: null, heightCm: null };
+
+    expect(
+      bodyEdit(
+        partly,
+        { ...formValuesFrom(partly), sex: 'female', heightCm: '180', weightKg: '71' },
+        TODAY,
+      ),
+    ).toEqual({ ok: true, patch: { weightKg: 71 } });
   });
 });
