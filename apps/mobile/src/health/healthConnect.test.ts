@@ -21,6 +21,7 @@ const lib = {
     >(),
 };
 
+vi.mock('react-native', () => ({ TurboModuleRegistry: { get: () => ({}) } }));
 vi.mock('react-native-health-connect', () => lib);
 
 const { healthConnectReader } = await import('./healthConnect.js');
@@ -31,8 +32,29 @@ const at = (dayOfMonth: number, hour: number, minute = 0): string =>
 
 const TODAY_START = new Date(2026, 6, 12).toISOString();
 const NO_DATA = { dataOrigins: [] as string[] };
+/**
+ * What the library really answers when nobody recorded anything: every total present, as
+ * zero, and no data origins. It never leaves a total out.
+ */
+const EMPTY_TOTALS = {
+  COUNT_TOTAL: 0,
+  BPM_AVG: 0,
+  ACTIVE_CALORIES_TOTAL: { inKilocalories: 0 },
+  EXERCISE_DURATION_TOTAL: { inSeconds: 0 },
+  ...NO_DATA,
+};
+const STEPS_4321 = { ...EMPTY_TOTALS, COUNT_TOTAL: 4321, dataOrigins: ['android'] };
 
 const read = (recordType: string) => ({ accessType: 'read', recordType });
+const ALL_GRANTED = [
+  'Steps',
+  'ActiveCaloriesBurned',
+  'ExerciseSession',
+  'SleepSession',
+  'RestingHeartRate',
+  'Height',
+  'Weight',
+].map(read);
 
 beforeEach(() => {
   // Local 3 PM on Sunday 12 July 2026, whatever zone the tests run in.
@@ -43,14 +65,8 @@ beforeEach(() => {
   lib.getSdkStatus.mockResolvedValue(3);
   lib.initialize.mockResolvedValue(true);
   lib.requestPermission.mockResolvedValue([]);
-  lib.getGrantedPermissions.mockResolvedValue([]);
-  lib.aggregateRecord.mockResolvedValue({
-    COUNT_TOTAL: 0,
-    BPM_AVG: 0,
-    ACTIVE_CALORIES_TOTAL: { inKilocalories: 0 },
-    EXERCISE_DURATION_TOTAL: { inSeconds: 0 },
-    ...NO_DATA,
-  });
+  lib.getGrantedPermissions.mockResolvedValue(ALL_GRANTED);
+  lib.aggregateRecord.mockResolvedValue(EMPTY_TOTALS);
   lib.readRecords.mockResolvedValue({ records: [] });
 });
 
@@ -144,6 +160,11 @@ describe('connect', () => {
     expect(await healthConnectReader.connect()).toBe('unauthorized');
   });
 
+  it('is not connected when nothing was granted', async () => {
+    lib.getGrantedPermissions.mockResolvedValue([]);
+    expect(await healthConnectReader.connect()).toBe('unauthorized');
+  });
+
   it('never throws, whatever the library does', async () => {
     lib.requestPermission.mockRejectedValue(new Error('activity gone'));
     await expect(healthConnectReader.connect()).resolves.toBe('unauthorized');
@@ -190,13 +211,7 @@ describe('readHealth', () => {
       if (recordType === 'ActiveCaloriesBurned' && timeRangeFilter.startTime === at(12, 7)) {
         return { ACTIVE_CALORIES_TOTAL: { inKilocalories: 300.4 }, dataOrigins: ['com.fitbit'] };
       }
-      return {
-        COUNT_TOTAL: 0,
-        BPM_AVG: 0,
-        ACTIVE_CALORIES_TOTAL: { inKilocalories: 0 },
-        EXERCISE_DURATION_TOTAL: { inSeconds: 0 },
-        ...NO_DATA,
-      };
+      return EMPTY_TOTALS;
     });
     lib.readRecords.mockImplementation(async (recordType, { timeRangeFilter }) => {
       if (recordType === 'ExerciseSession' && timeRangeFilter.startTime === TODAY_START) {
@@ -240,29 +255,86 @@ describe('readHealth', () => {
     expect(result!.body).toEqual({});
   });
 
-  it('leaves a refused type empty and still reads the rest', async () => {
-    lib.aggregateRecord.mockImplementation(async ({ recordType }) => {
-      if (recordType === 'RestingHeartRate') throw new Error('PERMISSION_ERROR');
-      if (recordType === 'Steps') return { COUNT_TOTAL: 4321, dataOrigins: ['android'] };
-      return { ...NO_DATA };
-    });
+  it('leaves a type that was never granted empty, without asking for it, and still syncs the day', async () => {
+    // A partial grant: everything except resting heart rate.
+    lib.getGrantedPermissions.mockResolvedValue(
+      ALL_GRANTED.filter((p) => p.recordType !== 'RestingHeartRate'),
+    );
+    lib.aggregateRecord.mockImplementation(async ({ recordType }) =>
+      recordType === 'Steps' ? STEPS_4321 : EMPTY_TOTALS,
+    );
 
     const [today] = (await healthConnectReader.readHealth(1))!.days;
 
     expect(today!.restingHeartRate).toBeNull();
     expect(today!.steps).toBe(4321);
+    // Asking would only be refused; and a refusal on a GRANTED type means something else.
+    expect(
+      lib.aggregateRecord.mock.calls.some(([request]) => request.recordType === 'RestingHeartRate'),
+    ).toBe(false);
   });
 
-  it('comes back empty, without throwing, when every read is refused', async () => {
+  it('drops a day whose read failed, rather than sending nulls over what the server has', async () => {
+    // The app is sent to the background part-way through a sync on a phone without
+    // background access: today was read, and then Health Connect starts refusing. The
+    // server overwrites every field of a day it is sent, so the half-read days must not
+    // go at all.
+    lib.aggregateRecord.mockImplementation(async ({ recordType, timeRangeFilter }) => {
+      if (timeRangeFilter.startTime !== TODAY_START) throw new Error('PERMISSION_ERROR');
+      return recordType === 'Steps' ? STEPS_4321 : EMPTY_TOTALS;
+    });
+
+    const result = await healthConnectReader.readHealth(7);
+
+    expect(result!.days.map((d) => d.localDate)).toEqual(['2026-07-12']);
+    expect(result!.days[0]!.steps).toBe(4321);
+  });
+
+  it('drops a day when only one of its reads failed', async () => {
+    lib.readRecords.mockImplementation(async (recordType) => {
+      if (recordType === 'SleepSession') throw new Error('rate limited');
+      return { records: [] };
+    });
+    lib.aggregateRecord.mockResolvedValue(STEPS_4321);
+
+    // Steps were readable, but a day sent without its sleep would erase the sleep the
+    // server already holds for it.
+    expect(await healthConnectReader.readHealth(1)).toBeNull();
+  });
+
+  it('has nothing to send when every read is refused', async () => {
     // A background run without background access: Health Connect refuses everything.
     lib.aggregateRecord.mockRejectedValue(new Error('PERMISSION_ERROR'));
     lib.readRecords.mockRejectedValue(new Error('PERMISSION_ERROR'));
 
+    expect(await healthConnectReader.readHealth(7)).toBeNull();
+  });
+
+  it('has nothing to send when no data type is granted, and does not ask', async () => {
+    lib.getGrantedPermissions.mockResolvedValue([read('BackgroundAccessPermission')]);
+
+    expect(await healthConnectReader.readHealth(7)).toBeNull();
+    expect(lib.aggregateRecord).not.toHaveBeenCalled();
+    expect(lib.readRecords).not.toHaveBeenCalled();
+  });
+
+  it('has nothing to send when the grants cannot be read', async () => {
+    lib.getGrantedPermissions.mockRejectedValue(new Error('binder died'));
+    expect(await healthConnectReader.readHealth(7)).toBeNull();
+  });
+
+  it('skips height and weight that were not granted', async () => {
+    lib.getGrantedPermissions.mockResolvedValue(
+      ALL_GRANTED.filter((p) => p.recordType !== 'Height' && p.recordType !== 'Weight'),
+    );
+    lib.aggregateRecord.mockResolvedValue(STEPS_4321);
+
     const result = await healthConnectReader.readHealth(1);
 
-    expect(result!.days[0]!.steps).toBeNull();
-    expect(result!.days[0]!.workouts).toEqual([]);
     expect(result!.body).toEqual({});
+    expect(lib.readRecords.mock.calls.some(([type]) => type === 'Height' || type === 'Weight')).toBe(
+      false,
+    );
   });
 
   it('asks for the latest height and weight only', async () => {

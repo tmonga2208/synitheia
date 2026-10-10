@@ -1,3 +1,4 @@
+import { TurboModuleRegistry } from 'react-native';
 import type { HealthSnapshot, SyncHealthInput } from '@synitheia/shared';
 import type * as HealthConnect from 'react-native-health-connect';
 import type { AggregateResult, AggregateResultRecordType } from 'react-native-health-connect';
@@ -8,10 +9,12 @@ import {
   availabilityOf,
   bodyFromLatest,
   grantOutcome,
+  grantedReadTypes,
   sessionsStartingIn,
   snapshotForDay,
   workoutFromSession,
   type ExerciseSessionInput,
+  type ReadRecordType,
   type SleepSessionInput,
 } from './healthConnectNormalize.js';
 import type { HealthConnectResult, HealthReader } from './types.js';
@@ -27,11 +30,10 @@ import type { HealthConnectResult, HealthReader } from './types.js';
  * app, so it only calls the library and hands the results over; every decision lives in
  * healthConnectNormalize.ts, where a test can reach it.
  *
- * The library is loaded by dynamic import, on first use, for two reasons. On iPhone it
- * must never be evaluated at all. And on Android, importing it throws if its native
- * module did not link into the build — which has happened to other native modules in this
- * repo. Loaded lazily inside a catch, that failure reads as "Health Connect unavailable"
- * instead of taking down the app, or the background task, at startup.
+ * The library is loaded by dynamic import, on first use, and only once its native module
+ * is known to be in the build. On iPhone it must never be evaluated at all. On Android,
+ * evaluating it without its native half throws — which has happened to other native
+ * modules in this repo — and that throw cannot simply be caught: see `load()`.
  */
 
 type Library = typeof HealthConnect;
@@ -43,11 +45,33 @@ const BODY_LOOKBACK_DAYS = 365;
 
 let loading: Promise<Library | null> | null = null;
 
+/** Whether the library's native half is really in this build. Asking is free of side effects. */
+function nativeModulePresent(): boolean {
+  try {
+    return TurboModuleRegistry.get('HealthConnect') != null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The library, or null when it cannot be used.
+ *
+ * The check comes BEFORE the import, and a try/catch around the import is not a
+ * substitute for it. The library calls `TurboModuleRegistry.getEnforcing` as it is
+ * evaluated, which throws when the native module is missing; Metro's module guard catches
+ * that throw, reports it as a FATAL error — a crash in a release build — and resolves the
+ * import with nothing. So an unlinked module would take the app down from the Health
+ * switch, from every foreground sync, and from the background task. Not evaluating the
+ * library is the only version of "unavailable" that is actually safe.
+ */
 function load(): Promise<Library | null> {
-  loading ??= import('react-native-health-connect').then(
-    (library) => library,
-    () => null,
-  );
+  loading ??= nativeModulePresent()
+    ? import('react-native-health-connect').then(
+        (library) => library,
+        () => null,
+      )
+    : Promise.resolve(null);
   return loading;
 }
 
@@ -74,61 +98,101 @@ async function aggregate<T extends AggregateResultRecordType>(
   range: TimeRange,
   pick: (result: AggregateResult<T>) => number | undefined,
 ): Promise<number | null> {
-  try {
-    const result = await library.aggregateRecord({ recordType, timeRangeFilter: range });
-    return aggregateValue(result, pick(result));
-  } catch {
-    // A type the user refused, or ANY read from the background without background access.
-    // Absent, not zero.
-    return null;
-  }
+  const result = await library.aggregateRecord({ recordType, timeRangeFilter: range });
+  return aggregateValue(result, pick(result));
 }
 
 async function sleepSessions(library: Library, range: TimeRange): Promise<SleepSessionInput[]> {
-  try {
-    return (await library.readRecords('SleepSession', { timeRangeFilter: range })).records;
-  } catch {
-    return [];
-  }
+  return (await library.readRecords('SleepSession', { timeRangeFilter: range })).records;
 }
 
 async function exerciseSessions(
   library: Library,
   range: TimeRange,
 ): Promise<ExerciseSessionInput[]> {
-  try {
-    return (await library.readRecords('ExerciseSession', { timeRangeFilter: range })).records;
-  } catch {
-    return [];
-  }
+  return (await library.readRecords('ExerciseSession', { timeRangeFilter: range })).records;
 }
 
-async function readDay(library: Library, day: DayBounds): Promise<HealthSnapshot> {
+/**
+ * One local day, or null when the day could not be read completely.
+ *
+ * Two different things look alike here and must not be treated alike:
+ *
+ *   - A type the user never granted. Not asked for at all; its field is null, which is
+ *     the truth, and the day still syncs. That is what a partial grant is.
+ *   - A read that FAILED on a type that was granted: the app went to the background
+ *     mid-sync on a phone without background access, or Health Connect rate-limited it.
+ *     That null would be a lie, and the server overwrites every field of a day it is
+ *     sent — so a half-read day would erase what a complete sync stored earlier. Such a
+ *     day is not sent at all, and the next full sync brings it up to date.
+ */
+async function readDay(
+  library: Library,
+  day: DayBounds,
+  granted: ReadonlySet<ReadRecordType>,
+): Promise<HealthSnapshot | null> {
   const range = between(day.start, day.end);
+  // Noted rather than thrown, so one refused read does not abandon the others mid-flight.
+  let failed = false;
+
+  /** A granted type's reading; `absent`, without asking, for a type that was never granted. */
+  const attempt = async <T>(
+    type: ReadRecordType,
+    read: () => Promise<T>,
+    absent: T,
+  ): Promise<T> => {
+    if (!granted.has(type)) return absent;
+    try {
+      return await read();
+    } catch {
+      failed = true;
+      return absent;
+    }
+  };
+
+  const total = {
+    steps: () => aggregate(library, 'Steps', range, (r) => r.COUNT_TOTAL),
+    activeKcal: (within: TimeRange) =>
+      aggregate(
+        library,
+        'ActiveCaloriesBurned',
+        within,
+        (r) => r.ACTIVE_CALORIES_TOTAL.inKilocalories,
+      ),
+    exerciseSeconds: () =>
+      aggregate(library, 'ExerciseSession', range, (r) => r.EXERCISE_DURATION_TOTAL.inSeconds),
+    restingBpm: () => aggregate(library, 'RestingHeartRate', range, (r) => r.BPM_AVG),
+  };
 
   // Totals come from Health Connect's own aggregates, which de-duplicate across apps.
   // Summing raw records would count a phone and a watch as two walks.
   const [steps, activeKcal, exerciseSeconds, restingBpm, nights, sessions] = await Promise.all([
-    aggregate(library, 'Steps', range, (r) => r.COUNT_TOTAL),
-    aggregate(library, 'ActiveCaloriesBurned', range, (r) => r.ACTIVE_CALORIES_TOTAL.inKilocalories),
-    aggregate(library, 'ExerciseSession', range, (r) => r.EXERCISE_DURATION_TOTAL.inSeconds),
-    aggregate(library, 'RestingHeartRate', range, (r) => r.BPM_AVG),
+    attempt('Steps', total.steps, null),
+    attempt('ActiveCaloriesBurned', () => total.activeKcal(range), null),
+    attempt('ExerciseSession', total.exerciseSeconds, null),
+    attempt('RestingHeartRate', total.restingBpm, null),
     // A night that ended today began before today's midnight, so look a day further back.
-    sleepSessions(library, between(new Date(day.start.getTime() - DAY_MS), day.end)),
-    exerciseSessions(library, range),
+    attempt(
+      'SleepSession',
+      () => sleepSessions(library, between(new Date(day.start.getTime() - DAY_MS), day.end)),
+      [],
+    ),
+    attempt('ExerciseSession', () => exerciseSessions(library, range), []),
   ]);
 
   const workouts: HealthSnapshot['workouts'] = [];
   for (const session of sessionsStartingIn(sessions, day)) {
-    const energyKcal = await aggregate(
-      library,
-      'ActiveCaloriesBurned',
-      { operator: 'between', startTime: session.startTime, endTime: session.endTime },
-      (r) => r.ACTIVE_CALORIES_TOTAL.inKilocalories,
-    );
+    const during: TimeRange = {
+      operator: 'between',
+      startTime: session.startTime,
+      endTime: session.endTime,
+    };
+    const energyKcal = await attempt('ActiveCaloriesBurned', () => total.activeKcal(during), null);
     const workout = workoutFromSession(session, energyKcal);
     if (workout) workouts.push(workout);
   }
+
+  if (failed) return null;
 
   return snapshotForDay(day, {
     steps,
@@ -140,7 +204,10 @@ async function readDay(library: Library, day: DayBounds): Promise<HealthSnapshot
   });
 }
 
-async function readBody(library: Library): Promise<SyncHealthInput['body']> {
+async function readBody(
+  library: Library,
+  granted: ReadonlySet<ReadRecordType>,
+): Promise<SyncHealthInput['body']> {
   const latest = {
     timeRangeFilter: between(new Date(Date.now() - BODY_LOOKBACK_DAYS * DAY_MS), new Date()),
     ascendingOrder: false,
@@ -150,15 +217,23 @@ async function readBody(library: Library): Promise<SyncHealthInput['body']> {
   let heightMeters: number | null = null;
   let weightKg: number | null = null;
 
-  try {
-    heightMeters = (await library.readRecords('Height', latest)).records[0]?.height.inMeters ?? null;
-  } catch {
-    /* not shared */
+  // A failure here needs no special handling: a missing key is simply left out of the
+  // request, and the server only sets the body fields it is given.
+  if (granted.has('Height')) {
+    try {
+      heightMeters =
+        (await library.readRecords('Height', latest)).records[0]?.height.inMeters ?? null;
+    } catch {
+      /* unreadable this time */
+    }
   }
-  try {
-    weightKg = (await library.readRecords('Weight', latest)).records[0]?.weight.inKilograms ?? null;
-  } catch {
-    /* not shared */
+  if (granted.has('Weight')) {
+    try {
+      weightKg =
+        (await library.readRecords('Weight', latest)).records[0]?.weight.inKilograms ?? null;
+    } catch {
+      /* unreadable this time */
+    }
   }
 
   return bodyFromLatest({ heightMeters, weightKg });
@@ -221,14 +296,27 @@ async function readHealth(days: number): Promise<SyncHealthInput | null> {
   const library = await ready();
   if (!library) return null;
 
+  let granted: ReadonlySet<ReadRecordType>;
+  try {
+    granted = grantedReadTypes(await library.getGrantedPermissions());
+  } catch {
+    return null;
+  }
+  // Nothing readable is nothing to send.
+  if (granted.size === 0) return null;
+
   const snapshots: HealthSnapshot[] = [];
   // One day at a time. Health Connect rate-limits callers, and far more tightly in the
   // background; forty-odd calls in one burst is how a sync gets itself throttled.
   for (let i = 0; i < days; i += 1) {
-    snapshots.push(await readDay(library, dayBounds(i)));
+    const snapshot = await readDay(library, dayBounds(i), granted);
+    if (snapshot) snapshots.push(snapshot);
   }
 
-  return { body: await readBody(library), days: snapshots };
+  // Every day failed: a background run without background access, most likely.
+  if (snapshots.length === 0) return null;
+
+  return { body: await readBody(library, granted), days: snapshots };
 }
 
 export const healthConnectReader: HealthReader = { isAvailable, connect, readHealth };

@@ -64,6 +64,18 @@ export function grantOutcome(
     : 'unauthorized';
 }
 
+/** Which of OUR data types the user has allowed the app to read. */
+export function grantedReadTypes(
+  granted: readonly { accessType: string; recordType: string }[],
+): ReadonlySet<ReadRecordType> {
+  const ours = new Set<string>(READ_RECORD_TYPES);
+  return new Set(
+    granted
+      .filter((p) => p.accessType === 'read' && ours.has(p.recordType))
+      .map((p) => p.recordType as ReadRecordType),
+  );
+}
+
 /**
  * An aggregate's value, or null when no app contributed to it.
  *

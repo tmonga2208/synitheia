@@ -8,6 +8,7 @@ import {
   availabilityOf,
   bodyFromLatest,
   grantOutcome,
+  grantedReadTypes,
   sessionsStartingIn,
   sleepForDay,
   snapshotForDay,
@@ -74,6 +75,24 @@ describe('grantOutcome', () => {
   it('ignores write grants and types the app never asked for', () => {
     expect(grantOutcome([{ accessType: 'write', recordType: 'Steps' }])).toBe('unauthorized');
     expect(grantOutcome([read('BloodPressure')])).toBe('unauthorized');
+  });
+});
+
+describe('grantedReadTypes', () => {
+  it('keeps the data types the app may read, and nothing else', () => {
+    const granted = grantedReadTypes([
+      { accessType: 'read', recordType: 'Steps' },
+      { accessType: 'read', recordType: 'SleepSession' },
+      { accessType: 'read', recordType: 'BackgroundAccessPermission' },
+      { accessType: 'write', recordType: 'Weight' },
+      { accessType: 'read', recordType: 'BloodPressure' },
+    ]);
+
+    expect([...granted].sort()).toEqual(['SleepSession', 'Steps']);
+  });
+
+  it('is empty when nothing was granted', () => {
+    expect(grantedReadTypes([]).size).toBe(0);
   });
 });
 
