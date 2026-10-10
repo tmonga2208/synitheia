@@ -331,7 +331,7 @@ real MongoDB. Phases 9–13 are scoped but not started.
 | 6. Habits                   | ✅             | CRUD, streak engine (grace day, revival, clock-skew, DST), weekly analysis                                                                                                                                      |
 | 7. Nutrition                | ✅             | Food entries w/ macro snapshotting, `DailyNutrition` rebuilt-not-incremented                                                                                                                                    |
 | 8. Water & Reminders        | ✅             | `clientKey` idempotency (the double-tap), reminder definitions + on-device notifications                                                                                                                        |
-| 9. Passive integrations     | ✅ *(partial)* | Health (iOS), Calendar, Weather and Location collectors ✅, all consent-gated through `emit()`. Health + Calendar background sync (`expo-background-task`, best-effort) is built and unit-tested; **wake-up on a real device is not yet verified**. Weather and Location stay foreground-only; Location remains opt-in and off by default. Android Health Connect ⬜. |
+| 9. Passive integrations     | ✅ *(partial)* | Health (iOS HealthKit; Android Health Connect — built and emulator-tested, **not yet verified on a phone**), Calendar, Weather and Location collectors ✅, all consent-gated through `emit()`. Health + Calendar background sync (`expo-background-task`, best-effort) is built and unit-tested; **wake-up on a real device is not yet verified**. Weather and Location stay foreground-only; Location remains opt-in and off by default. |
 | 10. Aggregation & inference | ✅ *(partial)* | `DailySummary` aggregator ✅ · detectors ✅: `possible_meal`, `low_water`, `unusual_spending`, `possible_habit_completion` (workout → habit), `low_activity`, `missed_habit` (habit slipping) · detectors run on `/today` AND when a sync lands · confirm/reject/correct loop ✅, including habit confirmation. |
 | 11. Synthesia AI            | ✅             | Context builder w/ consent + minimization, schema-forced output, **ungrounded insights dropped**, stored evidence, feedback                                                                                     |
 | 12. Privacy controls        | ✅             | Connected Context screen, per-source + separate AI toggles, per-source deletion, export, hard account deletion                                                                                                  |
@@ -351,10 +351,17 @@ real MongoDB. Phases 9–13 are scoped but not started.
 
 - Background sync is opportunistic, and **has not yet been verified on a device**. Whether
   the OS actually wakes the task can only be checked by hand; it cannot run in CI or the
-  iOS Simulator. Until that check is done, treat it as built and unit-tested, not working. Health reads return nothing
-  while the phone is locked, and Android has no Health Connect reader, so `steps`, `sleep`
-  and `workouts` are iOS-only. The aggregator reports `null` — not `0` — when they are
-  absent, so nothing downstream fabricates a rest day the user didn't take.
+  iOS Simulator. Until that check is done, treat it as built and unit-tested, not working.
+  On iPhone, health reads return nothing while the phone is locked. On Android, health
+  comes from Health Connect, which holds only what the phone itself (Android 14+) or
+  another app writes into it, reads in the background only with a separate permission
+  that older versions do not offer, and is built and emulator-tested, **not yet verified on a phone**: on an
+  Android 14 emulator a sideloaded build connected, read steps, a workout, sleep, weight
+  and height, and answered Health Connect's policy link, but background reads and real
+  sensor data have not been exercised. Health Connect has no record for sex or date of
+  birth, so those are typed in on the Body screen. The aggregator reports `null` — not
+  `0` — when health data is absent, so nothing downstream fabricates a rest day the user
+  didn't take.
 - The AI insight generator has not been exercised against a live Anthropic key (none was
   configured); its consent gate, "not enough history" refusal, and unavailable path are all
   verified.
