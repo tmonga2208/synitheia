@@ -2997,9 +2997,16 @@ Not a task an agent can do. Until it has been run, Android health is not verifie
 4. Walk for a few minutes. Reopen the app: do today's steps appear on Today?
 5. Record a workout in any app that writes to Health Connect (Fitbit, Samsung Health, Google Fit). With a habit named after it ("Morning run"), does "Mark Morning run done?" appear?
 6. Check the Body screen for weight, if one was logged in the last 30 days.
-7. Leave the app in the background for a few hours without opening it, then check whether Health's "last synced" time moved on its own.
+7. Leave the app in the background for a few hours without opening it, then check whether Health's "last synced" time moved on its own. It should only move if Health Connect offered background access in step 3 and you allowed it. On a phone that did not offer it, the time should stay put — and, either way, nothing that was on Today or in History before should have disappeared.
 8. In Health Connect, open the app's permissions and tap the privacy-policy link: does it open Connected Context?
 9. Turn Health off in the app, walk, reopen: steps should not update.
+
+Added after the whole-branch review, for what it changed:
+
+10. Interrupt a sync. Note yesterday's steps and sleep on Today or in History. Open the app and press Home within a second or two, a few times over. Reopen it properly: yesterday's numbers must still be there. (A sync cut off part-way used to be able to blank stored days.)
+11. Swipe the app away so it is not running. In Health Connect, tap the privacy-policy link again. Connected Context should open, and the arrow at its top should take you to Today rather than do nothing.
+12. Turn Health off and on in the app so the permission screen appears, and tap "privacy policy" on that screen. Expected, and not a fault: the permission screen closes, Connected Context shows, and a notice says Health is still off and to turn it on again.
+13. On the Body screen, add your sex and date of birth. A resting-energy figure should appear, and a "Your details" card listing what is stored. Tap Edit, change one value, save: the card and the figures should change. Empty a field and save: that detail should move back to "Add what's missing".
 
 ## Spec coverage
 
