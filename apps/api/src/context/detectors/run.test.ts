@@ -338,3 +338,72 @@ describe('low_water detector', () => {
     ).toBe(0);
   });
 });
+
+describe('workout → habit, through the runner', () => {
+  async function runHabit(userId: string) {
+    return HabitModel.create({
+      userId: new Types.ObjectId(userId),
+      name: 'Morning run',
+      icon: 'activity',
+      color: '#7D927D',
+      frequency: 'daily',
+      measure: 'check',
+      targetCount: 1,
+      // Before TODAY: `scheduledOn` rightly ignores a habit that did not exist yet on the
+      // day being evaluated, and the wall clock is months past this file's fixture dates.
+      createdAt: at('08:00', '2026-07-01'),
+    });
+  }
+
+  async function workout(userId: string) {
+    return emit({
+      userId,
+      source: 'health',
+      timestamp: at('12:00'),
+      timezone: IST,
+      dedupeKey: dedupeKey('health', 'workout', `${TODAY}:0`),
+      metadata: { type: 'workout.detected', activity: 'running', durationMin: 32, calories: 300 },
+    });
+  }
+
+  it('creates one actionable suggestion for the matching habit', async () => {
+    const userId = freshUser();
+    const habit = await runHabit(userId);
+    await workout(userId);
+
+    const created = await runDetectors(userId, IST, TODAY, { now: at('13:00') });
+
+    expect(created).toEqual([
+      expect.objectContaining({
+        type: 'possible_habit_completion',
+        title: 'Mark Morning run done?',
+        actionable: true,
+      }),
+    ]);
+    const stored = await InferredContextModel.findOne({ userId }).lean();
+    expect(stored!.proposed).toEqual({ kind: 'habit', habitId: habit._id.toString(), count: 1 });
+  });
+
+  it('stays silent on later days once the user has rejected it for that habit', async () => {
+    const userId = freshUser();
+    const habit = await runHabit(userId);
+
+    // Yesterday's suggestion, rejected.
+    await InferredContextModel.create({
+      userId: new Types.ObjectId(userId),
+      type: 'possible_habit_completion',
+      confidence: 0.8,
+      detector: `workout_habit:${habit._id.toString()}`,
+      title: 'Mark Morning run done?',
+      proposed: { kind: 'habit', habitId: habit._id.toString(), count: 1 },
+      status: 'rejected',
+      localDate: '2026-07-11',
+      expiresAt: at('12:00'),
+      resolvedAt: at('12:00', '2026-07-11'),
+    });
+
+    await workout(userId);
+
+    expect(await runDetectors(userId, IST, TODAY, { now: at('13:00') })).toEqual([]);
+  });
+});

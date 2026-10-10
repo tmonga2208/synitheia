@@ -18,6 +18,7 @@ import { detectLowActivity } from './lowActivity.js';
 import { detectLowWater } from './lowWater.js';
 import { detectPossibleMeal } from './possibleMeal.js';
 import { detectUnusualSpending } from './unusualSpending.js';
+import { detectWorkoutHabit } from './workoutHabit.js';
 import type { Detector, DetectorContext, EventLean, HabitToday } from './types.js';
 
 /**
@@ -42,6 +43,7 @@ export const DETECTORS: Detector[] = [
   detectUnusualSpending,
   detectLowActivity,
   detectHabitSlipping,
+  detectWorkoutHabit,
 ];
 
 export interface RunOptions {
