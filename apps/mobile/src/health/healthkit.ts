@@ -22,6 +22,7 @@ import {
   type HealthSnapshot,
   type SyncHealthInput,
 } from '@synitheia/shared';
+import { dayBounds } from './dayBounds.js';
 
 /**
  * Apple Health, read on the device.
@@ -113,20 +114,6 @@ export async function requestPermissions(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/** Local midnight-to-midnight, in the device's own zone — the same day the app means. */
-function dayBounds(daysAgo: number): { start: Date; end: Date; localDate: string } {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-
-  const localDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(
-    start.getDate(),
-  ).padStart(2, '0')}`;
-
-  return { start, end, localDate };
 }
 
 async function sumQuantity(
