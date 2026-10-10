@@ -350,18 +350,28 @@ real MongoDB. Phases 9–13 are scoped but not started.
 ### Known gaps
 
 - Background sync is opportunistic, and **has not yet been verified on a device**. Whether
-  the OS actually wakes the task can only be checked by hand; it cannot run in CI or the
+  the OS wakes the task on its own can only be checked by hand; it cannot run in CI or the
   iOS Simulator. Until that check is done, treat it as built and unit-tested, not working.
-  On iPhone, health reads return nothing while the phone is locked. On Android, health
-  comes from Health Connect, which holds only what the phone itself (Android 14+) or
-  another app writes into it, reads in the background only with a separate permission
-  that older versions do not offer, and is built and emulator-tested, **not yet verified on a phone**: on an
-  Android 14 emulator a sideloaded build connected, read steps, a workout, sleep, weight
-  and height, and answered Health Connect's policy link, but background reads and real
-  sensor data have not been exercised. Health Connect has no record for sex or date of
-  birth, so those are typed in on the Body screen. The aggregator reports `null` — not
-  `0` — when health data is absent, so nothing downstream fabricates a rest day the user
-  didn't take.
+  On an Android 14 emulator the task does run when its job is forced by hand, which shows
+  the wiring and not the wake-up. On iPhone, health reads return nothing while the phone
+  is locked.
+- Android health comes from Health Connect and is built and emulator-tested, **not yet
+  verified on a phone**. Health Connect holds only what the phone itself (Android 14+) or
+  another app writes into it. Unless the user has granted its separate background-access
+  permission — which the Android 14 emulator does not offer — it answers an app that is
+  not on screen differently: on Android 14, aggregates are refused and record reads
+  quietly come back empty. So without that permission the reader reads only while the app
+  is on screen and the background task sends nothing for health; with it the reader reads
+  in the background, a path that has never run. On the emulator a sideloaded build connected,
+  with every type allowed and with only some; read steps, a workout, sleep, weight and
+  height; took a sex and date of birth typed on the Body screen and let them be corrected
+  and removed; and answered Health Connect's policy link with the app running, stopped,
+  reclaimed in the background, and from the permission sheet itself (which closes the
+  sheet, because the policy is a screen inside the app). Not exercised: real sensor data,
+  a wearable, Android 9–13 where Health Connect is a separate app, and anything on a
+  physical phone. Health Connect has no record for sex or date of birth, so those are
+  only ever typed in. The aggregator reports `null` — not `0` — when health data is
+  absent, so nothing downstream fabricates a rest day the user didn't take.
 - The AI insight generator has not been exercised against a live Anthropic key (none was
   configured); its consent gate, "not enough history" refusal, and unavailable path are all
   verified.
