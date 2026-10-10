@@ -38,6 +38,7 @@ import { WeeklyChart } from '../../src/components/WeeklyChart.js';
 import { Timeline } from '../../src/components/Timeline.js';
 import { ApiError, api } from '../../src/api/client.js';
 import { useCalendarSync } from '../../src/calendar/useCalendarSync.js';
+import { useSourcePrefsMirror } from '../../src/sync/useSourcePrefsMirror.js';
 import { useHealthSync } from '../../src/health/useHealthSync.js';
 import { useAuth } from '../../src/store/auth.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
@@ -82,6 +83,8 @@ export default function Today() {
   const healthConnected =
     healthSources.data?.items.some((s) => s.source === 'health' && s.status === 'connected') ??
     false;
+
+  useSourcePrefsMirror(healthSources.data?.items);
 
   const calendarConnected =
     healthSources.data?.items.some((s) => s.source === 'calendar' && s.status === 'connected') ??
