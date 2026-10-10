@@ -47,6 +47,18 @@ describe('runContextSync', () => {
     expect(d.runHealthSync).not.toHaveBeenCalled();
   });
 
+  it('skips, rather than fails, when the keychain cannot be read', async () => {
+    // A locked phone whose tokens are not yet background-readable. Reporting failure
+    // would teach the OS to wake the app less often for something a later run can do.
+    const d = deps({
+      hasSession: vi.fn(async () => {
+        throw new Error('errSecInteractionNotAllowed');
+      }),
+    });
+    expect(await runContextSync(d)).toBe('skipped');
+    expect(d.runHealthSync).not.toHaveBeenCalled();
+  });
+
   it('does not read a source the user has switched off', async () => {
     const d = deps({
       readSourcePrefs: vi.fn(async () => ({ health: false, calendar: true, background: true })),

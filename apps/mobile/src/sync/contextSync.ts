@@ -45,7 +45,13 @@ export async function runContextSync(
 
   const prefs = await deps.readSourcePrefs();
   if (!prefs.background || (!prefs.health && !prefs.calendar)) return 'skipped';
-  if (!(await deps.hasSession())) return 'skipped';
+  try {
+    if (!(await deps.hasSession())) return 'skipped';
+  } catch {
+    // The keychain can be unreadable on a locked phone. That is "not now", not a failure:
+    // reporting one would have the OS back the task off for something a later run can do.
+    return 'skipped';
+  }
 
   const results: SyncRunResult[] = [];
   if (prefs.health) results.push(await deps.runHealthSync({ background: true }));

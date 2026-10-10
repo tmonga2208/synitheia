@@ -4066,7 +4066,9 @@ This step needs a physical iPhone or Android phone with a dev build, and a perso
 7. Lock the phone, trigger the task via Xcode. Expect Calendar to sync and no crash; Health is skipped.
 8. Turn the switch off. Trigger again. Expect nothing to sync.
 9. Sign out. Confirm in the Xcode console (or `TaskManager.isTaskRegisteredAsync`) that the task is unregistered.
-10. Leave the phone alone overnight with the app backgrounded, not force-quit. In the morning, check whether "last synced" advanced without opening Today first. This is the only test of real OS scheduling; record the result either way.
+10. **Upgrade path.** Install a build from `main` (before this branch), sign in, then install this build over it without signing out. Open the app once, lock the phone, and trigger the task from Xcode. Expect Calendar to sync: this proves the token migration really moved the tokens to the background-readable class.
+11. **Background launch.** Force the task to run from a terminated state (Xcode simulated launch after stopping the app). In the console, check whether the React tree mounts. Either way, expect to still be signed in when the app is next opened.
+12. Leave the phone alone overnight with the app backgrounded, not force-quit. In the morning, check whether "last synced" advanced without opening Today first. This is the only test of real OS scheduling; record the result either way.
 
 ---
 

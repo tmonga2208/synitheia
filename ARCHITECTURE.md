@@ -331,7 +331,7 @@ real MongoDB. Phases 9–13 are scoped but not started.
 | 6. Habits                   | ✅             | CRUD, streak engine (grace day, revival, clock-skew, DST), weekly analysis                                                                                                                                      |
 | 7. Nutrition                | ✅             | Food entries w/ macro snapshotting, `DailyNutrition` rebuilt-not-incremented                                                                                                                                    |
 | 8. Water & Reminders        | ✅             | `clientKey` idempotency (the double-tap), reminder definitions + on-device notifications                                                                                                                        |
-| 9. Passive integrations     | ✅ *(partial)* | Health (iOS), Calendar, Weather and Location collectors ✅, all consent-gated through `emit()`. Health + Calendar also sync from a background task (`expo-background-task`, best-effort) ✅. Weather and Location stay foreground-only; Location remains opt-in and off by default. Android Health Connect ⬜. |
+| 9. Passive integrations     | ✅ *(partial)* | Health (iOS), Calendar, Weather and Location collectors ✅, all consent-gated through `emit()`. Health + Calendar background sync (`expo-background-task`, best-effort) is built and unit-tested; **wake-up on a real device is not yet verified**. Weather and Location stay foreground-only; Location remains opt-in and off by default. Android Health Connect ⬜. |
 | 10. Aggregation & inference | ✅ *(partial)* | `DailySummary` aggregator ✅ · detectors ✅: `possible_meal`, `low_water`, `unusual_spending`, `possible_habit_completion` (workout → habit), `low_activity`, `missed_habit` (habit slipping) · detectors run on `/today` AND when a sync lands · confirm/reject/correct loop ✅, including habit confirmation. |
 | 11. Synthesia AI            | ✅             | Context builder w/ consent + minimization, schema-forced output, **ungrounded insights dropped**, stored evidence, feedback                                                                                     |
 | 12. Privacy controls        | ✅             | Connected Context screen, per-source + separate AI toggles, per-source deletion, export, hard account deletion                                                                                                  |
@@ -349,8 +349,9 @@ real MongoDB. Phases 9–13 are scoped but not started.
 
 ### Known gaps
 
-- Background sync is opportunistic. Whether the OS actually wakes the task is verified by
-  hand on a device; it cannot run in CI or the iOS Simulator. Health reads return nothing
+- Background sync is opportunistic, and **has not yet been verified on a device**. Whether
+  the OS actually wakes the task can only be checked by hand; it cannot run in CI or the
+  iOS Simulator. Until that check is done, treat it as built and unit-tested, not working. Health reads return nothing
   while the phone is locked, and Android has no Health Connect reader, so `steps`, `sleep`
   and `workouts` are iOS-only. The aggregator reports `null` — not `0` — when they are
   absent, so nothing downstream fabricates a rest day the user didn't take.

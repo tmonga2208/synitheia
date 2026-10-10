@@ -65,19 +65,46 @@ export async function setTokens(access: string, refresh: string): Promise<void> 
 }
 
 /**
+ * Move one keychain item to the background-readable class, keeping its value.
+ *
+ * Delete, then add — a plain re-save is NOT enough. Writing to a key that already exists
+ * is an update of its value only; the accessibility class is fixed when the item is
+ * created, so the old item would stay unreadable on a locked phone forever.
+ */
+async function restore(key: string, value: string): Promise<void> {
+  await SecureStore.deleteItemAsync(key);
+  try {
+    await SecureStore.setItemAsync(key, value, TOKEN_OPTIONS);
+  } catch {
+    // The item is gone and the new one was refused. Put the value back the old way
+    // rather than sign the user out over a storage-class upgrade.
+    await SecureStore.setItemAsync(key, value);
+    throw new Error('token accessibility upgrade failed');
+  }
+}
+
+/**
  * Re-store tokens written before TOKEN_OPTIONS existed. Runs once, from the foreground,
  * where the old items are still readable.
+ *
+ * Never throws. If the keychain cannot be read (a launch while locked) or a write is
+ * refused, the marker is not set and the next launch tries again.
  */
 export async function migrateTokenAccessibility(): Promise<void> {
-  if ((await SecureStore.getItemAsync(MIGRATED_KEY)) !== null) return;
+  try {
+    if ((await SecureStore.getItemAsync(MIGRATED_KEY)) !== null) return;
 
-  const [access, refresh] = await Promise.all([
-    SecureStore.getItemAsync(ACCESS_KEY),
-    SecureStore.getItemAsync(REFRESH_KEY),
-  ]);
-  if (access !== null && refresh !== null) await setTokens(access, refresh);
+    const [access, refresh] = await Promise.all([
+      SecureStore.getItemAsync(ACCESS_KEY),
+      SecureStore.getItemAsync(REFRESH_KEY),
+    ]);
+    if (access !== null) await restore(ACCESS_KEY, access);
+    if (refresh !== null) await restore(REFRESH_KEY, refresh);
 
-  await SecureStore.setItemAsync(MIGRATED_KEY, '1', TOKEN_OPTIONS);
+    await SecureStore.setItemAsync(MIGRATED_KEY, '1', TOKEN_OPTIONS);
+  } catch {
+    // Tokens are still where they were; only the upgrade is deferred.
+  }
 }
 
 export async function clearTokens(): Promise<void> {
@@ -105,7 +132,18 @@ export function setSessionExpiredHandler(handler: () => void): void {
 /** The single-flight guard. Concurrent 401s all await this one promise. */
 let refreshInFlight: Promise<string | null> | null = null;
 
+/**
+ * Whether any request waiting on the in-flight refresh came from the foreground.
+ *
+ * The refresh is shared, so "may a failure sign the user out?" cannot be the property of
+ * whichever caller happened to start it. If a background sync starts the refresh and a
+ * screen joins it, someone IS looking, and a dead session has to be handled now.
+ */
+let foregroundWaiting = false;
+
 async function refreshAccessToken(preserveSession = false): Promise<string | null> {
+  if (!preserveSession) foregroundWaiting = true;
+
   refreshInFlight ??= (async () => {
     try {
       const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
@@ -120,7 +158,7 @@ async function refreshAccessToken(preserveSession = false): Promise<string | nul
       if (!res.ok) {
         // A background task must never sign the user out: they are not looking, and the
         // next foreground request will find the same dead token and handle it properly.
-        if (!preserveSession) {
+        if (foregroundWaiting) {
           await clearTokens();
           onSessionExpired?.();
         }
@@ -132,6 +170,7 @@ async function refreshAccessToken(preserveSession = false): Promise<string | nul
       return data.accessToken;
     } finally {
       refreshInFlight = null;
+      foregroundWaiting = false;
     }
   })();
 

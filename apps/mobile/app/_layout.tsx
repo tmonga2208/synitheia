@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -18,6 +19,7 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
 import { useAuth } from '../src/store/auth.js';
 // Imported for its side effect too: this is what defines the background task.
 import { syncBackgroundRegistration } from '../src/sync/backgroundTask.js';
+import { shouldDeferHydrate } from '../src/sync/launch.js';
 import { clearSourcePrefs } from '../src/sync/sourcePrefs.js';
 import { ThemeProvider, useTheme, useThemeHydrated } from '../src/theme/ThemeProvider.js';
 
@@ -55,9 +57,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     init();
+
     // Before hydrate: tokens stored by an older build must be re-stored where a
     // background task can read them, and hydrate is the first thing that reads them.
-    void migrateTokenAccessibility().finally(() => void hydrate());
+    const start = () => void migrateTokenAccessibility().then(() => hydrate());
+
+    if (!shouldDeferHydrate(AppState.currentState)) {
+      start();
+      return;
+    }
+
+    // Launched by the OS for the background task, with nobody looking. See
+    // shouldDeferHydrate: the session check waits until the app is on screen.
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      subscription.remove();
+      start();
+    });
+    return () => subscription.remove();
   }, [hydrate, init]);
 
   useEffect(() => {
