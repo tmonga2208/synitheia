@@ -5,6 +5,8 @@ const LOOKBACK_DAYS = 14;
 const MIN_DAYS = 7;
 const EVENING_MINUTES = 19 * 60;
 const RATIO = 0.6;
+/** How recently today's step count must have been written to be judged at all. */
+const FRESH_MS = 90 * 60_000;
 
 const stepsOf = (e: EventLean): number => (e.metadata as { steps?: number }).steps ?? 0;
 
@@ -20,6 +22,13 @@ export const detectLowActivity: Detector = (ctx) => {
   if (!todayEvent) return [];
 
   if (localMinutesOfDay(ctx.now, ctx.timezone) < EVENING_MINUTES) return [];
+
+  // A background Health read returns nothing while the phone is locked, so after a day in
+  // a pocket this event can still hold the morning's number. A calendar sync or a Today
+  // load would then call a normal day "quiet" — and the once-per-day rule would keep that
+  // card up after the real count arrived. Stale data is no data.
+  const syncedAt = (todayEvent as { updatedAt?: Date }).updatedAt;
+  if (!syncedAt || ctx.now.getTime() - syncedAt.getTime() > FRESH_MS) return [];
 
   const since = addLocalDays(ctx.localDate, -LOOKBACK_DAYS);
   const recent = ctx.history.filter(

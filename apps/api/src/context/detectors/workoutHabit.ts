@@ -1,5 +1,5 @@
 import { activityName, matchWorkout } from './workoutMatch.js';
-import type { Detection, Detector, EventLean } from './types.js';
+import { WORKOUT_HABIT_PREFIX, type Detection, type Detector, type EventLean } from './types.js';
 
 const CONFIDENCE = { specific: 0.8, generic: 0.65 } as const;
 
@@ -42,7 +42,7 @@ export const detectWorkoutHabit: Detector = (ctx) => {
     const minutes = Math.round(meta.durationMin ?? 0);
 
     detections.push({
-      detector: `workout_habit:${habit.id}`,
+      detector: `${WORKOUT_HABIT_PREFIX}:${habit.id}`,
       type: 'possible_habit_completion',
       confidence: CONFIDENCE[best.kind],
       title: `Mark ${habit.name} done?`,

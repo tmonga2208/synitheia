@@ -61,3 +61,11 @@ export interface Detection {
 }
 
 export type Detector = (ctx: DetectorContext) => Detection[];
+
+/**
+ * Detectors whose name is `<prefix>:<habitId>`. The runner withdraws their pending cards
+ * once that habit is complete, so the prefixes live here rather than in two places.
+ */
+export const WORKOUT_HABIT_PREFIX = 'workout_habit';
+export const HABIT_SLIPPING_PREFIX = 'habit_slipping';
+export const PER_HABIT_PREFIXES = [WORKOUT_HABIT_PREFIX, HABIT_SLIPPING_PREFIX] as const;

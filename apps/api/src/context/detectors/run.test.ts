@@ -407,3 +407,77 @@ describe('workout → habit, through the runner', () => {
     expect(await runDetectors(userId, IST, TODAY, { now: at('13:00') })).toEqual([]);
   });
 });
+
+describe('suggestions whose premise has ended', () => {
+  async function seed(detectorPrefix: string, type: string) {
+    const userId = freshUser();
+    const habit = await HabitModel.create({
+      userId: new Types.ObjectId(userId),
+      name: 'Morning run',
+      icon: 'activity',
+      color: '#7D927D',
+      frequency: 'daily',
+      measure: 'check',
+      targetCount: 1,
+      createdAt: at('08:00', '2026-07-01'),
+    });
+    const suggestion = await InferredContextModel.create({
+      userId: new Types.ObjectId(userId),
+      type,
+      confidence: 0.8,
+      detector: `${detectorPrefix}:${habit._id.toString()}`,
+      title: 'Mark Morning run done?',
+      proposed: { kind: 'habit', habitId: habit._id.toString(), count: 1 },
+      status: 'pending',
+      localDate: TODAY,
+      expiresAt: at('12:00', '2026-07-14'),
+    });
+    return { userId, habit, suggestion };
+  }
+
+  async function complete(userId: string, habitId: Types.ObjectId) {
+    await HabitLogModel.create({
+      userId: new Types.ObjectId(userId),
+      habitId,
+      localDate: TODAY,
+      count: 1,
+      targetCount: 1,
+      completedAt: at('09:00'),
+    });
+  }
+
+  it.each([
+    ['workout_habit', 'possible_habit_completion'],
+    ['habit_slipping', 'missed_habit'],
+  ])('withdraws a pending %s card once the habit is done', async (prefix, type) => {
+    // Otherwise the only way to clear "Mark Morning run done?" after ticking the habit by
+    // hand is Dismiss — and a dismissal silences that habit's suggestions for good.
+    const { userId, habit, suggestion } = await seed(prefix, type);
+    await complete(userId, habit._id);
+
+    await runDetectors(userId, IST, TODAY, { now: at('13:00') });
+
+    const after = await InferredContextModel.findById(suggestion._id).lean();
+    expect(after!.status).toBe('expired');
+    expect(after!.resolvedAt).toBeTruthy();
+  });
+
+  it('leaves the card alone while the habit is still open', async () => {
+    const { userId, suggestion } = await seed('workout_habit', 'possible_habit_completion');
+
+    await runDetectors(userId, IST, TODAY, { now: at('13:00') });
+
+    const after = await InferredContextModel.findById(suggestion._id).lean();
+    expect(after!.status).toBe('pending');
+  });
+
+  it('does not count a withdrawn card as a rejection', async () => {
+    const { userId, habit } = await seed('workout_habit', 'possible_habit_completion');
+    await complete(userId, habit._id);
+    await runDetectors(userId, IST, TODAY, { now: at('13:00') });
+
+    expect(
+      await InferredContextModel.countDocuments({ userId, status: 'rejected' }),
+    ).toBe(0);
+  });
+});

@@ -19,7 +19,13 @@ import { detectLowWater } from './lowWater.js';
 import { detectPossibleMeal } from './possibleMeal.js';
 import { detectUnusualSpending } from './unusualSpending.js';
 import { detectWorkoutHabit } from './workoutHabit.js';
-import type { Detector, DetectorContext, EventLean, HabitToday } from './types.js';
+import {
+  PER_HABIT_PREFIXES,
+  type Detector,
+  type DetectorContext,
+  type EventLean,
+  type HabitToday,
+} from './types.js';
 
 /**
  * Detectors — the "Detect → Infer" half of the loop.
@@ -118,6 +124,21 @@ export async function runDetectors(
     rejectedHabitIds,
     waterTargetMl: prefs?.waterTargetMl ?? 2500,
   };
+
+  // A card about a habit that has since been completed is asking a question the user has
+  // already answered. Left up, the only way to clear it is Dismiss — which is recorded as
+  // a rejection and silences that habit's suggestions for good. Withdrawn as 'expired',
+  // never 'rejected': the user did not say the rule was wrong.
+  const doneDetectors = habits
+    .filter((h) => h.countToday >= h.targetCount)
+    .flatMap((h) => PER_HABIT_PREFIXES.map((prefix) => `${prefix}:${h.id}`));
+
+  if (doneDetectors.length > 0) {
+    await InferredContextModel.updateMany(
+      { userId: uid, localDate, status: 'pending', detector: { $in: doneDetectors } },
+      { $set: { status: 'expired', resolvedAt: ctx.now } },
+    );
+  }
 
   const detections = DETECTORS.flatMap((detect) => detect(ctx));
   const created: SyncSuggestion[] = [];

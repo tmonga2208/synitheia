@@ -23,6 +23,8 @@ export function fakeEvent(input: {
   at: Date;
   metadata?: Record<string, unknown>;
   source?: string;
+  /** When the row was last written. Defaults to `at`. */
+  updatedAt?: Date;
 }): EventLean {
   return {
     _id: new Types.ObjectId(),
@@ -31,6 +33,7 @@ export function fakeEvent(input: {
     timestamp: input.at,
     timezone: TEST_TZ,
     localDate: toLocalDate(input.at, TEST_TZ),
+    updatedAt: input.updatedAt ?? input.at,
     metadata: { type: input.type, ...(input.metadata ?? {}) },
   } as unknown as EventLean;
 }

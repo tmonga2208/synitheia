@@ -1,6 +1,6 @@
 import { addLocalDays, localMinutesOfDay } from '@synitheia/shared';
 import { minutesLabel } from './labels.js';
-import type { Detection, Detector } from './types.js';
+import { HABIT_SLIPPING_PREFIX, type Detection, type Detector } from './types.js';
 
 const LOOKBACK_DAYS = 28;
 const MIN_COMPLETIONS = 5;
@@ -53,7 +53,7 @@ export const detectHabitSlipping: Detector = (ctx) => {
     if (nowMinutes < usual + GRACE_MINUTES) continue;
 
     detections.push({
-      detector: `habit_slipping:${habit.id}`,
+      detector: `${HABIT_SLIPPING_PREFIX}:${habit.id}`,
       type: 'missed_habit',
       confidence: minutes.length >= 10 ? 0.7 : 0.6,
       title: `${habit.name} is usually done by now`,

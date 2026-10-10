@@ -3,11 +3,13 @@ import { addLocalDays } from '@synitheia/shared';
 import { detectLowActivity } from './lowActivity.js';
 import { TEST_DAY, baseCtx, fakeEvent, istAt } from './testing.js';
 
-const steps = (count: number, day?: string) =>
+/** Health stamps the day's step event at midday; `syncedAt` is when it was last written. */
+const steps = (count: number, day?: string, syncedAt: Date = istAt('23:59', day)) =>
   fakeEvent({
     type: 'steps.recorded',
     source: 'health',
     at: istAt('12:00', day),
+    updatedAt: syncedAt,
     metadata: { steps: count, distanceM: null },
   });
 
@@ -70,6 +72,32 @@ describe('low activity', () => {
       steps(8_000, addLocalDays(TEST_DAY, -(15 + i))),
     );
     expect(detectLowActivity(baseCtx({ events: [steps(1_000)], history: old }))).toEqual([]);
+  });
+
+  it('does not judge the day on a step count that has not been refreshed', () => {
+    // A phone locked in a pocket since 9 AM: Health could not be read, so the event still
+    // holds the morning's number. At 8 PM that is stale data, not a quiet day.
+    expect(
+      detectLowActivity(
+        baseCtx({
+          now: istAt('20:00'),
+          events: [steps(1_200, undefined, istAt('09:00'))],
+          history: pastDays(10, 8_000),
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('judges a step count synced within the last hour and a half', () => {
+    expect(
+      detectLowActivity(
+        baseCtx({
+          now: istAt('20:00'),
+          events: [steps(1_200, undefined, istAt('18:31'))],
+          history: pastDays(10, 8_000),
+        }),
+      ),
+    ).toHaveLength(1);
   });
 
   it('is more confident under 40%', () => {
