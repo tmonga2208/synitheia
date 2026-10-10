@@ -15,6 +15,7 @@ import {
 import { scheduledOn } from '../../modules/habits/service.js';
 import { detectLowWater } from './lowWater.js';
 import { detectPossibleMeal } from './possibleMeal.js';
+import { detectUnusualSpending } from './unusualSpending.js';
 import type { Detector, DetectorContext, EventLean, HabitToday } from './types.js';
 
 /**
@@ -33,7 +34,11 @@ import type { Detector, DetectorContext, EventLean, HabitToday } from './types.j
 /** Eight weeks, so a same-weekday baseline has up to eight samples. */
 const HISTORY_DAYS = 56;
 
-export const DETECTORS: Detector[] = [detectPossibleMeal, detectLowWater];
+export const DETECTORS: Detector[] = [
+  detectPossibleMeal,
+  detectLowWater,
+  detectUnusualSpending,
+];
 
 export interface RunOptions {
   /** Injected so tests and backfills do not depend on the wall clock. */
