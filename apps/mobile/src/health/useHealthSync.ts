@@ -2,10 +2,9 @@ import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { runHealthSync } from '../sync/runHealthSync.js';
-import { isAvailable, isSupported, requestPermissions } from './healthkit.js';
 
 /**
- * Keep Apple Health and Synítheia in step.
+ * Keep the phone's health store and Synítheia in step.
  *
  * Runs on foreground, not on a timer. Health only changes while the phone is in the user's
  * pocket, and there is nothing to sync while the app is open and idle — a polling loop would
@@ -61,29 +60,4 @@ export function useHealthSync(enabled: boolean): { sync: () => Promise<void> } {
   }, [enabled, sync]);
 
   return { sync };
-}
-
-/**
- * Turning the Health source on.
- *
- * Two grants, in order: iOS's, then ours. Asking iOS first means a user who declines the
- * system sheet never gets a "connected" row promising data we cannot read.
- */
-/**
- * Why a connect attempt ended the way it did.
- *
- * `unavailable`    the platform has no health store to talk to (Android today, an iPad).
- * `unauthorized`   the store IS there but the request failed. On a real device this is
- *                  almost always the HealthKit entitlement being stripped at signing —
- *                  Apple only grants it to a PAID developer account, so a free-Apple-ID
- *                  build (which is fine everywhere else) simply cannot read Health. It also
- *                  covers the user tapping "Don't Allow". Either way, retrying alone won't
- *                  help, so the message has to say what actually needs to change.
- */
-export type HealthConnectResult = 'connected' | 'unavailable' | 'unauthorized';
-
-export async function connectHealth(): Promise<HealthConnectResult> {
-  if (!isSupported()) return 'unavailable';
-  if (!(await isAvailable())) return 'unavailable';
-  return (await requestPermissions()) ? 'connected' : 'unauthorized';
 }

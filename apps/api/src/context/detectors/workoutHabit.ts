@@ -50,7 +50,9 @@ export const detectWorkoutHabit: Detector = (ctx) => {
       evidence: [
         {
           eventId: best.event._id.toString(),
-          label: `${displayActivity(meta.activity ?? '')}, ${minutes} min, from Apple Health`,
+          // Not "Apple Health": the server cannot tell which phone a workout came from,
+          // and on Android this evidence is read by someone who has never had one.
+          label: `${displayActivity(meta.activity ?? '')}, ${minutes} min, from your health data`,
           weight: 1,
         },
       ],

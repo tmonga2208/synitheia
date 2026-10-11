@@ -58,3 +58,29 @@ describe('matchWorkout', () => {
     expect(matchWorkout(habit, activity)).toBeNull();
   });
 });
+
+describe('names the Android reader sends', () => {
+  // apps/mobile/src/health/exerciseTypes.ts maps Health Connect's numeric exercise types
+  // onto these. They are the same names iPhone sends, which is the whole contract.
+  it.each([
+    ['Morning run', 'running', 'specific'],
+    ['Walk the dog', 'walking', 'specific'],
+    ['Bike to work', 'cycling', 'specific'],
+    ['Swim', 'swimming', 'specific'],
+    ['Yoga', 'yoga', 'specific'],
+    ['Lift weights', 'traditionalStrengthTraining', 'specific'],
+    ['Weekend hike', 'hiking', 'specific'],
+    ['Pilates', 'pilates', 'specific'],
+    ['Dance class', 'dance', 'specific'],
+    ['Gym', 'elliptical', 'generic'],
+    ['Workout', 'rowing', 'generic'],
+    ['Exercise', 'highIntensityIntervalTraining', 'generic'],
+    ['Gym', 'workout', 'generic'],
+  ] as const)('%s ← %s is a %s match', (habit, activity, expected) => {
+    expect(matchWorkout(habit, activity)).toBe(expected);
+  });
+
+  it('does not offer a specific habit for an unnamed workout', () => {
+    expect(matchWorkout('Morning run', 'workout')).toBeNull();
+  });
+});

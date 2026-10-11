@@ -70,7 +70,7 @@ export default function Today() {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
   /**
-   * Apple Health, pulled on every foreground.
+   * The phone's health store, pulled on every foreground.
    *
    * Here rather than in a provider because Today is where the result lands: steps fill a
    * step habit, which moves the ring the user is looking at the moment they open the app.

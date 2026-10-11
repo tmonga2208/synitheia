@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import {
   CategoryValueSleepAnalysis,
   WorkoutActivityType,
@@ -22,6 +21,8 @@ import {
   type HealthSnapshot,
   type SyncHealthInput,
 } from '@synitheia/shared';
+import { dayBounds } from './dayBounds.js';
+import type { HealthConnectResult, HealthReader } from './types.js';
 
 /**
  * Apple Health, read on the device.
@@ -31,10 +32,9 @@ import {
  * `toShare`, so the app is structurally incapable of modifying the user's health record even
  * if a future bug tried to.
  *
- * iOS only. Android's equivalent is Health Connect, which is a different native module — but
- * the server takes a normalized `SyncHealthInput` and knows nothing about HealthKit, so
- * adding Android means writing a second reader that returns this same shape. Nothing on the
- * server changes.
+ * iOS only. Android's counterpart is healthConnect.ts; both produce the same normalized
+ * `SyncHealthInput`, the server knows nothing about either, and the rest of the app
+ * reaches whichever one applies through healthStore.ts.
  *
  * The library (@kingstinct/react-native-healthkit v14) is built on Nitro modules: the API is
  * free functions with options objects, identifiers are the full `HKQuantityTypeIdentifier…`
@@ -67,26 +67,7 @@ const READ_PERMISSIONS: readonly ObjectTypeIdentifier[] = [
   'HKWorkoutTypeIdentifier',
 ];
 
-export function isSupported(): boolean {
-  return Platform.OS === 'ios';
-}
-
-/**
- * What the user's phone actually calls its health store.
- *
- * The UI must never hardcode "Apple Health". Android's health store is Health Connect, and
- * an Android user told to "add it in the Health app" would be sent looking for something
- * that does not exist on their phone. Naming the source is a platform question, so it gets
- * answered in exactly one place.
- */
-export function healthSourceName(): string {
-  if (Platform.OS === 'ios') return 'Apple Health';
-  if (Platform.OS === 'android') return 'Health Connect';
-  return 'your health app';
-}
-
-export async function isAvailable(): Promise<boolean> {
-  if (!isSupported()) return false;
+async function isAvailable(): Promise<boolean> {
   try {
     return await isHealthDataAvailableAsync();
   } catch {
@@ -103,7 +84,7 @@ export async function isAvailable(): Promise<boolean> {
  * whether we actually have data is to read and see if anything comes back, which is exactly
  * what sync does.
  */
-export async function requestPermissions(): Promise<boolean> {
+async function requestPermissions(): Promise<boolean> {
   if (!(await isAvailable())) return false;
 
   try {
@@ -113,20 +94,6 @@ export async function requestPermissions(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/** Local midnight-to-midnight, in the device's own zone — the same day the app means. */
-function dayBounds(daysAgo: number): { start: Date; end: Date; localDate: string } {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-
-  const localDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(
-    start.getDate(),
-  ).padStart(2, '0')}`;
-
-  return { start, end, localDate };
 }
 
 async function sumQuantity(
@@ -293,7 +260,7 @@ async function readBody(): Promise<Partial<BodyMetrics>> {
  * all day. The server upserts on (userId, localDate), so re-sending a day is free and
  * always correct, which is a far better trade than a cursor that silently goes stale.
  */
-export async function readHealth(days = 7): Promise<SyncHealthInput | null> {
+async function readHealth(days: number): Promise<SyncHealthInput | null> {
   if (!(await isAvailable())) return null;
 
   const snapshots: HealthSnapshot[] = [];
@@ -325,3 +292,14 @@ export async function readHealth(days = 7): Promise<SyncHealthInput | null> {
 
   return { body: await readBody(), days: snapshots };
 }
+
+/**
+ * Two grants, in order: iOS's, then ours. Asking iOS first means a user who declines the
+ * system sheet never gets a "connected" row promising data we cannot read.
+ */
+async function connect(): Promise<HealthConnectResult> {
+  if (!(await isAvailable())) return 'unavailable';
+  return (await requestPermissions()) ? 'connected' : 'unauthorized';
+}
+
+export const healthkitReader: HealthReader = { isAvailable, connect, readHealth };
