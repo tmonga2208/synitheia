@@ -1,7 +1,7 @@
 # Marketing Site — Design Spec
 
 Date: 2026-10-12
-Status: draft, awaiting review
+Status: approved 2026-10-12
 
 ---
 
@@ -68,7 +68,7 @@ One page, ten parts, in this order. "Mock" is an app screen or card rebuilt in H
 | Habits | Check, count, duration and step habits, daily or weekly. Streaks with a grace day. Step habits complete themselves from health data. An optional reminder per habit |
 | Nutrition | Log food with calories and macros, or from a photo. Daily totals. A calorie target suggested from your body details, applied only if you choose it |
 | Water | Quick-add against a daily target |
-| Body | Height and weight from the health store or typed in; sex and date of birth typed in. BMI and energy estimates |
+| Body | Height, weight, sex and date of birth from the phone's health store where it holds them, or typed in. BMI and energy estimates |
 | Reminders and targets | On-device reminders, daily or on chosen weekdays. One screen for the water, calorie and budget targets |
 
 The section also mentions XP: points for completed habits, logged water and a month kept
