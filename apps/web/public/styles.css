@@ -148,3 +148,493 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* The sticky header would otherwise sit on top of whatever a link jumps to. */
+  scroll-padding-top: 5.5rem;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+dl,
+dd,
+figure {
+  margin: 0;
+  padding: 0;
+}
+
+ul[role="list"] {
+  list-style: none;
+}
+
+svg {
+  display: block;
+}
+
+a {
+  color: var(--accent-text);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 0.5rem;
+}
+
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -5rem;
+  z-index: 20;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--button);
+  color: var(--button-text);
+  font-weight: 600;
+}
+
+.skip:focus {
+  top: 1rem;
+}
+
+/* ── Type: the app's scale, proportionally ────────────────────────────────────────────── */
+
+h1 {
+  font-size: clamp(2.5rem, 9vw, 4.25rem);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+}
+
+h3 {
+  font-size: 1.125rem;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+
+.overline {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.lead {
+  font-size: clamp(1.0625rem, 2.4vw, 1.25rem);
+  color: var(--text-muted);
+}
+
+.note {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+/* ── Layout ───────────────────────────────────────────────────────────────────────────── */
+
+.wrap {
+  width: min(100% - 2.5rem, 70rem);
+  margin-inline: auto;
+}
+
+main > section {
+  padding-block: clamp(3.5rem, 9vw, 6.5rem);
+}
+
+main > section + section {
+  border-top: 1px solid var(--border);
+}
+
+.stack > * + * {
+  margin-top: 1rem;
+}
+
+.section-head {
+  max-width: 40rem;
+}
+
+.after {
+  margin-top: 2rem;
+  max-width: 46rem;
+}
+
+.split {
+  display: grid;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.split > * {
+  min-width: 0;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+.grid > * {
+  min-width: 0;
+}
+
+@media (min-width: 40em) {
+  .grid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 56.25em) {
+  .split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4rem;
+  }
+
+  /* Text first in the source, so it comes first on a phone and for a screen reader. */
+  .split.flip > .split-text {
+    order: 2;
+  }
+}
+
+@media (min-width: 64em) {
+  .grid.three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────────────────── */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-header .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 4rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  color: var(--text);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.mark {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+}
+
+.mark path,
+.hero-mark path {
+  fill: none;
+  stroke-width: 72;
+  stroke-linecap: round;
+}
+
+.mark-outer {
+  stroke: var(--accent-soft);
+}
+
+.mark-middle {
+  stroke: var(--accent);
+}
+
+.mark-inner {
+  stroke: var(--accent-deep);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.site-nav a:not(.button) {
+  display: none;
+  align-items: center;
+  min-height: 2.75rem;
+  padding-inline: 0.875rem;
+  border-radius: 0.75rem;
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.site-nav a:not(.button):hover {
+  background: var(--surface-raised);
+}
+
+@media (min-width: 40em) {
+  .site-nav a:not(.button) {
+    display: inline-flex;
+  }
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────────────────── */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0.75rem 1.5rem;
+  border: 1px solid transparent;
+  border-radius: 1rem;
+  background: var(--button);
+  color: var(--button-text);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  box-shadow: var(--shadow-button);
+}
+
+/* An underline, not a lighter fill: a lighter sage would drop the label under 4.5:1. */
+.button:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+.button.secondary {
+  border-color: var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.button.small {
+  min-height: 2.75rem;
+  padding: 0.5rem 1.125rem;
+  font-size: 0.9375rem;
+  box-shadow: none;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+}
+
+main > section.hero {
+  padding-block: clamp(2.5rem, 7vw, 5rem) clamp(3.5rem, 9vw, 6.5rem);
+}
+
+.hero .wrap {
+  position: relative;
+}
+
+/*
+ * The mark, large and faint, behind the phone. Only where there are two columns: on one
+ * column it would sit under the paragraph, and muted text over a sage arc falls below 4.5:1.
+ */
+.hero-mark {
+  display: none;
+}
+
+@media (min-width: 56.25em) {
+  .hero-mark {
+    display: block;
+    position: absolute;
+    top: 50%;
+    right: -8vw;
+    width: 50vw;
+    opacity: 0.12;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+}
+
+.hero .overline {
+  margin-bottom: 1rem;
+}
+
+.hero .lead {
+  max-width: 34rem;
+  margin-top: 1.25rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.release-note {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* ── Cards and lists ──────────────────────────────────────────────────────────────────── */
+
+.card {
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 2rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.card p,
+.card li,
+.card dd {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.card .says {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.sources {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+.source dl {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.source dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+@media (min-width: 56.25em) {
+  /* Reads as a table on a wide screen without being one, so it never has to un-table itself. */
+  .source {
+    display: grid;
+    grid-template-columns: 13rem minmax(0, 1fr);
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .source dl {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.5rem;
+    margin-top: 0;
+  }
+}
+
+.checks,
+.steps,
+.checked ul {
+  display: grid;
+  gap: 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.checks {
+  margin-top: 2rem;
+}
+
+.checked ul {
+  margin-top: 1rem;
+}
+
+/* ── Download ─────────────────────────────────────────────────────────────────────────── */
+
+.downloads {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+@media (min-width: 56.25em) {
+  .downloads {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.download {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.download .button {
+  align-self: flex-start;
+}
+
+.checked {
+  margin-top: 1rem;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────────────────── */
+
+.site-footer {
+  padding-block: 2.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.site-footer .links {
+  margin-top: 0.5rem;
+}
+
+/* ── Motion: one thing moves, once, and only if the visitor has not asked for stillness ── */
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}

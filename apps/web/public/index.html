@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Synítheia — your day, understood</title>
+  <meta name="description" content="One app for habits, spending, meals, water and health. It notices patterns, shows its evidence and asks before it records anything. Free for Android and iPhone.">
+  <meta name="theme-color" content="#FBF9F6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#15171A" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="https://synitheia.vercel.app/">
+  <link rel="icon" type="image/png" sizes="48x48" href="favicon.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://synitheia.vercel.app/">
+  <meta property="og:title" content="Synítheia — your day, understood">
+  <meta property="og:description" content="One app for habits, spending, meals, water and health. It notices patterns and asks. It never assumes.">
+  <meta property="og:image" content="https://synitheia.vercel.app/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preload" href="fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="#top">
+        <svg class="mark" viewBox="0 0 1024 1024" aria-hidden="true">
+          <path class="mark-outer" d="M338.7 764.2A306 306 0 1 1 763.9 685.8"/>
+          <path class="mark-middle" d="M495.1 717.3A206 206 0 1 1 710.1 455.6"/>
+          <path class="mark-inner" d="M539.4 407.5A108 108 0 1 0 565.8 605.6"/>
+        </svg>
+        <span>Synítheia</span>
+      </a>
+      <nav class="site-nav" aria-label="Sections">
+        <a href="#timeline">Features</a>
+        <a href="#your-data">Your data</a>
+        <a class="button small" href="#download">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <svg class="hero-mark" viewBox="0 0 1024 1024" aria-hidden="true">
+        <path class="mark-outer" d="M338.7 764.2A306 306 0 1 1 763.9 685.8"/>
+        <path class="mark-middle" d="M495.1 717.3A206 206 0 1 1 710.1 455.6"/>
+        <path class="mark-inner" d="M539.4 407.5A108 108 0 1 0 565.8 605.6"/>
+      </svg>
+      <div class="wrap split">
+        <div class="split-text">
+          <p class="overline">For Android and iPhone</p>
+          <h1 id="hero-title">Your day, understood</h1>
+          <p class="lead">Habits, spending, meals and water — tracked together, so Synítheia can tell you what they mean as a whole. It notices patterns and asks. It never assumes.</p>
+          <div class="actions">
+            <a class="button" href="https://github.com/tmonga2208/synitheia/releases/latest/download/Synitheia.apk">Download for Android</a>
+            <a class="button secondary" href="#download-iphone">Get it on iPhone</a>
+          </div>
+          <p class="release-note"><span data-release="version">Latest release</span> · Free · Android 8.0 or newer · iPhone needs sideloading</p>
+        </div>
+        <!-- mock: today -->
+      </div>
+    </section>
+
+    <section id="timeline" aria-labelledby="timeline-title">
+      <div class="wrap split flip">
+        <div class="split-text stack">
+          <p class="overline">Today</p>
+          <h2 id="timeline-title">One timeline, not seven trackers</h2>
+          <p>Expenses, habits, food, water, steps, workouts, sleep, calendar events and the weather land in one feed, in the order they happened. You open one screen to see your day, not a tab for each thing you track.</p>
+          <p>The ring at the top is one number for the whole day, across everything you track.</p>
+        </div>
+        <!-- mock: your-day -->
+      </div>
+    </section>
+
+    <section id="trackers" aria-labelledby="trackers-title">
+      <div class="wrap">
+        <div class="section-head stack">
+          <p class="overline">Trackers</p>
+          <h2 id="trackers-title">Everything you track, in one place</h2>
+          <p class="lead">Six trackers share one account, one timeline and one set of targets.</p>
+        </div>
+        <ul class="grid two three" role="list">
+          <li class="card stack">
+            <h3>Expenses</h3>
+            <p>Add one in a few taps, or bring one in: share a payment screenshot or a receipt photo, paste the SMS, or upload a CSV or a bank-statement PDF, even a password-protected one. Split a bill with your contacts and see who owes you. Subscriptions post themselves on the day they are due, and a monthly budget keeps count.</p>
+          </li>
+          <li class="card stack">
+            <h3>Habits</h3>
+            <p>Tick it, count it, time it or walk it, daily or weekly. Streaks forgive one missed day. Step habits complete themselves from your health data, and each habit can have its own reminder.</p>
+          </li>
+          <li class="card stack">
+            <h3>Nutrition</h3>
+            <p>Log a meal with its calories and macros, or start from a photo and confirm what it found. The day’s totals sit against a calorie target that is suggested from your body details and applied only if you choose it.</p>
+          </li>
+          <li class="card stack">
+            <h3>Water</h3>
+            <p>One tap adds a glass, counted against a daily target you set.</p>
+          </li>
+          <li class="card stack">
+            <h3>Body</h3>
+            <p>Height, weight, sex and date of birth come from your phone’s health store where it holds them, or you type them in. From those it works out BMI and how much energy you use.</p>
+          </li>
+          <li class="card stack">
+            <h3>Reminders and targets</h3>
+            <p>Reminders are scheduled on your phone, daily or on the weekdays you pick. One screen holds your water, calorie and budget targets.</p>
+          </li>
+        </ul>
+        <p class="note after">Completed habits, logged water and a month kept within budget earn XP.</p>
+        <div class="grid two">
+          <!-- mock: expense-draft -->
+          <!-- mock: habits -->
+        </div>
+      </div>
+    </section>
+
+    <section id="suggestions" aria-labelledby="suggestions-title">
+      <div class="wrap">
+        <div class="split">
+          <div class="split-text stack">
+            <p class="overline">Suggestions</p>
+            <h2 id="suggestions-title">It asks before it assumes</h2>
+            <p>Six rules watch for things worth asking about. Each one shows you what it saw, and nothing is added to your day until you confirm it.</p>
+            <p>They are plain rules written in code, not AI, so the same day always produces the same question.</p>
+            <p>When a background sync turns one up, it can reach you as a notification: at most two a day, and none overnight.</p>
+          </div>
+          <!-- mock: suggestion -->
+        </div>
+        <ul class="grid two three" role="list">
+          <li class="card stack">
+            <h3>Possible meal</h3>
+            <p class="says">“Looks like you had lunch around 1:04 PM”</p>
+            <p>Shows the food expense and its time, how often you have made a similar purchase, and an arrival at a known place when location is on.</p>
+          </li>
+          <li class="card stack">
+            <h3>Low water</h3>
+            <p class="says">“You’ve had 600 ml today”</p>
+            <p>Shows your own recent daily average. It never measures you against a population norm.</p>
+          </li>
+          <li class="card stack">
+            <h3>Unusual spending</h3>
+            <p class="says">“You’ve spent more than usual for a Friday”</p>
+            <p>Shows today’s total beside your average for that weekday, and how many of them the average rests on.</p>
+          </li>
+          <li class="card stack">
+            <h3>Low activity</h3>
+            <p class="says">“A quieter day than usual”</p>
+            <p>Shows today’s steps beside your recent average.</p>
+          </li>
+          <li class="card stack">
+            <h3>Habit slipping</h3>
+            <p class="says">“Reading is usually done by now”</p>
+            <p>Shows the time you usually finish it, and how many recent days that comes from.</p>
+          </li>
+          <li class="card stack">
+            <h3>Workout matches a habit</h3>
+            <p class="says">“Mark Run done?”</p>
+            <p>Shows the workout, its length, and that it came from your health data.</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="insights" aria-labelledby="insights-title">
+      <div class="wrap split flip">
+        <div class="split-text stack">
+          <p class="overline">Synítheia AI</p>
+          <h2 id="insights-title">Insights you can check</h2>
+          <p>AI insights are off until you turn them on. When they are on, a hosted AI model is sent totals and averages that the server has already worked out, such as “food spending averaged ₹482 across four Fridays”. It is never sent a merchant, a note or a place.</p>
+          <p>Every insight has a “Why am I seeing this?” that shows the exact numbers the model was given, and you can mark an insight helpful or not. Most days it has nothing to say, and that is the right answer.</p>
+        </div>
+        <!-- mock: insight -->
+      </div>
+    </section>
+
+    <section id="history" aria-labelledby="history-title">
+      <div class="wrap split">
+        <div class="split-text stack">
+          <p class="overline">History</p>
+          <h2 id="history-title">A month at a glance</h2>
+          <p>Each day in the calendar is tinted by how it went, in five steps, so a strong week and a thin one look different at a glance. A day with nothing logged stays an outline.</p>
+          <p>Tap any day to see it as it was. Past days are read-only.</p>
+        </div>
+        <!-- mock: month -->
+      </div>
+    </section>
+
+    <section id="your-data" aria-labelledby="your-data-title">
+      <div class="wrap">
+        <div class="split flip">
+          <div class="split-text stack">
+            <p class="overline">Privacy</p>
+            <h2 id="your-data-title">Your data, switch by switch</h2>
+            <p>The Connected Context screen lists every source the app can read, what it is used for and when it last synced. Each source has two switches: one to collect it, and a separate one to let Synítheia AI use it.</p>
+          </div>
+          <!-- mock: source -->
+        </div>
+        <ul class="sources" role="list">
+          <li class="card source">
+            <h3>Health and activity</h3>
+            <dl>
+              <div><dt>iPhone</dt><dd>Apple Health. Not available when the .ipa is re-signed with a free Apple ID.</dd></div>
+              <div><dt>Android</dt><dd>Health Connect. New in 0.2.0 and not yet verified on a physical phone.</dd></div>
+              <div><dt>Notes</dt><dd>Read-only. Steps, active energy, workouts, sleep, resting heart rate, height and weight.</dd></div>
+            </dl>
+          </li>
+          <li class="card source">
+            <h3>Calendar</h3>
+            <dl>
+              <div><dt>iPhone</dt><dd>Yes</dd></div>
+              <div><dt>Android</dt><dd>Yes</dd></div>
+              <div><dt>Notes</dt><dd>Read-only. Your calendar is never written to.</dd></div>
+            </dl>
+          </li>
+          <li class="card source">
+            <h3>Weather</h3>
+            <dl>
+              <div><dt>iPhone</dt><dd>Yes</dd></div>
+              <div><dt>Android</dt><dd>Yes</dd></div>
+              <div><dt>Notes</dt><dd>Your approximate area only, while the app is open.</dd></div>
+            </dl>
+          </li>
+          <li class="card source">
+            <h3>Location</h3>
+            <dl>
+              <div><dt>iPhone</dt><dd>Yes</dd></div>
+              <div><dt>Android</dt><dd>Yes</dd></div>
+              <div><dt>Notes</dt><dd>Off by default. Best-effort, and only while the app is open.</dd></div>
+            </dl>
+          </li>
+          <li class="card source">
+            <h3>SMS and notifications</h3>
+            <dl>
+              <div><dt>iPhone</dt><dd>No</dd></div>
+              <div><dt>Android</dt><dd>No</dd></div>
+              <div><dt>Notes</dt><dd>Not available on either phone. The reasons are in the next section.</dd></div>
+            </dl>
+          </li>
+        </ul>
+        <p class="after">Health and Calendar can also sync while the app is closed. The phone decides when that happens, so it is best-effort, and it has not yet been confirmed on a physical phone. On Android it carries health data only if you allow background access for Synítheia in Health Connect, which not every phone offers.</p>
+        <ul class="checks">
+          <li>Export everything as JSON.</li>
+          <li>Delete one source’s data, or your whole account. Deleted means erased, not hidden.</li>
+          <li>Receipt photos are not kept unless you turn that on.</li>
+        </ul>
+        <p class="note after">Signing up creates an account on a server run by the app’s developer, and what you log is stored there. This page describes what the app does. It is not a legal privacy policy.</p>
+      </div>
+    </section>
+
+    <section id="limits" aria-labelledby="limits-title">
+      <div class="wrap">
+        <div class="section-head stack">
+          <p class="overline">Limits</p>
+          <h2 id="limits-title">What it doesn’t do, and why</h2>
+          <p class="lead">Capturing payments without you is not something the phones allow, so the app does not pretend to.</p>
+        </div>
+        <ul class="grid two three" role="list">
+          <li class="card stack">
+            <h3>It does not read your SMS</h3>
+            <p>iPhone gives apps no way to. On Android, Google Play allows it only for the app you use as your SMS app.</p>
+          </li>
+          <li class="card stack">
+            <h3>It does not read your notifications</h3>
+            <p>iPhone gives apps no way to, and store policy on Android does not allow it for tracking expenses.</p>
+          </li>
+          <li class="card stack">
+            <h3>It is not connected to UPI or your bank</h3>
+            <p>UPI has no public interface that an app like this can use.</p>
+          </li>
+        </ul>
+        <p class="after">So you hand it the data instead: share the payment screenshot, paste the SMS or upload the statement. Screenshots and pasted messages are read by an AI model, and a CSV is read by plain code. Whatever is read arrives as a draft, and nothing becomes an expense until you confirm it.</p>
+      </div>
+    </section>
+
+    <section id="download" aria-labelledby="download-title">
+      <div class="wrap">
+        <div class="section-head stack">
+          <p class="overline">Download</p>
+          <h2 id="download-title">Get Synítheia</h2>
+          <p class="lead">Both builds are free and come from the project’s GitHub releases. You sign in with an email address and a password.</p>
+        </div>
+        <div class="downloads">
+          <div class="card download" id="download-android">
+            <h3>Android</h3>
+            <a class="button" href="https://github.com/tmonga2208/synitheia/releases/latest/download/Synitheia.apk">Download the .apk</a>
+            <p class="release-line" data-release="apk">Latest release</p>
+            <p>For Android 8.0 or newer.</p>
+            <ol class="steps">
+              <li>Download the file.</li>
+              <li>Open it and, when Android asks, allow your browser to install apps.</li>
+              <li>Open Synítheia and create an account.</li>
+            </ol>
+            <p>It is not on the Play Store. Install it only from this page or from GitHub Releases.</p>
+          </div>
+          <div class="card download" id="download-iphone">
+            <h3>iPhone</h3>
+            <a class="button" href="https://github.com/tmonga2208/synitheia/releases/latest/download/Synitheia-unsigned.ipa">Download the unsigned .ipa</a>
+            <p class="release-line" data-release="ipa">Latest release</p>
+            <p>This file cannot be installed by tapping it.</p>
+            <ol class="steps">
+              <li>Download the file on a computer.</li>
+              <li>Install it on your phone with Sideloadly or AltStore, signing with your Apple ID.</li>
+              <li>Open Synítheia and create an account.</li>
+            </ol>
+            <p>With a free Apple ID the app has to be re-signed every seven days, and Apple Health does not work.</p>
+          </div>
+        </div>
+        <div class="card checked">
+          <h3>What has been checked</h3>
+          <ul>
+            <li>The Android build was installed, opened and updated from 0.1.1 on an Android 14 emulator. Not yet run on a physical phone.</li>
+            <li>Health on Android, through Health Connect, is new in 0.2.0 and not yet verified on a physical phone.</li>
+            <li>Background sync is best-effort and not yet confirmed on a physical phone.</li>
+            <li>The iPhone build is made by the release pipeline and has not been installed on a phone for this version.</li>
+          </ul>
+        </div>
+        <p class="links">
+          <a href="https://github.com/tmonga2208/synitheia/releases">All releases</a>
+          <a href="https://github.com/tmonga2208/synitheia">Source code</a>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>Synítheia is a personal project. This page sets no cookies and has no analytics. It asks GitHub for the latest release details, and nothing else leaves it.</p>
+      <p class="links">
+        <a href="https://github.com/tmonga2208/synitheia">Source code</a>
+        <a href="https://github.com/tmonga2208/synitheia/releases">All releases</a>
+        <a href="fonts/OFL.txt">Manrope font licence</a>
+      </p>
+    </div>
+  </footer>
+</body>
+</html>
