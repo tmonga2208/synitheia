@@ -1,0 +1,120 @@
+/*
+ * Synítheia's public page.
+ *
+ * The colours are the app's own (apps/mobile/src/theme/palette.ts), written down once, here.
+ * Nothing below the two :root blocks may contain a colour literal, and a test enforces it,
+ * for the same reason the app forbids importing its palette outside its theme.
+ */
+:root {
+  color-scheme: light dark;
+
+  --bg: #FBF9F6;
+  --surface: #FBF9F6;
+  --surface-raised: #EFECEA;
+  --border: #DBDAD7;
+
+  --text: #2D2D2D;
+  --text-muted: #6B6B68;
+
+  /* Sage as decoration: the ring, the mark, borders. 3.18:1 on bone, so never words. */
+  --accent: #7D927D;
+  --accent-deep: #67806A;
+  --accent-soft: #A8B8A8;
+  --accent-wash: #E8EDE8;
+  /* Sage that can carry words: the tone the app uses for a habit's metadata line. */
+  --accent-text: #5E7260;
+
+  /* The app's own button is white on --accent, 3.34:1. Here it has to clear 4.5:1. */
+  --button: #5E7260;
+  --button-text: #FFFFFF;
+
+  --focus: #2D2D2D;
+
+  /* The History ramp: sage over bone at the app's alphas, flattened so it can be measured. */
+  --flow-0: #EFECEA;
+  --flow-1: #DDE0D9;
+  --flow-2: #C1CABE;
+  --flow-3: #9EAD9C;
+  --flow-4: #5E7260;
+
+  /* One accent per habit, as in the app. */
+  --habit-sage: #7D927D;
+  --habit-sage-wash: #E8EDE8;
+  --habit-indigo: #7D8FA9;
+  --habit-indigo-wash: #E5E9EF;
+  --habit-clay: #C08A7D;
+  --habit-clay-wash: #F4E9E6;
+
+  /* What kind of thing a timeline row is. Decoration: the words carry the meaning. */
+  --dot-habit: #7D927D;
+  --dot-money: #C08A7D;
+  --dot-food: #B0917D;
+  --dot-move: #7D8FA9;
+  --dot-water: #7DA095;
+
+  --shadow-card: 0 6px 30px rgba(90, 90, 80, 0.06);
+  --shadow-raised: 0 10px 40px rgba(90, 90, 80, 0.1);
+  --shadow-button: 0 8px 32px rgba(74, 90, 74, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15171A;
+    --surface: #1A1D21;
+    --surface-raised: #20242A;
+    --border: #2C3138;
+
+    --text: #E6E9EC;
+    --text-muted: #8D949C;
+
+    --accent: #89A889;
+    --accent-deep: #7A9A7A;
+    --accent-soft: #5E7460;
+    --accent-wash: #1F2620;
+    --accent-text: #89A889;
+
+    /* Lifted sage cannot hold white (2.62:1), so the label inverts, as it does in the app. */
+    --button: #89A889;
+    --button-text: #15171A;
+
+    --focus: #E6E9EC;
+
+    --flow-0: #20242A;
+    --flow-1: #2E3634;
+    --flow-2: #404C44;
+    --flow-3: #546557;
+    --flow-4: #89A889;
+
+    --habit-sage: #597159;
+    --habit-sage-wash: #252C2B;
+    --habit-indigo: #536C90;
+    --habit-indigo-wash: #242B35;
+    --habit-clay: #A6533F;
+    --habit-clay-wash: #332726;
+
+    --dot-habit: #779377;
+    --dot-money: #C57865;
+    --dot-food: #B08366;
+    --dot-move: #768EB0;
+    --dot-water: #639686;
+
+    /* A soft shadow over charcoal renders as nothing; depth comes from the surface steps. */
+    --shadow-card: none;
+    --shadow-raised: none;
+    --shadow-button: none;
+  }
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
