@@ -61,7 +61,42 @@
           </div>
           <p class="release-note"><span data-release="version">Latest release</span> · Free · Android 8.0 or newer · iPhone needs sideloading</p>
         </div>
-        <!-- mock: today -->
+        <figure class="mock" id="mock-today">
+          <div class="phone" role="img" aria-label="The Today screen. A greeting, a ring showing the day 72 percent complete, a six-day streak and 240 XP, and a card asking whether a food expense at 1:04 PM was lunch, with Dismiss and Confirm.">
+            <div class="m-bar">
+              <span class="m-avatar">A</span>
+              <span class="m-icons">
+                <span class="m-icon"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+                <span class="m-icon"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 7H4c0-1 2-2 2-7M10 20a2 2 0 0 0 4 0"/></svg></span>
+              </span>
+            </div>
+            <p class="m-overline">Friday, October 9</p>
+            <p class="m-title">Good afternoon, Asha</p>
+            <p class="m-sub">You’re on a 6-day streak. Keep the momentum.</p>
+            <div class="m-ring">
+              <svg viewBox="0 0 200 200" aria-hidden="true">
+                <circle class="ring-track" cx="100" cy="100" r="78"/>
+                <circle class="ring-progress" cx="100" cy="100" r="78" stroke-dasharray="490.09" stroke-dashoffset="137.22" transform="rotate(-90 100 100)"/>
+              </svg>
+              <p class="m-ring-value"><span>72<small>%</small></span></p>
+            </div>
+            <div class="m-chips">
+              <span class="m-chip"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>6 Day Streak</span>
+              <span class="m-chip">240 XP</span>
+            </div>
+            <div class="m-card">
+              <span class="m-tag">detected</span>
+              <p class="m-card-title">Looks like you had lunch around 1:04 PM</p>
+              <p class="m-body">Add it to today?</p>
+              <p class="m-evidence">• Food expense at 1:04 PM</p>
+              <div class="m-actions">
+                <span class="m-button secondary">Dismiss</span>
+                <span class="m-button">Confirm</span>
+              </div>
+            </div>
+          </div>
+          <figcaption>Sample data</figcaption>
+        </figure>
       </div>
     </section>
 
@@ -73,7 +108,48 @@
           <p>Expenses, habits, food, water, steps, workouts, sleep, calendar events and the weather land in one feed, in the order they happened. You open one screen to see your day, not a tab for each thing you track.</p>
           <p>The ring at the top is one number for the whole day, across everything you track.</p>
         </div>
-        <!-- mock: your-day -->
+        <figure class="mock" id="mock-your-day">
+          <div class="panel" role="img" aria-label="The Your Day card, in three parts. Morning: one habit and 500 millilitres of water. Afternoon: a 320 rupee lunch, the meal it was logged as, and a design review. Evening: a 32 minute run, 6,480 steps and a completed habit.">
+            <div class="m-bucket">
+              <div class="m-bucket-head">
+                <div class="m-dots"><span class="m-dot habit"></span><span class="m-dot water"></span></div>
+                <div>
+                  <p class="m-overline">Morning</p>
+                  <p class="m-bucket-summary">1 habit · 500 ml water</p>
+                </div>
+              </div>
+            </div>
+            <div class="m-bucket">
+              <div class="m-bucket-head">
+                <div class="m-dots"><span class="m-dot money"></span><span class="m-dot food"></span></div>
+                <div>
+                  <p class="m-overline">Afternoon</p>
+                  <p class="m-bucket-summary">₹320.00 · 540 kcal</p>
+                </div>
+              </div>
+              <div class="m-rows">
+                <p class="m-row"><span class="m-time">1:04 PM</span><span class="m-dot money"></span><span>₹320.00 spent at Green Bowl · Food</span></p>
+                <p class="m-row"><span class="m-time">1:10 PM</span><span class="m-dot food"></span><span>Dal and rice for lunch · 540 kcal</span></p>
+                <p class="m-row"><span class="m-time">3:00 PM</span><span class="m-dot context"></span><span>Design review · 45 min</span></p>
+              </div>
+            </div>
+            <div class="m-bucket">
+              <div class="m-bucket-head">
+                <div class="m-dots"><span class="m-dot habit"></span><span class="m-dot move"></span></div>
+                <div>
+                  <p class="m-overline">Evening</p>
+                  <p class="m-bucket-summary">1 habit · 6,480 steps</p>
+                </div>
+              </div>
+              <div class="m-rows">
+                <p class="m-row"><span class="m-time">6:15 PM</span><span class="m-dot move"></span><span>running · 32 min</span></p>
+                <p class="m-row"><span class="m-time">6:50 PM</span><span class="m-dot move"></span><span>6,480 steps</span></p>
+                <p class="m-row"><span class="m-time">7:05 PM</span><span class="m-dot habit"></span><span>Run completed</span></p>
+              </div>
+            </div>
+          </div>
+          <figcaption>Sample data</figcaption>
+        </figure>
       </div>
     </section>
 
@@ -112,8 +188,62 @@
         </ul>
         <p class="note after">Completed habits, logged water and a month kept within budget earn XP.</p>
         <div class="grid two">
-          <!-- mock: expense-draft -->
-          <!-- mock: habits -->
+          <figure class="mock" id="mock-expense-draft">
+            <div class="panel" role="img" aria-label="A draft expense read from a payment screenshot: 320 rupees at Green Bowl Cafe, category Food, marked as being added. It shows the line it was read from and says the app is 92 percent sure it read it correctly.">
+              <div class="m-draft-head">
+                <p class="m-amount">₹320.00</p>
+                <span class="m-chip selected">Adding</span>
+              </div>
+              <p class="m-evidence">“Paid ₹320.00 to Green Bowl Cafe”</p>
+              <div class="m-field">
+                <p class="m-label">Amount</p>
+                <p class="m-input">₹ 320.00</p>
+              </div>
+              <div class="m-field">
+                <p class="m-label">Merchant</p>
+                <p class="m-input">Green Bowl Cafe</p>
+              </div>
+              <div class="m-field">
+                <p class="m-label">Category</p>
+                <div class="m-pills">
+                  <span class="m-chip selected">Food</span>
+                  <span class="m-chip">Transport</span>
+                  <span class="m-chip">Shopping</span>
+                </div>
+              </div>
+              <p class="m-evidence">We are 92% sure we read this correctly.</p>
+            </div>
+            <figcaption>Sample data</figcaption>
+          </figure>
+          <figure class="mock" id="mock-habits">
+            <div class="panel plain" role="img" aria-label="Three habit cards, each in its own colour. Read is done for today, on a 14-day streak. Walk is at 3,500 of 8,000 steps, on a 6-day streak. Meditate, ten minutes daily, is on its first day.">
+              <div class="m-habit sage done">
+                <span class="m-habit-icon"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21a2 2 0 0 0 2 2h13"/></svg></span>
+                <div>
+                  <p class="m-habit-name">Read</p>
+                  <p class="m-habit-meta">Daily • 14D Streak</p>
+                </div>
+                <span class="m-check"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+              </div>
+              <div class="m-habit indigo">
+                <span class="m-habit-icon"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+                <div>
+                  <p class="m-habit-name">Walk</p>
+                  <p class="m-habit-meta">3,500 / 8,000 steps • 6D Streak</p>
+                </div>
+                <span class="m-check"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+              </div>
+              <div class="m-habit clay">
+                <span class="m-habit-icon"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c0-8 5-14 14-14 0 9-6 14-14 14zM5 19c3-5 6-8 10-10"/></svg></span>
+                <div>
+                  <p class="m-habit-name">Meditate</p>
+                  <p class="m-habit-meta">10 min daily • First Day</p>
+                </div>
+                <span class="m-check"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+              </div>
+            </div>
+            <figcaption>Sample data</figcaption>
+          </figure>
         </div>
       </div>
     </section>
@@ -128,7 +258,18 @@
             <p>They are plain rules written in code, not AI, so the same day always produces the same question.</p>
             <p>When a background sync turns one up, it can reach you as a notification: at most two a day, and none overnight.</p>
           </div>
-          <!-- mock: suggestion -->
+          <figure class="mock" id="mock-suggestion">
+            <div class="panel" role="img" aria-label="A suggestion card tagged as detected. It asks: Mark Run done? Its evidence is a 32 minute run from your health data. Under it are two buttons, Dismiss and Confirm.">
+              <span class="m-tag">detected</span>
+              <p class="m-card-title">Mark Run done?</p>
+              <p class="m-evidence">• Running, 32 min, from your health data</p>
+              <div class="m-actions">
+                <span class="m-button secondary">Dismiss</span>
+                <span class="m-button">Confirm</span>
+              </div>
+            </div>
+            <figcaption>Sample data</figcaption>
+          </figure>
         </div>
         <ul class="grid two three" role="list">
           <li class="card stack">
@@ -173,7 +314,18 @@
           <p>AI insights are off until you turn them on. When they are on, a hosted AI model is sent totals and averages that the server has already worked out, such as “food spending averaged ₹482 across four Fridays”. It is never sent a merchant, a note or a place.</p>
           <p>Every insight has a “Why am I seeing this?” that shows the exact numbers the model was given, and you can mark an insight helpful or not. Most days it has nothing to say, and that is the right answer.</p>
         </div>
-        <!-- mock: insight -->
+        <figure class="mock" id="mock-insight">
+          <div class="panel" role="img" aria-label="An insight card titled Fridays cost more, with Why am I seeing this opened. It shows what the model was given: 18 food expenses across the last 4 Fridays, averaging 482 rupees against 376 on other weekdays.">
+            <p class="m-card-title first">Fridays cost more</p>
+            <p class="m-body">Your food spending on Fridays has run above your other weekdays for the past month.</p>
+            <p class="m-why"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>Why am I seeing this?</p>
+            <div class="m-metrics">
+              <p>Based on 18 food expenses across the last 4 Fridays.</p>
+              <p class="m-metric"><span>Food spending on Fridays</span><span>₹482.00 vs ₹376.00 other weekdays</span></p>
+            </div>
+          </div>
+          <figcaption>Sample data</figcaption>
+        </figure>
       </div>
     </section>
 
@@ -185,7 +337,21 @@
           <p>Each day in the calendar is tinted by how it went, in five steps, so a strong week and a thin one look different at a glance. A day with nothing logged stays an outline.</p>
           <p>Tap any day to see it as it was. Past days are read-only.</p>
         </div>
-        <!-- mock: month -->
+        <figure class="mock" id="mock-month">
+          <div class="panel" role="img" aria-label="The History calendar for October 2026. Days one to eight are tinted from pale to deep sage by how each went, except the fourth, which is an outline because nothing was logged. The ninth is marked as today, and the rest of the month has not happened yet.">
+            <p class="m-month-head">October 2026</p>
+            <div class="m-week"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+            <div class="m-days">
+              <span></span><span></span><span></span>
+              <span class="m-day f3">1</span><span class="m-day f4">2</span><span class="m-day f0">3</span><span class="m-day hollow">4</span>
+              <span class="m-day f2">5</span><span class="m-day f4">6</span><span class="m-day f1">7</span><span class="m-day f4">8</span><span class="m-day f3 today">9</span><span class="m-day later">10</span><span class="m-day later">11</span>
+              <span class="m-day later">12</span><span class="m-day later">13</span><span class="m-day later">14</span><span class="m-day later">15</span><span class="m-day later">16</span><span class="m-day later">17</span><span class="m-day later">18</span>
+              <span class="m-day later">19</span><span class="m-day later">20</span><span class="m-day later">21</span><span class="m-day later">22</span><span class="m-day later">23</span><span class="m-day later">24</span><span class="m-day later">25</span>
+              <span class="m-day later">26</span><span class="m-day later">27</span><span class="m-day later">28</span><span class="m-day later">29</span><span class="m-day later">30</span><span class="m-day later">31</span>
+            </div>
+          </div>
+          <figcaption>Sample data</figcaption>
+        </figure>
       </div>
     </section>
 
@@ -197,7 +363,32 @@
             <h2 id="your-data-title">Your data, switch by switch</h2>
             <p>The Connected Context screen lists every source the app can read, what it is used for and when it last synced. Each source has two switches: one to collect it, and a separate one to let Synítheia AI use it.</p>
           </div>
-          <!-- mock: source -->
+          <figure class="mock" id="mock-source">
+            <div class="panel" role="img" aria-label="A source card from Connected Context: Health and Activity, connected, with what it is used for, where it comes from on each phone and when it last synced. The switch to collect it is on. The separate switch to let Synítheia AI use it is off.">
+              <div class="m-source-head">
+                <p class="m-card-title first">Health &amp; Activity</p>
+                <p class="m-status">Connected</p>
+              </div>
+              <p class="m-body">Steps, workouts, and sleep appear on your timeline and let Synítheia notice things like lower activity on days you eat more.</p>
+              <p class="m-evidence">Apple Health on iOS · Health Connect on Android</p>
+              <p class="m-evidence">Last synced Oct 9, 9:12 AM</p>
+              <div class="m-toggle">
+                <div>
+                  <p class="m-toggle-title">Collect this data</p>
+                  <p class="m-toggle-note">Read it into your timeline and your day.</p>
+                </div>
+                <span class="m-switch on"></span>
+              </div>
+              <div class="m-toggle">
+                <div>
+                  <p class="m-toggle-title">Let Synítheia AI use it</p>
+                  <p class="m-toggle-note">A separate decision. You can keep a source and still keep it out of the model.</p>
+                </div>
+                <span class="m-switch"></span>
+              </div>
+            </div>
+            <figcaption>Sample data</figcaption>
+          </figure>
         </div>
         <ul class="sources" role="list">
           <li class="card source">

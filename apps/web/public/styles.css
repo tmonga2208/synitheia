@@ -631,10 +631,665 @@ main > section.hero {
   margin-top: 0.5rem;
 }
 
+/* ── Mocks: the app's screens, drawn from the same tokens ──────────────────────────────── */
+
+.mock {
+  min-width: 0;
+}
+
+/* A pill, so the caption stays readable where the hero's mark passes behind it. */
+.mock figcaption {
+  width: fit-content;
+  margin: 0.875rem auto 0;
+  padding: 0.125rem 0.75rem;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.phone {
+  position: relative;
+  width: min(100%, 21.5rem);
+  margin-inline: auto;
+  padding: 1.25rem 1.125rem 1.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 2.75rem;
+  background: var(--bg);
+  box-shadow: var(--shadow-raised);
+}
+
+.panel {
+  width: min(100%, 26rem);
+  margin-inline: auto;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 2rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.panel.plain {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.i {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.m-bar,
+.m-draft-head,
+.m-source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.m-avatar,
+.m-icon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+}
+
+.m-avatar {
+  background: var(--button);
+  color: var(--button-text);
+  font-weight: 600;
+}
+
+.m-icons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.m-icon {
+  background: var(--surface-raised);
+}
+
+.m-overline {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.phone .m-overline {
+  margin-top: 1.25rem;
+}
+
+.m-title {
+  margin-top: 0.25rem;
+  font-size: 1.625rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.m-sub,
+.m-body {
+  margin-top: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.m-ring {
+  position: relative;
+  width: 11rem;
+  margin: 1.25rem auto 0;
+}
+
+.m-ring svg {
+  width: 100%;
+  height: auto;
+}
+
+.ring-track,
+.ring-progress {
+  fill: none;
+  stroke-width: 22;
+}
+
+.ring-track {
+  stroke: var(--border);
+}
+
+.ring-progress {
+  stroke: var(--accent);
+  stroke-linecap: round;
+}
+
+.m-ring-value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 3.25rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+
+.m-ring-value small {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+.m-chips,
+.m-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.m-chips {
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.m-pills {
+  margin-top: 0.375rem;
+}
+
+.m-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.m-chip .i {
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke-width: 2;
+}
+
+.m-chip.selected {
+  background: var(--button);
+  color: var(--button-text);
+}
+
+.m-card {
+  margin-top: 1.25rem;
+  padding: 1.125rem;
+  border: 1px solid var(--border);
+  border-radius: 1.75rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.m-tag {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.m-card-title {
+  margin-top: 0.625rem;
+  font-size: 1.0625rem;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.m-card-title.first {
+  margin-top: 0;
+}
+
+.m-evidence,
+.m-toggle-note,
+.m-habit-meta {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.m-evidence {
+  margin-top: 0.375rem;
+}
+
+.m-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.m-button {
+  flex: 1;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.875rem;
+  background: var(--button);
+  color: var(--button-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.m-button.secondary {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+/* Your Day */
+
+.m-bucket {
+  padding-block: 0.875rem;
+}
+
+.m-bucket:first-child {
+  padding-top: 0;
+}
+
+.m-bucket:last-child {
+  padding-bottom: 0;
+}
+
+.m-bucket + .m-bucket {
+  border-top: 1px solid var(--border);
+}
+
+.m-bucket-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.m-dots {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 0.1875rem;
+  width: 2.125rem;
+}
+
+.m-dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.m-dot.habit {
+  background: var(--dot-habit);
+}
+
+.m-dot.money {
+  background: var(--dot-money);
+}
+
+.m-dot.food {
+  background: var(--dot-food);
+}
+
+.m-dot.move {
+  background: var(--dot-move);
+}
+
+.m-dot.water {
+  background: var(--dot-water);
+}
+
+.m-dot.context {
+  background: var(--accent-soft);
+}
+
+.m-bucket-summary {
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.m-rows {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.m-row {
+  display: grid;
+  grid-template-columns: 3.75rem 0.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.m-time {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+/* Expense draft */
+
+.m-amount {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.m-field {
+  margin-top: 0.875rem;
+}
+
+.m-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.m-input {
+  margin-top: 0.375rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 1rem;
+  background: var(--surface-raised);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.m-field + .m-evidence {
+  margin-top: 0.875rem;
+}
+
+/* Habits: each card carries its own accent, as in the app */
+
+.m-habit {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--habit);
+  border-radius: 1.5rem;
+  background: var(--surface);
+}
+
+.m-habit.sage {
+  --habit: var(--habit-sage);
+  --habit-wash: var(--habit-sage-wash);
+}
+
+.m-habit.indigo {
+  --habit: var(--habit-indigo);
+  --habit-wash: var(--habit-indigo-wash);
+}
+
+.m-habit.clay {
+  --habit: var(--habit-clay);
+  --habit-wash: var(--habit-clay-wash);
+}
+
+/* Only the sage card is ever "done": muted text is measured on its wash and on no other. */
+.m-habit.sage.done {
+  background: var(--habit-wash);
+}
+
+.m-habit-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 1rem;
+  background: var(--habit-wash);
+}
+
+.m-habit-icon .i,
+.m-check .i {
+  stroke: var(--habit);
+}
+
+.m-habit.done .m-habit-icon {
+  background: var(--surface);
+}
+
+.m-habit-name {
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.m-check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  margin-left: auto;
+  border: 2px solid var(--habit);
+  border-radius: 50%;
+}
+
+.m-check .i {
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 2.2;
+}
+
+.m-habit.done .m-check {
+  background: var(--habit);
+}
+
+.m-habit.done .m-check .i {
+  stroke: var(--surface);
+}
+
+/* Insight */
+
+.m-why {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.m-why .i {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.m-metrics {
+  margin-top: 0.75rem;
+  padding: 0.875rem;
+  border-radius: 1rem;
+  background: var(--surface-raised);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.m-metrics > p:first-child {
+  color: var(--text-muted);
+}
+
+.m-metric {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-top: 0.5rem;
+}
+
+.m-metric span:first-child {
+  color: var(--text-muted);
+}
+
+/* History */
+
+.m-month-head {
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.m-week,
+.m-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.375rem;
+}
+
+.m-week {
+  margin-top: 1rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.m-days {
+  margin-top: 0.5rem;
+}
+
+.m-day {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.m-day.f0 {
+  background: var(--flow-0);
+  color: var(--text-muted);
+}
+
+.m-day.f1 {
+  background: var(--flow-1);
+}
+
+.m-day.f2 {
+  background: var(--flow-2);
+}
+
+.m-day.f3 {
+  background: var(--flow-3);
+}
+
+.m-day.f4 {
+  background: var(--flow-4);
+  color: var(--button-text);
+}
+
+/* A real date with nothing logged: an outline, never the lowest tint. They mean different things. */
+.m-day.hollow {
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.m-day.later {
+  color: var(--text-muted);
+}
+
+.m-day.today {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Connected Context */
+
+.m-status {
+  flex: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--accent-text);
+}
+
+.m-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.875rem;
+  padding: 0.875rem;
+  border-radius: 1.25rem;
+  background: var(--surface-raised);
+}
+
+.m-toggle-title {
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.m-switch {
+  position: relative;
+  flex: none;
+  width: 3rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.m-switch::after {
+  content: "";
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.m-switch.on {
+  background: var(--accent);
+}
+
+.m-switch.on::after {
+  left: auto;
+  right: 0.1875rem;
+}
+
 /* ── Motion: one thing moves, once, and only if the visitor has not asked for stillness ── */
 
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;
+  }
+
+  /* The ring draws in once, as it does in the app. */
+  .ring-progress {
+    animation: ring-draw 900ms ease-out both;
+  }
+}
+
+@keyframes ring-draw {
+  from {
+    stroke-dashoffset: 490.09;
   }
 }
