@@ -3699,7 +3699,7 @@ Expected: the screenshot shows every section and all eight mocks, exactly as wit
 - [ ] **Step 7: GitHub unreachable**
 
 Flags: `--width 390 --height 844 --block "*api.github.com*" --eval "[...document.querySelectorAll('[data-release]')].map((el) => el.textContent)"`
-Expected: `evalResult` is `["Latest release", "Latest release", "Latest release"]`; `failedRequests` has exactly one entry, containing `ERR_BLOCKED_BY_CLIENT`; `consoleErrors` contains nothing except Chrome's own line about that one blocked request.
+Expected: `evalResult` is `["Latest release", "Latest release", "Latest release"]`; `failedRequests` has exactly one entry, which Chrome names `inspector` (its reason for a request blocked through the debugging interface); `consoleErrors` is empty.
 
 Then the same without `--block`:
 Expected: `evalResult` is three strings that each begin with the latest release's tag, `v0.2.0` at the time of writing; the second and third end in `MB`.
