@@ -54,22 +54,6 @@
       "blockedPermissions": [
         "android.permission.READ_SMS",
         "android.permission.RECEIVE_SMS"
-      ],
-      "intentFilters": [
-        {
-          "action": "android.intent.action.SEND",
-          "category": [
-            "android.intent.category.DEFAULT"
-          ],
-          "data": [
-            {
-              "mimeType": "image/*"
-            },
-            {
-              "mimeType": "text/plain"
-            }
-          ]
-        }
       ]
     },
     "plugins": [
@@ -131,7 +115,8 @@
           }
         }
       ],
-      "./plugins/withHealthConnectRationale"
+      "./plugins/withHealthConnectRationale",
+      "./plugins/withShareTarget"
     ],
     "extra": {
       "apiUrl": "https://api-production-ee61.up.railway.app",

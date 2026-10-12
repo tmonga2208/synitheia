@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -34,6 +34,8 @@ import {
 } from '../../src/components/primitives.js';
 import { SkeletonList } from '../../src/components/Skeleton.js';
 import { DateField } from '../../src/components/DateField.js';
+import { SharedArrival } from '../../src/expenses/SharedArrival.js';
+import { sharedContentFrom } from '../../src/expenses/sharedContent.js';
 import {
   SplitWith,
   resolveExpense,
@@ -153,6 +155,24 @@ export default function NewExpense() {
    */
   const [locked, setLocked] = useState<{ file: UploadFile; message: string } | null>(null);
   const [password, setPassword] = useState('');
+
+  /*
+    Something shared into the app from another one (Android only: plugins/withShareTarget.js).
+    It arrives as parameters on this screen's own link, which anything can open, so it is
+    validated and then only SHOWN. Reading it is the user's tap, further down.
+  */
+  const { sharedImage, sharedText, sharedError } = useLocalSearchParams();
+  const shared = useMemo(
+    () =>
+      Platform.OS === 'android' ? sharedContentFrom({ sharedImage, sharedText, sharedError }) : null,
+    [sharedImage, sharedText, sharedError],
+  );
+  // Which share has been dealt with. Keyed by its content, so a second share that lands
+  // while this screen is still open is offered too.
+  const sharedKey =
+    shared === null ? null : shared.kind === 'image' ? shared.uri : shared.kind === 'text' ? shared.text : shared.kind;
+  const [handledShare, setHandledShare] = useState<string | null>(null);
+  const pendingShare = shared !== null && sharedKey !== handledShare ? shared : null;
 
   const categories = useQuery({
     queryKey: CATEGORIES_KEY,
@@ -345,6 +365,22 @@ export default function NewExpense() {
     }
   }
 
+  /** The same two imports the buttons below start, fed by what was shared instead. */
+  function readShared(): void {
+    const content = pendingShare;
+    if (content === null || content.kind === 'unreadable') return;
+
+    setHandledShare(sharedKey);
+    void runIngest(() =>
+      content.kind === 'image'
+        ? api.upload<{ ingestion: WireIngestion }>(
+            '/expenses/ingest/file',
+            fileForm({ uri: content.uri, name: content.name, type: content.mimeType }),
+          )
+        : api.post<{ ingestion: WireIngestion }>('/expenses/ingest/text', { text: content.text }),
+    );
+  }
+
   async function scanScreenshot(): Promise<{ ingestion: WireIngestion } | null> {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -517,6 +553,15 @@ export default function NewExpense() {
                 {error}
               </Text>
             </Card>
+          ) : null}
+
+          {pendingShare && !reviewing ? (
+            <SharedArrival
+              shared={pendingShare}
+              busy={ingesting}
+              onRead={readShared}
+              onDismiss={() => setHandledShare(sharedKey)}
+            />
           ) : null}
 
           {/*
