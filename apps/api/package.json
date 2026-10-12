@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "tsx --env-file=.env --conditions=development src/scripts/seed-demo.ts",
-    "recompute-xp": "tsx --env-file=.env --conditions=development src/scripts/recompute-xp.ts"
+    "recompute-xp": "tsx --env-file=.env --conditions=development src/scripts/recompute-xp.ts",
+    "purge-orphans": "tsx --env-file=.env --conditions=development src/scripts/purge-orphans.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
