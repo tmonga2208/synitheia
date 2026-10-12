@@ -16,9 +16,21 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const CHROME =
+export const CHROME =
   process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
+/**
+ * Whether a page is wider than the width it was asked to fit.
+ *
+ * Measured against the width requested, never against `window.innerWidth`: under phone
+ * emulation Chrome zooms out to show an overflowing page, so `innerWidth` grows to match the
+ * content and the two are equal exactly when something has gone wrong.
+ */
+export function overflows(scrollWidth, requestedWidth) {
+  return scrollWidth > requestedWidth;
+}
 
 function parseArgs(argv) {
   const opts = { width: 390, height: 844, scheme: 'light', dpr: 1, block: [], tabs: 0 };
@@ -160,7 +172,12 @@ async function main() {
     if (opts.noJs) await page('Emulation.setScriptExecutionDisabled', { value: true });
     if (opts.block.length > 0) await page('Network.setBlockedURLs', { urls: opts.block });
 
-    await page('Page.navigate', { url: opts.url });
+    const navigation = await page('Page.navigate', { url: opts.url });
+    // A refused connection still fires a load event, for Chrome's own error page. Without
+    // this, a server that is not running reads as a page with nothing wrong with it.
+    if (navigation.errorText) {
+      throw new Error(`could not load ${opts.url}: ${navigation.errorText}`);
+    }
     for (let waited = 0; !loaded && waited < 15000; waited += 100) await sleep(100);
     if (!loaded) throw new Error('the page did not finish loading');
     // Fonts swap in after load, and the page's one animation runs for under a second.
@@ -188,17 +205,12 @@ async function main() {
       return exceptionDetails ? `threw: ${exceptionDetails.text}` : result.value;
     };
 
-    const report = {
-      url: opts.url,
-      viewport: `${opts.width}x${opts.height}`,
-      scheme: opts.scheme,
-      // With scripts disabled nothing can be evaluated; the screenshot is the evidence then.
-      measured: opts.noJs
-        ? null
-        : await evaluate(`({
+    // With scripts disabled nothing can be evaluated; the screenshot is the evidence then.
+    const measured = opts.noJs
+      ? null
+      : await evaluate(`({
             scrollWidth: document.documentElement.scrollWidth,
             innerWidth: window.innerWidth,
-            overflowsSideways: document.documentElement.scrollWidth > window.innerWidth,
             pageHeight: document.documentElement.scrollHeight,
             focused: document.activeElement && document.activeElement !== document.body
               ? (document.activeElement.textContent || '').trim().slice(0, 60)
@@ -206,7 +218,14 @@ async function main() {
             fontsLoaded: [...document.fonts]
               .filter((face) => face.status === 'loaded')
               .map((face) => face.family + ' ' + face.unicodeRange.slice(0, 13)),
-          })`),
+          })`);
+    if (measured) measured.overflowsSideways = overflows(measured.scrollWidth, opts.width);
+
+    const report = {
+      url: opts.url,
+      viewport: `${opts.width}x${opts.height}`,
+      scheme: opts.scheme,
+      measured,
       evalResult: opts.eval && !opts.noJs ? await evaluate(opts.eval) : undefined,
       consoleErrors,
       failedRequests,
@@ -250,7 +269,10 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+// Only when run as a command: the tests import `overflows` from this file.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
