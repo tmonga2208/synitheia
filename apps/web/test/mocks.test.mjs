@@ -37,6 +37,9 @@ for (const name of EXPECTED) {
       pictures[0][1].length >= 80,
       'the description is too short to stand in for the picture',
     );
+    // Heard on its own, in a list of images, the label is all a listener gets: the caption
+    // under the picture does not come with it. So the label itself has to say it is an example.
+    assert.match(pictures[0][1], /^Example: /, 'the description does not say it is an example');
     assert.match(figure.body, /<figcaption>Sample data<\/figcaption>\s*$/);
   });
 }

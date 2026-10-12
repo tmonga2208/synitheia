@@ -269,3 +269,26 @@ Changed: `README.md` (the layout block lists `web/` and the site's address),
 deployed), `pnpm-lock.yaml` (one importer entry).
 
 Not touched: `apps/mobile`, `apps/api`, `packages/`, and the workflows.
+
+---
+
+## Amended after the whole-branch review (2026-10-12)
+
+The review checked the page's claims against the code and found that several things this
+spec told the page to say are not true of the app as released. This spec's first rule is
+that the page claims no more than the app has been shown to do, so the page follows the
+code, and these lines above are superseded:
+
+| This spec said | The code | The page now says |
+|---|---|---|
+| "Export everything as JSON" | The export leaves out subscriptions, custom categories, daily health records, the XP ledger and receipts | What is exported, and what is not yet |
+| "Delete one source's data" | The endpoint exists, but no screen calls it | Nothing |
+| "Delete the account, which erases rather than flags" | Account deletion skips four collections (daily health records, subscriptions, custom categories, the XP ledger) and stored receipt images | That deletion exists, and what it does not yet remove |
+| Screenshots and pasted messages are read by an AI model | So are receipt and meal photos and the text of PDF statements, and none of it waits for the AI switch | All of them, and that imports do not depend on the switch |
+| "Share the payment screenshot" | Import is a picker inside the app; nothing handles an image shared into it | "Pick" |
+| SMS and notifications are impossible, or forbidden by store policy | Not verified, and Google's policy lists an exception for money-management apps | That the app does not ask for that access, and why |
+| The ring is "one number for the whole day" | It scores habits, water and nutrition | That |
+| An insight example with a per-category weekday figure and a count of expenses | The context holds weekday averages against the all-day average, and no counts | The real metric |
+
+The gaps in the first three rows are defects in the API and the app, outside this spec.
+When they are fixed, the stronger sentences come back together with their tests.
