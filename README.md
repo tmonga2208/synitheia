@@ -134,21 +134,22 @@ An empty result is a correct answer. Most days contain nothing worth remarking o
 
 ## What we don't do, and why
 
-The brief asked for automatic transaction capture. **The platforms will not allow it**, and
-pretending otherwise would have produced a feature that either doesn't work or gets the app
-pulled:
+The brief asked for automatic transaction capture. **iOS will not allow it at all, and on
+Android it takes a permission we decided not to hold:**
 
 - **iOS exposes no SMS or notification access at all.** Not restricted — absent.
-- **Play Store restricts `READ_SMS`** to default SMS handler apps. "Finance tracking" is not
-  an approvable use case. (`app.json` lists it under `blockedPermissions`, so this is
-  auditable rather than merely claimed.)
+- **Android's `READ_SMS` is a restricted permission.** Google Play allows it for a short list
+  of declared uses, each subject to review. "SMS-based money management" is on that list, so
+  this is a choice rather than a prohibition: reading SMS means holding every message the
+  user receives. (`app.json` lists it under `blockedPermissions`, so the choice is auditable
+  rather than merely claimed.)
 - **UPI has no public API.** The lawful route in India is the RBI Account Aggregator
   framework, which requires a registered FIU partner.
 
-So the user hands us the data instead — share the payment screenshot, paste the transaction
+So the user hands us the data instead — pick the payment screenshot, paste the transaction
 SMS, upload a statement. This works on iOS, needs no restricted permission, and arrives with
-explicit per-item consent. Via the share sheet it is two taps, which is *less* manual work
-than most "automatic" trackers achieve in practice.
+explicit per-item consent. (Sharing an image straight into the app from another one is not
+built yet: Android declares the share target, but nothing handles what arrives.)
 
 Screenshots and free-text SMS go to a vision model. **CSV does not** — it already has
 structure, and making a solved problem probabilistic would be spending money and latency to
