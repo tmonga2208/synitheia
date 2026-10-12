@@ -292,3 +292,8 @@ code, and these lines above are superseded:
 
 The gaps in the first three rows are defects in the API and the app, outside this spec.
 When they are fixed, the stronger sentences come back together with their tests.
+
+**Later the same day:** the first and third rows were fixed in the API
+(`apps/api/src/modules/privacy/routes.ts`, held by `routes.test.ts` beside it), and "Export
+everything" and "Deleted means erased" are back on the page with their tests. The second
+row stands: the endpoint now forgets the daily health records too, but no screen calls it.

@@ -26,8 +26,10 @@ const MUST_BE_STATED = [
     'pasted messages and the text of a PDF statement are read by a hosted AI model, whether or not AI insights are on',
   ],
   ['the merchant promise is about insights only', 'For insights it is never sent a merchant, a note or a place'],
-  ['what the export leaves out', 'The export does not yet include'],
-  ['what deleting an account leaves behind', 'it does not yet remove'],
+  // True since the API fix of 2026-10-12, which a test there holds
+  // (apps/api/src/modules/privacy/routes.test.ts). Before it, neither could be said.
+  ['the export is complete', 'Export everything stored about you as JSON'],
+  ['deleting an account erases it', 'Deleted means erased, not hidden'],
   ['what the ring measures', 'your habits, water and food targets'],
   ['iPhone also supplies sex and date of birth', 'on iPhone also sex and date of birth'],
 ];
@@ -54,10 +56,9 @@ const MUST_NOT_APPEAR = [
   ['anything "automatic"', /automatic/i],
   ['background sync without its condition', /syncs? in the background/i],
   // Added after the whole-branch review. Each of these was on the page and was not true of
-  // the code: the account-deletion route skips four collections, the export omits five, no
-  // screen deletes one source's data, nothing handles an image shared into the app, and the
-  // insight context has no per-category weekday figure.
-  ['that deleting erases everything', /erased, not hidden|export everything|one source.s data/i],
+  // the code: no screen deletes one source's data, nothing handles an image shared into the
+  // app, and the insight context has no per-category weekday figure.
+  ['a button the app does not have', /one source.s data/i],
   ['a share path the app does not have', /share (a|the) payment screenshot/i],
   ['a store-policy reason nobody verified', /google play allows|store policy/i],
   ['phones forbidding what is really a choice', /not something the phones allow/i],
