@@ -1,0 +1,11 @@
+{
+  "name": "@synitheia/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The public page for Synítheia. Static files, no build step.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "preview": "node scripts/preview.mjs"
+  }
+}

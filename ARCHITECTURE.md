@@ -99,7 +99,8 @@ Not one tab per tracker — that would produce exactly the "seven separate track
 synitheia/
 ├── apps/
 │   ├── mobile/           # React Native (Expo, custom dev client)
-│   └── api/              # Node + Fastify + TypeScript
+│   ├── api/              # Node + Fastify + TypeScript
+│   └── web/              # The public page: static files, no build (§11)
 ├── packages/
 │   ├── shared/           # zod schemas, DTOs, shared domain types, event taxonomy
 │   └── config/           # tsconfig, eslint, prettier bases
@@ -415,3 +416,33 @@ about what we are willing to show a user.
    now carries a code-formatted `displayValue` (`₹960.00`), and the prompt permits quoting
    only that. Formatting is deterministic — handing it to an LLM is how a ₹960 lunch
    becomes a ₹96,000 one in the sentence the user actually reads.
+
+---
+
+## 11. The public page (added October 2026)
+
+`apps/web` is the page people are sent to: what the app does, what it has and has not been
+shown to do, and the two downloads. It is a folder of static files that Vercel serves as it
+stands. There is no framework and no build step, because one page needs neither, and no
+dependency, so the lockfile gains nothing.
+
+Three decisions shape it:
+
+- **The app's screens are rebuilt in HTML**, from the same colour values as
+  `apps/mobile/src/theme`, rather than shown as screenshots. They follow the visitor's light
+  or dark setting, weigh almost nothing, and each is exposed to a screen reader as one
+  described picture, so sample data is never read out as fact.
+- **The download buttons are plain links to `releases/latest/download/…`.** They follow every
+  release with no redeploy and work with JavaScript off. A test reads the artifact names out
+  of the build workflows, so renaming one there fails here instead of leaving a dead button.
+- **The page's claims are held by tests.** `test/copy.test.mjs` requires each "not yet
+  verified" statement and forbids the claims the project cannot back. When a statement stops
+  being true, the sentence and the test change together.
+
+The only request the page makes to another host is one call to GitHub's public API, for the
+latest release's version, date and file sizes. The content-security policy in `vercel.json`
+allows that and nothing else. `scripts/preview.mjs` serves the page locally with the same
+headers, so a violation shows up before a deploy rather than after, and `scripts/shoot.mjs`
+loads it in a throwaway headless Chrome at a chosen width and theme.
+
+Deploys are by hand, with the Vercel CLI, from `apps/web`.

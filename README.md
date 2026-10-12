@@ -9,6 +9,7 @@ The user should feel: *"the app understands my day without me constantly updatin
 apps/
   api/       Node 22 · Fastify · TypeScript · Mongoose
   mobile/    React Native · Expo (custom dev client) · Expo Router
+  web/       The public page · plain HTML and CSS, no build step
 packages/
   shared/    zod schemas, domain types, money + timezone primitives — the contract both sides compile against
   config/    tsconfig / eslint bases
@@ -26,6 +27,12 @@ pnpm db:up                          # Mongo 8 as a single-node replica set, via 
 cp apps/api/.env.example apps/api/.env   # then set JWT_SECRET (32+ chars)
 pnpm api                            # http://localhost:4000
 pnpm mobile                         # Expo dev client
+```
+
+The public page needs none of that:
+
+```bash
+pnpm --filter @synitheia/web preview   # http://127.0.0.1:4173, with production's response headers
 ```
 
 An AI key is optional. Without one the app is fully functional; the Synthesia AI layer
