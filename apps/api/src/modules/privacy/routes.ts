@@ -8,20 +8,24 @@ import {
   DailyNutritionModel,
   DailySummaryModel,
   DataSourceConnectionModel,
+  ExpenseCategoryModel,
   ExpenseIngestionModel,
   ExpenseModel,
   FoodEntryModel,
   FoodIngestionModel,
   HabitLogModel,
   HabitModel,
+  HealthDayModel,
   InferredContextModel,
   PersonalEventModel,
   ReceiptModel,
   RefreshTokenModel,
   ReminderModel,
+  SubscriptionModel,
   UserModel,
   UserPreferenceModel,
   WaterEntryModel,
+  XpAwardModel,
 } from '../../db/models.js';
 import { AppError } from '../../core/errors.js';
 import { purgeAllReceipts } from '../expenses/receipts.js';
@@ -82,6 +86,69 @@ const SOURCE_COPY: Record<
     reliability: 'Not available.',
   },
 };
+
+interface UserCollection {
+  /** The name this collection has in an export. */
+  key: string;
+  /** False for credentials: an export is a file a person may hand to someone else. */
+  exported: boolean;
+  read: (userId: Types.ObjectId) => Promise<unknown[]>;
+  remove: (userId: Types.ObjectId) => Promise<void>;
+}
+
+/**
+ * The two things this file asks of a model. Spelled out rather than written as mongoose's
+ * `Model<T>`, whose type parameters make twenty differently shaped models unassignable to
+ * one signature. What every one of them does have is a `userId` to be found and deleted by.
+ */
+interface OwnedByUser {
+  find: (filter: { userId: Types.ObjectId }) => { lean: () => { exec: () => Promise<unknown[]> } };
+  deleteMany: (filter: { userId: Types.ObjectId }) => PromiseLike<unknown>;
+}
+
+function userCollection(key: string, model: OwnedByUser, exported = true): UserCollection {
+  return {
+    key,
+    exported,
+    read: (userId) => model.find({ userId }).lean().exec(),
+    remove: async (userId) => {
+      await model.deleteMany({ userId });
+    },
+  };
+}
+
+/**
+ * Every collection that holds something of a user's.
+ *
+ * ONE list, used by both the export and account deletion, because they used to be two and
+ * both fell behind as collections were added: deleting an account left daily health records,
+ * subscriptions, categories and the XP ledger on the server, and the export left out those
+ * and more. A collection added to models.ts and not added here fails routes.test.ts, which
+ * asks the models themselves rather than trusting any list.
+ */
+const USER_DATA: UserCollection[] = [
+  userCollection('preferences', UserPreferenceModel),
+  userCollection('categories', ExpenseCategoryModel),
+  userCollection('expenses', ExpenseModel),
+  userCollection('expenseDrafts', ExpenseIngestionModel),
+  userCollection('receipts', ReceiptModel),
+  userCollection('subscriptions', SubscriptionModel),
+  userCollection('habits', HabitModel),
+  userCollection('habitLogs', HabitLogModel),
+  userCollection('food', FoodEntryModel),
+  userCollection('foodDrafts', FoodIngestionModel),
+  userCollection('dailyNutrition', DailyNutritionModel),
+  userCollection('water', WaterEntryModel),
+  userCollection('reminders', ReminderModel),
+  userCollection('healthDays', HealthDayModel),
+  userCollection('events', PersonalEventModel),
+  userCollection('inferences', InferredContextModel),
+  userCollection('dailySummaries', DailySummaryModel),
+  userCollection('insights', AIInsightModel),
+  userCollection('connections', DataSourceConnectionModel),
+  userCollection('xpAwards', XpAwardModel),
+  userCollection('refreshTokens', RefreshTokenModel, false),
+];
 
 export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void> {
   const api = app.withTypeProvider<ZodTypeProvider>();
@@ -251,6 +318,13 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
         { $set: { status: 'disabled', aiAllowed: false, eventCount: 0, lastSyncedAt: null } },
       );
 
+      // Health also keeps one record per day (steps, sleep, heart rate, workouts) outside the
+      // timeline. Forgetting the events and keeping those would be forgetting the summary
+      // of the thing and keeping the thing.
+      if (req.params.source === 'health') {
+        await HealthDayModel.deleteMany({ userId: uid });
+      }
+
       // Summaries are derived from events, so they are now stale. Drop them; they
       // rebuild on next read from what remains.
       await DailySummaryModel.deleteMany({ userId: uid });
@@ -261,49 +335,21 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
 
   api.get('/privacy/export', { onRequest: [app.requireAuth] }, async (req) => {
     const uid = new Types.ObjectId(req.user.id);
+    const exported = USER_DATA.filter((collection) => collection.exported);
 
-    const [
-      user,
-      preferences,
-      expenses,
-      habits,
-      habitLogs,
-      food,
-      water,
-      reminders,
-      events,
-      inferences,
-      insights,
-      connections,
-    ] = await Promise.all([
+    const [user, rows] = await Promise.all([
       UserModel.findById(uid).lean(),
-      UserPreferenceModel.findOne({ userId: uid }).lean(),
-      ExpenseModel.find({ userId: uid }).lean(),
-      HabitModel.find({ userId: uid }).lean(),
-      HabitLogModel.find({ userId: uid }).lean(),
-      FoodEntryModel.find({ userId: uid }).lean(),
-      WaterEntryModel.find({ userId: uid }).lean(),
-      ReminderModel.find({ userId: uid }).lean(),
-      PersonalEventModel.find({ userId: uid }).lean(),
-      InferredContextModel.find({ userId: uid }).lean(),
-      AIInsightModel.find({ userId: uid }).lean(),
-      DataSourceConnectionModel.find({ userId: uid }).lean(),
+      Promise.all(exported.map((collection) => collection.read(uid))),
     ]);
+
+    const data = Object.fromEntries(exported.map((collection, i) => [collection.key, rows[i]]));
 
     return {
       exportedAt: new Date().toISOString(),
       user,
-      preferences,
-      expenses,
-      habits,
-      habitLogs,
-      food,
-      water,
-      reminders,
-      events,
-      inferences,
-      insights,
-      connections,
+      ...data,
+      // One document per user, and it has always been exported as an object, not a list.
+      preferences: data.preferences?.[0] ?? null,
     };
   });
 
@@ -333,25 +379,12 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
         throw AppError.badRequest('The email you entered does not match this account');
       }
 
-      await Promise.all([
-        ExpenseModel.deleteMany({ userId: uid }),
-        ExpenseIngestionModel.deleteMany({ userId: uid }),
-        ReceiptModel.deleteMany({ userId: uid }),
-        HabitModel.deleteMany({ userId: uid }),
-        HabitLogModel.deleteMany({ userId: uid }),
-        FoodEntryModel.deleteMany({ userId: uid }),
-        FoodIngestionModel.deleteMany({ userId: uid }),
-        DailyNutritionModel.deleteMany({ userId: uid }),
-        WaterEntryModel.deleteMany({ userId: uid }),
-        ReminderModel.deleteMany({ userId: uid }),
-        PersonalEventModel.deleteMany({ userId: uid }),
-        InferredContextModel.deleteMany({ userId: uid }),
-        DailySummaryModel.deleteMany({ userId: uid }),
-        AIInsightModel.deleteMany({ userId: uid }),
-        DataSourceConnectionModel.deleteMany({ userId: uid }),
-        UserPreferenceModel.deleteMany({ userId: uid }),
-        RefreshTokenModel.deleteMany({ userId: uid }),
-      ]);
+      // The stored images first, while the rows that say where they are still exist.
+      // Deleting only the rows would leave the photos in storage with nothing pointing at
+      // them: unreachable by us, and still there.
+      await purgeAllReceipts(env, req.user.id);
+
+      await Promise.all(USER_DATA.map((collection) => collection.remove(uid)));
 
       await UserModel.deleteOne({ _id: uid });
 
