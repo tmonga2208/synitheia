@@ -17,6 +17,8 @@ packages/
 
 Full architecture, the passive-data feasibility matrix, and the phased plan: **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
 
+The public page, with the downloads: **https://synitheia.vercel.app**
+
 ---
 
 ## Running it
