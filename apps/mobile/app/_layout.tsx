@@ -24,6 +24,7 @@ import { forgetLocalData, persistOptions, queryClient } from '../src/api/queryCl
 import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
 import { OfflineBanner } from '../src/components/OfflineBanner.js';
 import { ToastHost } from '../src/components/ToastHost.js';
+import { startNewDay } from '../src/offline/newDay.js';
 import { loadOutbox, useOutbox } from '../src/offline/outbox.js';
 import { startSavedOfflineNotice, syncNow } from '../src/offline/sync.js';
 import type { ReminderRoute } from '../src/reminders/plan.js';
@@ -49,10 +50,25 @@ startConnectivity(probeServer, { beforeOnline: () => syncNow(queryClient) });
 startSavedOfflineNotice();
 
 /**
- * Runs once the saved cache has been read back, before any query may fetch: changes still
- * waiting from last time are sent first, so the first data the screens fetch has them.
+ * A new day starts Today's numbers afresh, even offline, and with the app left open past
+ * midnight (src/offline/newDay.ts). What starts afresh is refetched as soon as it can be.
+ */
+function bringCacheToToday(): void {
+  const zone =
+    useAuth.getState().user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  for (const queryKey of startNewDay(queryClient, zone)) {
+    void queryClient.invalidateQueries({ queryKey });
+  }
+}
+setInterval(bringCacheToToday, 60_000);
+
+/**
+ * Runs once the saved cache has been read back, before any query may fetch: the cache is
+ * brought to today, and changes still waiting from last time are sent first, so the first
+ * data the screens fetch has them.
  */
 async function holdIfWaiting(): Promise<void> {
+  bringCacheToToday();
   await loadOutbox();
   if (useOutbox.getState().items.length > 0) void holdUntilSynced();
 }
@@ -160,10 +176,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return () => subscription.remove();
   }, [status]);
 
-  // Back from the background while offline: check now rather than at the next tick.
+  // Back from the background: a new day may have started, and, offline, the connection
+  // is checked now rather than at the next tick.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void checkConnectivityNow();
+      if (state !== 'active') return;
+      bringCacheToToday();
+      void checkConnectivityNow();
     });
     return () => subscription.remove();
   }, []);
