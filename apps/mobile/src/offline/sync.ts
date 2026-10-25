@@ -1,5 +1,6 @@
 import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { showToast } from '../feedback/toast.js';
+import { SAVED_ON_PHONE } from './copy.js';
 import { drainOutbox, useOutbox, type DrainResult } from './outbox.js';
 import { replayChange } from './replay.js';
 
@@ -73,4 +74,26 @@ function tryAgainLater(client: QueryClient): void {
     // Offline, coming back online sends them.
     if (onlineManager.isOnline()) void syncNow(client);
   }, delay);
+}
+
+/**
+ * The first change kept on the phone in a time offline says so, once; the banner says it
+ * from then on. Changes read back from the phone at launch, and changes waiting behind
+ * others while online, say nothing.
+ */
+export function startSavedOfflineNotice(): () => void {
+  let told = false;
+  const stopOnline = onlineManager.subscribe((online) => {
+    if (online) told = false;
+  });
+  const stopOutbox = useOutbox.subscribe((state, previous) => {
+    if (!previous.loaded || state.items.length <= previous.items.length) return;
+    if (told || onlineManager.isOnline()) return;
+    told = true;
+    showToast({ message: SAVED_ON_PHONE });
+  });
+  return () => {
+    stopOnline();
+    stopOutbox();
+  };
 }

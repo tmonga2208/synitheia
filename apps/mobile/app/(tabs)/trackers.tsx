@@ -1,8 +1,7 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Crypto from 'expo-crypto';
+import { useQuery } from '@tanstack/react-query';
 import { Droplets, Leaf, Utensils, Wallet } from 'lucide-react-native';
 import {
   WATER_PRESETS_ML,
@@ -21,6 +20,7 @@ import {
 import { SkeletonTrackers } from '../../src/components/Skeleton.js';
 import { TrackerTile } from '../../src/components/TrackerTile.js';
 import { api } from '../../src/api/client.js';
+import { useAddWater } from '../../src/water/useAddWater.js';
 import { useAuth } from '../../src/store/auth.js';
 import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
@@ -66,7 +66,6 @@ export default function Trackers() {
 
   const user = useAuth((s) => s.user);
   const currency = user?.currency ?? 'INR';
-  const queryClient = useQueryClient();
 
   const { data, error, isPending, isRefetching, refetch } = useQuery({
     queryKey: TODAY_KEY,
@@ -74,32 +73,11 @@ export default function Trackers() {
   });
 
   /**
-   * Optimistic, and idempotent on the server via clientKey. Tapping a glass must feel
-   * instant, and people double-tap it — the key is what stops a second tap, or a retry
-   * on a flaky connection, from logging 500ml twice.
+   * A glass shows at once, here and on the water screen, with or without a connection
+   * (src/water/useAddWater.ts). Each tap is its own glass; a resend of the same glass, after
+   * a lost answer, is recognised by the server and logged once.
    */
-  const addWater = useMutation({
-    meta: { failed: 'Couldn’t log water' },
-    mutationFn: (amountMl: number) =>
-      api.post<unknown>('/water', { amountMl, clientKey: Crypto.randomUUID() }),
-    onMutate: async (amountMl: number) => {
-      await queryClient.cancelQueries({ queryKey: TODAY_KEY });
-      const previous = queryClient.getQueryData<TodayResponse>(TODAY_KEY);
-
-      if (previous) {
-        queryClient.setQueryData<TodayResponse>(TODAY_KEY, {
-          ...previous,
-          water: { ...previous.water, totalMl: previous.water.totalMl + amountMl },
-        });
-      }
-
-      return { previous };
-    },
-    onError: (_err, _amount, context) => {
-      if (context?.previous) queryClient.setQueryData(TODAY_KEY, context.previous);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: TODAY_KEY }),
-  });
+  const addWater = useAddWater();
 
   if (isPending) return <SkeletonTrackers />;
 
@@ -211,7 +189,7 @@ export default function Trackers() {
             <Touchable
               key={ml}
               style={styles.preset}
-              onPress={() => addWater.mutate(ml)}
+              onPress={() => addWater(ml)}
               accessibilityRole="button"
               accessibilityLabel={`Log ${ml} millilitres of water`}
             >

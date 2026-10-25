@@ -35,7 +35,7 @@ import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { HabitCard, type TodayHabit } from '../../src/components/HabitCard.js';
 import { WeeklyChart } from '../../src/components/WeeklyChart.js';
 import { Timeline } from '../../src/components/Timeline.js';
-import { api } from '../../src/api/client.js';
+import { api, isQueued } from '../../src/api/client.js';
 import { useCalendarSync } from '../../src/calendar/useCalendarSync.js';
 import { useHabitLog } from '../../src/habits/useHabitLog.js';
 import { useSourcePrefsMirror } from '../../src/sync/useSourcePrefsMirror.js';
@@ -46,6 +46,13 @@ import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 
 const TODAY_KEY = ['today'] as const;
+
+interface SuggestionAnswer {
+  id: string;
+  action: 'confirm' | 'reject';
+  /** Names the answer if the server refuses it when it syncs. */
+  title: string;
+}
 
 function formatMetric(metric: SupportingMetric, currency: string): string {
   switch (metric.unit) {
@@ -108,8 +115,8 @@ export default function Today() {
 
   const resolveSuggestion = useMutation({
     meta: { failed: 'Couldn’t save your answer' },
-    mutationFn: ({ id, action }: { id: string; action: 'confirm' | 'reject' }) =>
-      api.post<unknown>(`/inferences/${id}/resolve`, { action }),
+    mutationFn: ({ id, action, title }: SuggestionAnswer) =>
+      api.offline.post<unknown>(`/inferences/${id}/resolve`, { action }, title),
 
     onMutate: async ({ id }) => {
       await queryClient.cancelQueries({ queryKey: TODAY_KEY });
@@ -130,7 +137,9 @@ export default function Today() {
       if (context?.previous) queryClient.setQueryData(TODAY_KEY, context.previous);
     },
 
-    onSettled: () => queryClient.invalidateQueries({ queryKey: TODAY_KEY }),
+    // Still on the phone: the card has already gone, and the sync refetches when it lands.
+    onSettled: (result) =>
+      isQueued(result) ? undefined : queryClient.invalidateQueries({ queryKey: TODAY_KEY }),
   });
 
   const openHabit = useCallback((habit: TodayHabit) => {
@@ -330,7 +339,11 @@ export default function Today() {
                     fullWidth={false}
                     style={styles.suggestionButton}
                     onPress={() =>
-                      resolveSuggestion.mutate({ id: suggestion.id, action: 'reject' })
+                      resolveSuggestion.mutate({
+                        id: suggestion.id,
+                        action: 'reject',
+                        title: suggestion.title,
+                      })
                     }
                   />
                   <Button
@@ -338,7 +351,11 @@ export default function Today() {
                     fullWidth={false}
                     style={styles.suggestionButton}
                     onPress={() =>
-                      resolveSuggestion.mutate({ id: suggestion.id, action: 'confirm' })
+                      resolveSuggestion.mutate({
+                        id: suggestion.id,
+                        action: 'confirm',
+                        title: suggestion.title,
+                      })
                     }
                   />
                 </View>

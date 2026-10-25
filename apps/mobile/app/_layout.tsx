@@ -25,7 +25,7 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
 import { OfflineBanner } from '../src/components/OfflineBanner.js';
 import { ToastHost } from '../src/components/ToastHost.js';
 import { loadOutbox, useOutbox } from '../src/offline/outbox.js';
-import { syncNow } from '../src/offline/sync.js';
+import { startSavedOfflineNotice, syncNow } from '../src/offline/sync.js';
 import type { ReminderRoute } from '../src/reminders/plan.js';
 import { routeForNotification } from '../src/reminders/route.js';
 import { refreshReminders, requestReminderRefresh } from '../src/reminders/schedule.js';
@@ -46,6 +46,7 @@ setWriteListener(requestReminderRefresh);
 // meanwhile. On the way back, the changes made offline are sent first, and only then do
 // the queries refetch (src/api/connectivity.ts, src/offline/sync.ts).
 startConnectivity(probeServer, { beforeOnline: () => syncNow(queryClient) });
+startSavedOfflineNotice();
 
 /**
  * Runs once the saved cache has been read back, before any query may fetch: changes still

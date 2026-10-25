@@ -34,7 +34,7 @@ vi.stubGlobal('fetch', fetchMock);
 const { QueryClient, onlineManager } = await import('@tanstack/react-query');
 const outbox = await import('./outbox.js');
 const { useToast } = await import('../feedback/toast.js');
-const { syncMessage, syncNow } = await import('./sync.js');
+const { startSavedOfflineNotice, syncMessage, syncNow } = await import('./sync.js');
 
 const change = (id: string, label = '250 ml of water'): QueuedChange => ({
   id,
@@ -130,5 +130,43 @@ describe('syncNow', () => {
     await vi.advanceTimersByTimeAsync(15_000);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(outbox.useOutbox.getState().items).toEqual([]);
+  });
+});
+
+describe('the saved-offline notice', () => {
+  const SAVED = 'Saved on this phone. It’ll sync when you’re back online.';
+  let stop: () => void;
+
+  beforeEach(async () => {
+    onlineManager.setOnline(true);
+    await outbox.clearOutbox();
+    useToast.setState({ current: null });
+    stop = startSavedOfflineNotice();
+  });
+
+  afterEach(() => {
+    stop();
+  });
+
+  it('says once per time offline that changes are kept on the phone', async () => {
+    onlineManager.setOnline(false);
+
+    await outbox.enqueue(change('a'));
+    expect(useToast.getState().current?.message).toBe(SAVED);
+
+    useToast.setState({ current: null });
+    await outbox.enqueue(change('b'));
+    expect(useToast.getState().current).toBeNull();
+
+    onlineManager.setOnline(true);
+    onlineManager.setOnline(false);
+    await outbox.enqueue(change('c'));
+    expect(useToast.getState().current?.message).toBe(SAVED);
+  });
+
+  it('stays quiet for a change that waits behind others while online', async () => {
+    await outbox.enqueue(change('a'));
+
+    expect(useToast.getState().current).toBeNull();
   });
 });

@@ -1,7 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { HABIT_MEASURES, measureOf, type TodayResponse } from '@synitheia/shared';
-import { api } from '../api/client.js';
+import {
+  HABIT_MEASURES,
+  measureOf,
+  todayLocalDate,
+  type LocalDate,
+  type TodayResponse,
+} from '@synitheia/shared';
+import { api, isQueued } from '../api/client.js';
 import { showToast } from '../feedback/toast.js';
+import { useAuth } from '../store/auth.js';
 import { tickMessage } from './tickCopy.js';
 
 type TodayHabit = TodayResponse['habits'][number];
@@ -12,6 +19,15 @@ interface Step {
   habit: TodayHabit;
   /** +1 adds one step of the habit's measure; -1 takes one back. */
   direction: 1 | -1;
+  /** The day the tap was made on, so a tick sent after midnight still counts for it. */
+  localDate: LocalDate;
+}
+
+/** Today on the user's calendar, the way the server counts their days. */
+function userToday(): LocalDate {
+  const zone =
+    useAuth.getState().user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return todayLocalDate(zone);
 }
 
 /**
@@ -28,12 +44,14 @@ export function useHabitLog(): { log: (habit: TodayHabit) => void; unlog: (habit
 
   const step = useMutation({
     meta: { failed: 'Couldn’t log that habit' },
-    mutationFn: ({ habit, direction }: Step) =>
+    mutationFn: ({ habit, direction, localDate }: Step) =>
       // One tap moves one STEP of the habit's measure, not one unit: a step goal that moved
-      // 1 at a time would need 8,000 taps.
-      api.post<unknown>(`/habits/${habit.id}/log`, {
-        increment: direction * HABIT_MEASURES[measureOf(habit)].step,
-      }),
+      // 1 at a time would need 8,000 taps. Offline, it waits on the phone (src/offline).
+      api.offline.post<unknown>(
+        `/habits/${habit.id}/log`,
+        { localDate, increment: direction * HABIT_MEASURES[measureOf(habit)].step },
+        habit.name,
+      ),
 
     onMutate: async ({ habit, direction }: Step) => {
       await queryClient.cancelQueries({ queryKey: TODAY_KEY });
@@ -58,7 +76,7 @@ export function useHabitLog(): { log: (habit: TodayHabit) => void; unlog: (habit
       return { previous };
     },
 
-    onSuccess: (_result, { habit, direction }) => {
+    onSuccess: (_result, { habit, direction, localDate }) => {
       if (direction === -1) return;
       const count = habit.todayCount + HABIT_MEASURES[measureOf(habit)].step;
       showToast({
@@ -66,7 +84,8 @@ export function useHabitLog(): { log: (habit: TodayHabit) => void; unlog: (habit
         action: {
           label: 'Undo',
           // The habit as it now is, so the step back lands where the tick left it.
-          onPress: () => step.mutate({ habit: { ...habit, todayCount: count }, direction: -1 }),
+          onPress: () =>
+            step.mutate({ habit: { ...habit, todayCount: count }, direction: -1, localDate }),
         },
       });
     },
@@ -75,7 +94,9 @@ export function useHabitLog(): { log: (habit: TodayHabit) => void; unlog: (habit
       if (context?.previous) queryClient.setQueryData(TODAY_KEY, context.previous);
     },
 
-    onSettled: () => {
+    // Still on the phone: the card already shows it, and the sync refetches when it lands.
+    onSettled: (result) => {
+      if (isQueued(result)) return;
       void queryClient.invalidateQueries({ queryKey: TODAY_KEY });
       // A log recomputes the streak, which the habit lists and history render.
       void queryClient.invalidateQueries({ queryKey: ['habits'] });
@@ -84,7 +105,7 @@ export function useHabitLog(): { log: (habit: TodayHabit) => void; unlog: (habit
   });
 
   return {
-    log: (habit) => step.mutate({ habit, direction: 1 }),
-    unlog: (habit) => step.mutate({ habit, direction: -1 }),
+    log: (habit) => step.mutate({ habit, direction: 1, localDate: userToday() }),
+    unlog: (habit) => step.mutate({ habit, direction: -1, localDate: userToday() }),
   };
 }

@@ -2,8 +2,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Crypto from 'expo-crypto';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Droplets, Trash2 } from 'lucide-react-native';
 import { WATER_PRESETS_ML, formatVolume } from '@synitheia/shared';
 import {
@@ -16,27 +15,23 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ProgressRing } from '../src/components/ProgressRing.js';
-import { api } from '../src/api/client.js';
+import { api, isQueued } from '../src/api/client.js';
 import { deferWithUndo } from '../src/feedback/undo.js';
+import { useAddWater } from '../src/water/useAddWater.js';
+import {
+  WATER_KEY,
+  hideGlass,
+  putGlassBack,
+  refetchWater,
+  type WaterResponse,
+  type WireWaterEntry,
+} from '../src/water/waterCache.js';
 import { useAuth } from '../src/store/auth.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
 
-const WATER_KEY = ['water'] as const;
 const ACCENT_COLOR = '#8A9AA9';
-
-interface WireWaterEntry {
-  _id: string;
-  amountMl: number;
-  loggedAt: string;
-}
-
-interface WaterResponse {
-  items: WireWaterEntry[];
-  totalMl: number;
-  targetMl: number;
-}
 
 /**
  * Water, in detail.
@@ -58,48 +53,12 @@ export default function WaterScreen() {
     queryFn: () => api.get<WaterResponse>('/water'),
   });
 
-  const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: WATER_KEY });
-    void queryClient.invalidateQueries({ queryKey: ['today'] });
-  };
-
-  /**
-   * A glass moves the ring at once. Waiting on the server made every tap feel unheard;
-   * if the server refuses, the ring goes back and the failure is reported (app/_layout).
-   */
-  const add = useMutation({
-    meta: { failed: 'Couldn’t log water' },
-    mutationFn: (amountMl: number) =>
-      api.post<unknown>('/water', { amountMl, clientKey: Crypto.randomUUID() }),
-
-    onMutate: async (amountMl: number) => {
-      await queryClient.cancelQueries({ queryKey: WATER_KEY });
-      const previous = queryClient.getQueryData<WaterResponse>(WATER_KEY);
-      const pending: WireWaterEntry = {
-        _id: `pending-${Crypto.randomUUID()}`,
-        amountMl,
-        loggedAt: new Date().toISOString(),
-      };
-
-      // Newest first, as the server lists them.
-      queryClient.setQueryData<WaterResponse>(WATER_KEY, (current) =>
-        current
-          ? { ...current, items: [pending, ...current.items], totalMl: current.totalMl + amountMl }
-          : current,
-      );
-      return { previous };
-    },
-
-    onError: (_error, _amount, context) => {
-      if (context?.previous) queryClient.setQueryData(WATER_KEY, context.previous);
-    },
-
-    onSettled: invalidate,
-  });
+  // A glass shows at once, here and on Today, with or without a connection.
+  const addWater = useAddWater();
 
   /**
    * One tap on the bin removes the entry from the screen and offers Undo; the server is
-   * told only once the offer has gone (src/feedback/undo.ts).
+   * told only once the offer has gone (src/feedback/undo.ts), or, offline, on the way back.
    */
   function removeEntry(entry: WireWaterEntry) {
     let index = 0;
@@ -107,24 +66,20 @@ export default function WaterScreen() {
     deferWithUndo({
       message: `Removed ${formatVolume(entry.amountMl)}`,
       failed: 'Couldn’t remove that entry',
-      apply: () =>
-        queryClient.setQueryData<WaterResponse>(WATER_KEY, (current) => {
-          if (!current) return current;
-          index = Math.max(0, current.items.findIndex((item) => item._id === entry._id));
-          return {
-            ...current,
-            items: current.items.filter((item) => item._id !== entry._id),
-            totalMl: Math.max(0, current.totalMl - entry.amountMl),
-          };
-        }),
-      revert: () =>
-        queryClient.setQueryData<WaterResponse>(WATER_KEY, (current) => {
-          if (!current || current.items.some((item) => item._id === entry._id)) return current;
-          const items = [...current.items];
-          items.splice(Math.min(index, items.length), 0, entry);
-          return { ...current, items, totalMl: current.totalMl + entry.amountMl };
-        }),
-      commit: () => api.delete<void>(`/water/${entry._id}`).then(invalidate),
+      apply: () => {
+        index = hideGlass(queryClient, entry);
+      },
+      revert: () => putGlassBack(queryClient, entry, index),
+      commit: () =>
+        api.offline
+          .delete<void>(
+            `/water/${entry._id}`,
+            undefined,
+            `Removing ${formatVolume(entry.amountMl)} of water`,
+          )
+          .then((result) => {
+            if (!isQueued(result)) refetchWater(queryClient);
+          }),
     });
   }
 
@@ -199,7 +154,7 @@ export default function WaterScreen() {
             <Touchable
               key={ml}
               style={styles.preset}
-              onPress={() => add.mutate(ml)}
+              onPress={() => addWater(ml)}
               accessibilityRole="button"
               accessibilityLabel={`Log ${ml} millilitres`}
             >
@@ -234,8 +189,6 @@ export default function WaterScreen() {
                 </Text>
                 <Touchable
                   onPress={() => removeEntry(entry)}
-                  // A glass still on its way to the server has nothing to delete yet.
-                  disabled={entry._id.startsWith('pending-')}
                   style={styles.delete}
                   accessibilityRole="button"
                   accessibilityLabel={`Remove ${entry.amountMl} millilitres logged at ${time.format(new Date(entry.loggedAt))}`}

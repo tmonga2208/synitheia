@@ -23,7 +23,7 @@ import {
   Touchable,
 } from '../src/components/primitives.js';
 import { Skeleton, SkeletonList } from '../src/components/Skeleton.js';
-import { ApiError, api } from '../src/api/client.js';
+import { ApiError, api, isQueued } from '../src/api/client.js';
 import { errorLine } from '../src/api/errorCopy.js';
 import type {
   InsightAvailability,
@@ -127,8 +127,8 @@ export default function Insights() {
 
   const feedback = useMutation({
     meta: { failed: 'Couldn’t save your feedback' },
-    mutationFn: ({ id, value }: { id: string; value: InsightFeedback }) =>
-      api.post<unknown>(`/insights/${id}/feedback`, { feedback: value }),
+    mutationFn: ({ id, value, title }: { id: string; value: InsightFeedback; title: string }) =>
+      api.offline.post<unknown>(`/insights/${id}/feedback`, { feedback: value }, title),
 
     onMutate: async ({ id, value }) => {
       await queryClient.cancelQueries({ queryKey: INSIGHTS_KEY });
@@ -151,15 +151,17 @@ export default function Insights() {
       if (context?.previous) queryClient.setQueryData(INSIGHTS_KEY, context.previous);
     },
 
-    onSettled: () => queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
+    // Still on the phone: the card already shows it, and the sync refetches when it lands.
+    onSettled: (result) =>
+      isQueued(result) ? undefined : queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
   });
 
   const dismiss = useMutation({
     meta: { failed: 'Couldn’t dismiss that insight' },
-    mutationFn: (id: string) =>
-      api.post<unknown>(`/insights/${id}/status`, { status: 'dismissed' }),
+    mutationFn: ({ id, title }: { id: string; title: string }) =>
+      api.offline.post<unknown>(`/insights/${id}/status`, { status: 'dismissed' }, title),
 
-    onMutate: async (id: string) => {
+    onMutate: async ({ id }: { id: string; title: string }) => {
       await queryClient.cancelQueries({ queryKey: INSIGHTS_KEY });
       const previous = queryClient.getQueryData<ListResponse<WireInsight>>(INSIGHTS_KEY);
 
@@ -176,7 +178,8 @@ export default function Insights() {
       if (context?.previous) queryClient.setQueryData(INSIGHTS_KEY, context.previous);
     },
 
-    onSettled: () => queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
+    onSettled: (result) =>
+      isQueued(result) ? undefined : queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
   });
 
   const back = (
@@ -293,8 +296,10 @@ export default function Insights() {
                 key={insight._id}
                 insight={insight}
                 currency={currency}
-                onFeedback={(value) => feedback.mutate({ id: insight._id, value })}
-                onDismiss={() => dismiss.mutate(insight._id)}
+                onFeedback={(value) =>
+                  feedback.mutate({ id: insight._id, value, title: insight.title })
+                }
+                onDismiss={() => dismiss.mutate({ id: insight._id, title: insight.title })}
               />
             ))}
           </View>
