@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
@@ -20,11 +20,10 @@ import {
   holdUntilSynced,
   startConnectivity,
 } from '../src/api/connectivity.js';
-import { errorLine } from '../src/api/errorCopy.js';
+import { forgetLocalData, persistOptions, queryClient } from '../src/api/queryClient.js';
 import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
 import { OfflineBanner } from '../src/components/OfflineBanner.js';
 import { ToastHost } from '../src/components/ToastHost.js';
-import { showToast } from '../src/feedback/toast.js';
 import { loadOutbox, useOutbox } from '../src/offline/outbox.js';
 import { syncNow } from '../src/offline/sync.js';
 import type { ReminderRoute } from '../src/reminders/plan.js';
@@ -43,52 +42,19 @@ void SplashScreen.preventAutoHideAsync();
 // habit done), so every write asks for the reminders to be re-planned.
 setWriteListener(requestReminderRefresh);
 
-/**
- * What a mutation may say about itself. `failed` names the action for the toast ("Couldn’t
- * log water"); `reportsOwnError` marks a screen that shows its own error, inline or in an
- * alert, so the same failure is not reported twice.
- */
-interface MutationMeta {
-  failed?: string;
-  reportsOwnError?: boolean;
-}
-
-const queryClient = new QueryClient({
-  // A failed change always says so. Many used to fail in silence: a glass of water that
-  // did not log, an expense that did not delete, with nothing on screen to show it.
-  mutationCache: new MutationCache({
-    onError: (error, _variables, _context, mutation) => {
-      const meta = (mutation.meta ?? {}) as MutationMeta;
-      if (meta.reportsOwnError) return;
-      showToast({ message: errorLine(error, meta.failed), tone: 'error' });
-    },
-  }),
-  defaultOptions: {
-    queries: {
-      // Personal tracking data changes slowly and mostly from this device. A minute of
-      // staleness avoids a refetch storm on every tab switch without ever showing the
-      // user a number they'd call wrong.
-      staleTime: 60_000,
-      retry: 2,
-      refetchOnWindowFocus: false,
-    },
-    mutations: {
-      // A change made offline fails at once and says so, rather than waiting, paused and
-      // silent, for a connection that may never come while the screen is open.
-      networkMode: 'always',
-    },
-  },
-});
-
 // While a request cannot connect, the server is checked until it answers; queries pause
 // meanwhile. On the way back, the changes made offline are sent first, and only then do
 // the queries refetch (src/api/connectivity.ts, src/offline/sync.ts).
 startConnectivity(probeServer, { beforeOnline: () => syncNow(queryClient) });
 
-// Changes still waiting from last time are sent before the screens fetch anything.
-void loadOutbox().then(() => {
+/**
+ * Runs once the saved cache has been read back, before any query may fetch: changes still
+ * waiting from last time are sent first, so the first data the screens fetch has them.
+ */
+async function holdIfWaiting(): Promise<void> {
+  await loadOutbox();
   if (useOutbox.getState().items.length > 0) void holdUntilSynced();
-});
+}
 
 /**
  * Routes the user to the right place once we know who they are.
@@ -170,8 +136,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (status === 'loading') return;
 
     // Signed out: the mirror must not outlive the session, or the next account on this
-    // phone would inherit the last one's "connected" sources.
-    const settle = status === 'anon' ? clearSourcePrefs() : Promise.resolve();
+    // phone would inherit the last one's "connected" sources. Nor may the saved data, or
+    // the changes made offline: the next account would see the one, and send the other.
+    const settle =
+      status === 'anon'
+        ? Promise.all([clearSourcePrefs(), forgetLocalData()])
+        : Promise.resolve();
     void settle.then(() => syncBackgroundRegistration());
   }, [status]);
 
@@ -314,7 +284,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          {/* Outside QueryClientProvider so every consumer below — including AuthGate's
+          {/* Outside PersistQueryClientProvider so every consumer below — including AuthGate's
               screens — can call useTheme(). */}
           <ThemeProvider>
             {/* The INNER boundary — themed. Catches every crash below this point, which is
@@ -322,11 +292,16 @@ export default function RootLayout() {
                 than the outer boundary's static-light one. See the doc on
                 ErrorBoundary's `themed` prop for why both instances exist. */}
             <ErrorBoundary themed>
-              <QueryClientProvider client={queryClient}>
+              <PersistQueryClientProvider
+                client={queryClient}
+                persistOptions={persistOptions}
+                onSuccess={holdIfWaiting}
+                onError={holdIfWaiting}
+              >
                 <AuthGate>
                   <ThemedShell />
                 </AuthGate>
-              </QueryClientProvider>
+              </PersistQueryClientProvider>
             </ErrorBoundary>
           </ThemeProvider>
         </SafeAreaProvider>
