@@ -1,9 +1,14 @@
+import { webcrypto } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('expo-secure-store', () => ({
   AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'afterFirstUnlockThisDeviceOnly',
 }));
 vi.mock('expo-constants', () => ({ default: { expoConfig: { extra: {} } } }));
+vi.mock('expo-crypto', () => ({
+  getRandomBytes: (count: number) => webcrypto.getRandomValues(new Uint8Array(count)),
+  randomUUID: () => webcrypto.randomUUID(),
+}));
 
 const { ApiError, NetworkError } = await import('./client.js');
 const { describeError, errorLine } = await import('./errorCopy.js');

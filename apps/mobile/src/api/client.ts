@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { noteNetworkFailure, noteNetworkSuccess } from './connectivity.js';
+import { newKey } from '../offline/ids.js';
 
 /**
  * The API client.
@@ -251,11 +252,20 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
   _retried?: boolean;
   /** Set by background sync. A failed refresh then leaves the stored session untouched. */
   background?: boolean;
+  /**
+   * The key that marks this change. Every write gets one; a change sent again (from the
+   * offline queue, after a lost answer) passes the key it was first sent with, and the
+   * server answers it without applying it twice (api/src/core/idempotency.ts).
+   */
+  idempotencyKey?: string;
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, _retried, headers, background, ...rest } = options;
+  const { body, _retried, headers, background, idempotencyKey, ...rest } = options;
   const token = await getAccessToken();
+  const isWrite = (rest.method ?? 'GET').toUpperCase() !== 'GET';
+  // Kept across the refresh-and-retry below, so the retry is the same change.
+  const key = isWrite ? (idempotencyKey ?? newKey()) : undefined;
 
   const isFormData = body instanceof FormData;
   const hasBody = body !== undefined;
@@ -282,6 +292,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       headers: {
         ...(hasBody && !isFormData ? { 'content-type': 'application/json' } : {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(key ? { 'Idempotency-Key': key } : {}),
         ...headers,
       },
       body: isFormData ? (body as FormData) : hasBody ? JSON.stringify(body) : undefined,
@@ -303,7 +314,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       throw new NetworkError('offline');
     });
     if (fresh) {
-      return request<T>(path, { ...options, _retried: true });
+      return request<T>(path, { ...options, _retried: true, idempotencyKey: key });
     }
   }
 
@@ -312,8 +323,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     throw new ApiError(res.status, errorBody, `Request failed with ${res.status}`);
   }
 
-  const method = (rest.method ?? 'GET').toUpperCase();
-  if (method !== 'GET') onWrite?.();
+  if (isWrite) onWrite?.();
 
   if (res.status === 204) return undefined as T;
 

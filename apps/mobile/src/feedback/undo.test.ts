@@ -1,3 +1,4 @@
+import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ToastModule from './toast.js';
 import type * as UndoModule from './undo.js';
@@ -6,6 +7,10 @@ vi.mock('expo-secure-store', () => ({
   AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'afterFirstUnlockThisDeviceOnly',
 }));
 vi.mock('expo-constants', () => ({ default: { expoConfig: { extra: {} } } }));
+vi.mock('expo-crypto', () => ({
+  getRandomBytes: (count: number) => webcrypto.getRandomValues(new Uint8Array(count)),
+  randomUUID: () => webcrypto.randomUUID(),
+}));
 
 let toast: typeof ToastModule;
 let undo: typeof UndoModule;

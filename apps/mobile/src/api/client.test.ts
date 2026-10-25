@@ -29,6 +29,10 @@ vi.mock('expo-secure-store', () => ({
 vi.mock('expo-constants', () => ({
   default: { expoConfig: { extra: { apiUrl: 'https://api.test' } } },
 }));
+vi.mock('expo-crypto', () => ({
+  getRandomBytes: (count: number) => new Uint8Array(count).map(() => Math.floor(Math.random() * 256)),
+  randomUUID: () => `key-${Math.random().toString(16).slice(2)}-${Date.now()}`,
+}));
 
 const fetchMock = vi.fn<typeof fetch>();
 vi.stubGlobal('fetch', fetchMock);
@@ -281,6 +285,46 @@ describe('telling the app whether it is online', () => {
 
     fetchMock.mockRejectedValueOnce(new TypeError('Network request failed'));
     expect(await client.probeServer()).toBe(false);
+  });
+});
+
+describe('change keys', () => {
+  const headerOf = (call: number, name: string) =>
+    (fetchMock.mock.calls[call]![1]?.headers as Record<string, string>)[name];
+
+  it('mark every write, so the server can tell a resend from a new change', async () => {
+    fetchMock.mockResolvedValueOnce(json(201, {})).mockResolvedValueOnce(json(200, {}));
+
+    await client.api.post('/water', { amountMl: 250 });
+    await client.api.get('/today');
+
+    expect(headerOf(0, 'Idempotency-Key')).toMatch(/.{8,}/);
+    expect(headerOf(1, 'Idempotency-Key')).toBeUndefined();
+  });
+
+  it('send a change’s own key when it is sent again', async () => {
+    fetchMock.mockResolvedValueOnce(json(201, {}));
+
+    await client.request('/water', {
+      method: 'POST',
+      body: { amountMl: 250 },
+      idempotencyKey: 'queued-change-1',
+    });
+
+    expect(headerOf(0, 'Idempotency-Key')).toBe('queued-change-1');
+  });
+
+  it('send a write retried after a token refresh as the same change', async () => {
+    store.set('synitheia.access', 'stale');
+    store.set('synitheia.refresh', 'good');
+    fetchMock
+      .mockResolvedValueOnce(json(401))
+      .mockResolvedValueOnce(json(200, { accessToken: 'new-access', refreshToken: 'new-refresh' }))
+      .mockResolvedValueOnce(json(201, {}));
+
+    await client.api.post('/water', { amountMl: 250 });
+
+    expect(headerOf(2, 'Idempotency-Key')).toBe(headerOf(0, 'Idempotency-Key'));
   });
 });
 
