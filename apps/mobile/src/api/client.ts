@@ -1,7 +1,9 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import { onlineManager } from '@tanstack/react-query';
 import { noteNetworkFailure, noteNetworkSuccess } from './connectivity.js';
 import { newKey } from '../offline/ids.js';
+import { enqueue, loadOutbox, useOutbox, type QueuedChange } from '../offline/outbox.js';
 
 /**
  * The API client.
@@ -330,6 +332,53 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return (await res.json()) as T;
 }
 
+/** A change kept on the phone to be sent later (src/offline/outbox.ts). */
+export interface Queued {
+  queued: true;
+  /** Its place in the outbox, and its Idempotency-Key. */
+  id: string;
+}
+
+export function isQueued(value: unknown): value is Queued {
+  return (
+    typeof value === 'object' && value !== null && (value as { queued?: unknown }).queued === true
+  );
+}
+
+/**
+ * A change that can wait for a connection.
+ *
+ * Offline, it is kept on the phone and nothing is sent. Online, it is sent; if no answer
+ * comes back it may or may not have arrived, so it is kept under the key it was sent with,
+ * and its resend is answered from the server's record if it did. A refusal is thrown as
+ * from any other request: the same change would be refused again.
+ *
+ * While older changes are still waiting, a new one waits behind them, so a habit made
+ * offline is created before its first tick is sent.
+ */
+async function offlineWrite<T>(
+  method: QueuedChange['method'],
+  path: string,
+  body: unknown,
+  label: string,
+): Promise<T | Queued> {
+  const key = newKey();
+  const keep = async (): Promise<Queued> => {
+    await enqueue({ id: key, method, path, body, label, createdAt: new Date().toISOString() });
+    return { queued: true, id: key };
+  };
+
+  await loadOutbox();
+  if (!onlineManager.isOnline() || useOutbox.getState().items.length > 0) return keep();
+
+  try {
+    return await request<T>(path, { method, body, idempotencyKey: key });
+  } catch (error) {
+    if (error instanceof NetworkError) return keep();
+    throw error;
+  }
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown, options?: { background?: boolean }) =>
@@ -340,4 +389,15 @@ export const api = {
     request<T>(path, { method: 'DELETE', body }),
   upload: <T>(path: string, form: FormData) =>
     request<T>(path, { method: 'POST', body: form }),
+  /** Writes that work offline. `label` names the change if it is refused when it syncs. */
+  offline: {
+    post: <T>(path: string, body: unknown, label: string) =>
+      offlineWrite<T>('POST', path, body, label),
+    put: <T>(path: string, body: unknown, label: string) =>
+      offlineWrite<T>('PUT', path, body, label),
+    patch: <T>(path: string, body: unknown, label: string) =>
+      offlineWrite<T>('PATCH', path, body, label),
+    delete: <T>(path: string, body: unknown, label: string) =>
+      offlineWrite<T>('DELETE', path, body, label),
+  },
 };

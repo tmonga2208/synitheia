@@ -64,7 +64,7 @@ export function registerIdempotency(app: FastifyInstance): void {
 
     const record = await IdempotencyRecordModel.findOne({ userId, key }).lean();
     if (!record || record.state === 'pending') {
-      throw AppError.conflict('This change is still being saved.');
+      throw AppError.conflict('This change is still being saved.', { inProgress: true });
     }
     if (record.method !== req.method || record.path !== req.url) {
       throw new AppError('validation_failed', 'This Idempotency-Key was already used for a different change.');

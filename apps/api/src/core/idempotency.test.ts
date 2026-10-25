@@ -38,7 +38,9 @@ async function app(): Promise<FastifyInstance> {
   });
   server.setErrorHandler((error, _req, reply) => {
     if (error instanceof AppError) {
-      return reply.status(error.status).send({ error: { code: error.code, message: error.message } });
+      return reply
+        .status(error.status)
+        .send({ error: { code: error.code, message: error.message, details: error.details } });
     }
     return reply.status(500).send({ error: { code: 'internal', message: 'Something went wrong' } });
   });
@@ -152,6 +154,8 @@ describe('idempotency keys', () => {
     await first;
 
     expect(again.statusCode).toBe(409);
+    // Marked, so the app waits and resends instead of dropping it as a real conflict.
+    expect(again.json().error.details).toEqual({ inProgress: true });
     expect(runs).toBe(1);
   });
 

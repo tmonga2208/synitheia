@@ -34,10 +34,26 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => `key-${Math.random().toString(16).slice(2)}-${Date.now()}`,
 }));
 
+/** The phone's storage, where the outbox keeps changes made offline. */
+const disk = new Map<string, string>();
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: {
+    getItem: async (key: string) => disk.get(key) ?? null,
+    setItem: async (key: string, value: string) => {
+      disk.set(key, value);
+    },
+    removeItem: async (key: string) => {
+      disk.delete(key);
+    },
+  },
+}));
+
 const fetchMock = vi.fn<typeof fetch>();
 vi.stubGlobal('fetch', fetchMock);
 
+const { onlineManager } = await import('@tanstack/react-query');
 const client = await import('./client.js');
+const outbox = await import('../offline/outbox.js');
 
 const json = (status: number, body: unknown = {}) =>
   new Response(JSON.stringify(body), {
@@ -52,6 +68,7 @@ beforeEach(() => {
   setItemAsync.mockClear();
   deleteItemAsync.mockClear();
   fetchMock.mockReset();
+  onlineManager.setOnline(true);
 });
 
 describe('token storage', () => {
@@ -325,6 +342,84 @@ describe('change keys', () => {
     await client.api.post('/water', { amountMl: 250 });
 
     expect(headerOf(2, 'Idempotency-Key')).toBe(headerOf(0, 'Idempotency-Key'));
+  });
+});
+
+describe('writes that can wait (api.offline)', () => {
+  beforeEach(async () => {
+    await outbox.clearOutbox();
+  });
+
+  const waiting = () => outbox.useOutbox.getState().items;
+
+  it('send at once when online, and return the answer', async () => {
+    fetchMock.mockResolvedValueOnce(json(201, { entry: { id: 'w1' } }));
+
+    const result = await client.api.offline.post('/water', { amountMl: 250 }, '250 ml of water');
+
+    expect(result).toEqual({ entry: { id: 'w1' } });
+    expect(client.isQueued(result)).toBe(false);
+    expect(waiting()).toEqual([]);
+  });
+
+  it('offline, keep the change on the phone and send nothing', async () => {
+    onlineManager.setOnline(false);
+
+    const result = await client.api.offline.post('/water', { amountMl: 250 }, '250 ml of water');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(client.isQueued(result)).toBe(true);
+    expect(waiting()).toEqual([
+      expect.objectContaining({
+        id: (result as { id: string }).id,
+        method: 'POST',
+        path: '/water',
+        body: { amountMl: 250 },
+        label: '250 ml of water',
+      }),
+    ]);
+  });
+
+  it('when the answer is lost, keep the change under the key it was sent with', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Network request failed'));
+
+    const result = await client.api.offline.delete('/water/w1', undefined, '250 ml of water');
+
+    const sentKey = (fetchMock.mock.calls[0]![1]?.headers as Record<string, string>)[
+      'Idempotency-Key'
+    ];
+    expect(client.isQueued(result)).toBe(true);
+    expect(waiting().map((c) => [c.id, c.method, c.path])).toEqual([
+      [sentKey, 'DELETE', '/water/w1'],
+    ]);
+  });
+
+  it('show a refusal as before, and keep nothing', async () => {
+    fetchMock.mockResolvedValueOnce(
+      json(422, { error: { code: 'validation_failed', message: 'Too much', requestId: 'r' } }),
+    );
+
+    await expect(
+      client.api.offline.patch('/targets', { waterMl: 99999 }, 'your targets'),
+    ).rejects.toMatchObject({ name: 'ApiError', status: 422 });
+    expect(waiting()).toEqual([]);
+  });
+
+  it('with changes already waiting, wait behind them so nothing overtakes', async () => {
+    await outbox.enqueue({
+      id: 'older-change-1',
+      method: 'POST',
+      path: '/habits',
+      body: { name: 'Read' },
+      label: 'Read',
+      createdAt: '2026-10-25T09:00:00.000Z',
+    });
+
+    const result = await client.api.offline.put('/habits/h1/logs/2026-10-25', {}, 'Read');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(client.isQueued(result)).toBe(true);
+    expect(waiting().map((c) => c.id)).toEqual(['older-change-1', (result as { id: string }).id]);
   });
 });
 
