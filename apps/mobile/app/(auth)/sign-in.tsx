@@ -26,6 +26,7 @@ export default function SignIn() {
   const signIn = useAuth((s) => s.signIn);
   const signInWithApple = useAuth((s) => s.signInWithApple);
   const signInWithGoogle = useAuth((s) => s.signInWithGoogle);
+  const expired = useAuth((s) => s.signedOutReason === 'expired');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -67,6 +68,15 @@ export default function SignIn() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {expired ? (
+            <View style={styles.notice} accessibilityLiveRegion="polite">
+              <Text variant="bodyMedium">You were signed out</Text>
+              <Text variant="caption" color={t.textMuted}>
+                Sign in again to pick up where you left off. Nothing you logged is lost.
+              </Text>
+            </View>
+          ) : null}
+
           <Text variant="title">Welcome back</Text>
           <Text variant="body" color={t.textMuted} style={styles.subtitle}>
             Pick your rituals back up where you left them.
@@ -189,6 +199,15 @@ const makeStyles = (t: Theme) =>
       backgroundColor: t.surfaceRaised,
       borderWidth: 1,
       borderColor: t.danger,
+    },
+    notice: {
+      gap: spacing.xs,
+      marginBottom: spacing.xl,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
     },
     cta: { marginTop: spacing.xl },
     divider: {

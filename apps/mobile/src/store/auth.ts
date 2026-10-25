@@ -2,8 +2,12 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as AuthSession from 'expo-auth-session';
+import * as SecureStore from 'expo-secure-store';
+import { onlineManager } from '@tanstack/react-query';
 import { create } from 'zustand';
 import {
+  ApiError,
+  NetworkError,
   api,
   clearTokens,
   hasSession,
@@ -120,6 +124,11 @@ function isUserCancellation(error: unknown): boolean {
 interface AuthState {
   user: User | null;
   status: AuthStatus;
+  /**
+   * Why the last session ended, when the user did not end it. Sign-in says so, instead of
+   * the user landing on the first-run welcome screen with no idea what happened.
+   */
+  signedOutReason: 'expired' | null;
 
   /** Wire up the client's session-expiry callback exactly once, at app start. */
   init: () => void;
@@ -142,29 +151,85 @@ async function dropReminders(): Promise<void> {
   await clearReminders().catch(() => undefined);
 }
 
-export const useAuth = create<AuthState>((set) => {
-  /** Reminders word money in the user's currency; they learn it here. */
+/**
+ * The last signed-in user, kept so the app can open without a connection.
+ *
+ * Only the profile (name, email, time zone, currency, setup state), never a credential. In
+ * secure storage rather than plain storage anyway, because it is someone's email address.
+ */
+const USER_KEY = 'synitheia.user';
+
+async function rememberUser(user: User): Promise<void> {
+  await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user)).catch(() => undefined);
+}
+
+async function recallUser(): Promise<User | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(USER_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function forgetUser(): Promise<void> {
+  await SecureStore.deleteItemAsync(USER_KEY).catch(() => undefined);
+}
+
+/** No answer, or no usable one: says nothing about whether the session is still good. */
+function couldNotAsk(error: unknown): boolean {
+  return (
+    error instanceof NetworkError ||
+    (error instanceof ApiError && (error.kind === 'server' || error.kind === 'rate'))
+  );
+}
+
+/** Stops waiting for the connection before asking the server again; null when not waiting. */
+let stopWaiting: (() => void) | null = null;
+
+function retryWhenOnline(retry: () => void): void {
+  if (stopWaiting) return;
+  stopWaiting = onlineManager.subscribe((online) => {
+    if (!online) return;
+    stopWaiting?.();
+    stopWaiting = null;
+    retry();
+  });
+}
+
+export const useAuth = create<AuthState>((set, get) => {
+  /** Reminders word money in the user's currency, and an offline launch needs the user. */
   function know(user: User): void {
     setReminderCurrency(user.currency);
+    void rememberUser(user);
   }
 
   async function adopt(session: SessionResponse): Promise<void> {
     await setTokens(session.accessToken, session.refreshToken);
     know(session.user);
-    set({ user: session.user, status: 'authed' });
+    set({ user: session.user, status: 'authed', signedOutReason: null });
+  }
+
+  /** Everything this phone keeps for the account, gone. */
+  async function leave(): Promise<void> {
+    stopWaiting?.();
+    stopWaiting = null;
+    await dropReminders();
+    await forgetUser();
   }
 
   return {
     user: null,
     status: 'loading',
+    signedOutReason: null,
 
     init() {
       // A refresh that fails means the refresh token was revoked or reused. The client
       // has already cleared the Keychain; all that is left is to drop the UI to signed-out
       // so the router sends the user to sign-in instead of rendering an empty dashboard.
       setSessionExpiredHandler(() => {
-        void dropReminders();
-        set({ user: null, status: 'anon' });
+        void leave();
+        set({ user: null, status: 'anon', signedOutReason: 'expired' });
       });
     },
 
@@ -180,9 +245,29 @@ export const useAuth = create<AuthState>((set) => {
         const { user } = await api.get<MeResponse>('/me');
         know(user);
         set({ user, status: 'authed' });
-      } catch {
-        // The client already attempted a refresh and cleared tokens if it failed.
+      } catch (error) {
+        /**
+         * Opening the app on a plane used to sign the user out: any failure here, a missing
+         * connection included, cleared the session. Only the server saying no ends it now.
+         * Without an answer the app opens as the user it last knew, and screens load when
+         * the connection returns. Nobody remembered (the first launch of this build, say):
+         * wait for the connection, then ask again.
+         */
+        if (couldNotAsk(error)) {
+          const remembered = await recallUser();
+          if (remembered) {
+            know(remembered);
+            set({ user: remembered, status: 'authed' });
+          } else {
+            retryWhenOnline(() => void get().hydrate());
+          }
+          return;
+        }
+
+        // The server answered, and the session is over. The client has already tried a
+        // refresh and cleared the tokens if that failed; this makes sure.
         await clearTokens();
+        await forgetUser();
         set({ user: null, status: 'anon' });
       }
     },
@@ -339,9 +424,10 @@ export const useAuth = create<AuthState>((set) => {
       } catch {
         // A network failure must not trap the user in a session they asked to leave.
       } finally {
-        await dropReminders();
+        await leave();
         await clearTokens();
-        set({ user: null, status: 'anon' });
+        // Their own choice: nothing to explain on the sign-in screen.
+        set({ user: null, status: 'anon', signedOutReason: null });
       }
     },
   };

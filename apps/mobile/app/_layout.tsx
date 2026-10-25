@@ -89,6 +89,7 @@ const queryClient = new QueryClient({
 function AuthGate({ children }: { children: React.ReactNode }) {
   const status = useAuth((s) => s.status);
   const user = useAuth((s) => s.user);
+  const signedOutReason = useAuth((s) => s.signedOutReason);
   const hydrate = useAuth((s) => s.hydrate);
   const init = useAuth((s) => s.init);
 
@@ -125,7 +126,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inSetup = segments[0] === 'setup';
 
     if (status === 'anon' && !inAuthGroup && !inOnboarding) {
-      router.replace('/onboarding');
+      // Someone whose session ended goes to sign-in, which says why. The welcome screen is
+      // for someone new, and landing there looked like the app had forgotten them.
+      router.replace(signedOutReason === 'expired' ? '/(auth)/sign-in' : '/onboarding');
       return;
     }
 
@@ -149,7 +152,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (inAuthGroup || inOnboarding || inSetup) {
       router.replace('/');
     }
-  }, [status, segments, router, user?.onboardedAt]);
+  }, [status, segments, router, user?.onboardedAt, signedOutReason]);
 
   useEffect(() => {
     if (status === 'loading') return;

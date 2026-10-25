@@ -11,8 +11,37 @@ const mocks = vi.hoisted(() => ({
   setReminderCurrency: vi.fn(),
 }));
 
+/** Shaped like the real ones: what the store looks at is `reason` and `kind`. */
+const errors = vi.hoisted(() => {
+  class NetworkError extends Error {
+    constructor(readonly reason: 'offline' | 'timeout') {
+      super(reason);
+    }
+  }
+  class ApiError extends Error {
+    constructor(
+      readonly status: number,
+      readonly kind: 'server' | 'rate' | 'validation' | 'auth' | 'app',
+    ) {
+      super(`HTTP ${status}`);
+    }
+  }
+  return { NetworkError, ApiError };
+});
+
+/** The phone's secure storage, where the last known user is kept for offline launches. */
+const secure = vi.hoisted(() => new Map<string, string>());
+
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: async (key: string) => secure.get(key) ?? null,
+  setItemAsync: async (key: string, value: string) => void secure.set(key, value),
+  deleteItemAsync: async (key: string) => void secure.delete(key),
+}));
+
 vi.mock('../api/client.js', () => ({
   api: { post: mocks.post, get: mocks.get },
+  ApiError: errors.ApiError,
+  NetworkError: errors.NetworkError,
   clearTokens: mocks.clearTokens,
   hasSession: mocks.hasSession,
   setSessionExpiredHandler: mocks.setSessionExpiredHandler,
@@ -30,6 +59,7 @@ vi.mock('expo-apple-authentication', () => ({}));
 vi.mock('expo-auth-session', () => ({}));
 
 const { useAuth } = await import('./auth.js');
+const { onlineManager } = await import('@tanstack/react-query');
 
 const USER = {
   id: '6a7025c8d36b5e0013390001',
@@ -48,7 +78,9 @@ beforeEach(() => {
   mocks.clearReminders.mockResolvedValue(undefined);
   mocks.clearTokens.mockResolvedValue(undefined);
   mocks.setTokens.mockResolvedValue(undefined);
-  useAuth.setState({ user: null, status: 'loading' });
+  secure.clear();
+  onlineManager.setOnline(true);
+  useAuth.setState({ user: null, status: 'loading', signedOutReason: null });
 });
 
 describe('signing out', () => {
@@ -84,6 +116,81 @@ describe('a session that expires', () => {
 
     expect(mocks.clearReminders).toHaveBeenCalledTimes(1);
     expect(useAuth.getState().status).toBe('anon');
+  });
+
+  it('remembers why, so sign-in can say so; signing out on purpose does not', async () => {
+    useAuth.getState().init();
+    const expire = mocks.setSessionExpiredHandler.mock.calls[0]![0] as () => void;
+
+    expire();
+    expect(useAuth.getState().signedOutReason).toBe('expired');
+
+    useAuth.setState({ user: USER, status: 'authed' });
+    mocks.post.mockResolvedValue(undefined);
+    await useAuth.getState().signOut();
+    expect(useAuth.getState().signedOutReason).toBeNull();
+  });
+});
+
+describe('opening the app', () => {
+  it('remembers who opened it, for a launch without a connection', async () => {
+    mocks.hasSession.mockResolvedValue(true);
+    mocks.get.mockResolvedValue({ user: USER });
+
+    await useAuth.getState().hydrate();
+
+    expect(JSON.parse(secure.get('synitheia.user')!)).toEqual(USER);
+  });
+
+  it('offline, keeps the session and opens as the remembered user', async () => {
+    secure.set('synitheia.user', JSON.stringify(USER));
+    mocks.hasSession.mockResolvedValue(true);
+    mocks.get.mockRejectedValue(new errors.NetworkError('offline'));
+
+    await useAuth.getState().hydrate();
+
+    expect(mocks.clearTokens).not.toHaveBeenCalled();
+    expect(useAuth.getState()).toMatchObject({ status: 'authed', user: USER });
+  });
+
+  it('with the server down, keeps the session too', async () => {
+    secure.set('synitheia.user', JSON.stringify(USER));
+    mocks.hasSession.mockResolvedValue(true);
+    mocks.get.mockRejectedValue(new errors.ApiError(503, 'server'));
+
+    await useAuth.getState().hydrate();
+
+    expect(mocks.clearTokens).not.toHaveBeenCalled();
+    expect(useAuth.getState().status).toBe('authed');
+  });
+
+  it('offline with nobody remembered, waits and tries again once the connection is back', async () => {
+    mocks.hasSession.mockResolvedValue(true);
+    mocks.get
+      .mockRejectedValueOnce(new errors.NetworkError('offline'))
+      .mockResolvedValueOnce({ user: USER });
+
+    await useAuth.getState().hydrate();
+    expect(mocks.clearTokens).not.toHaveBeenCalled();
+    expect(useAuth.getState().status).toBe('loading');
+
+    onlineManager.setOnline(false);
+    onlineManager.setOnline(true);
+
+    await vi.waitFor(() => expect(useAuth.getState().status).toBe('authed'));
+    expect(useAuth.getState().user).toEqual(USER);
+  });
+
+  it('signs out when the server says the session is over', async () => {
+    secure.set('synitheia.user', JSON.stringify(USER));
+    mocks.hasSession.mockResolvedValue(true);
+    mocks.get.mockRejectedValue(new errors.ApiError(401, 'auth'));
+
+    await useAuth.getState().hydrate();
+
+    expect(mocks.clearTokens).toHaveBeenCalledTimes(1);
+    expect(useAuth.getState().status).toBe('anon');
+    expect(secure.has('synitheia.user')).toBe(false);
   });
 });
 
