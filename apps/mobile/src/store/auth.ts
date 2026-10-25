@@ -10,6 +10,7 @@ import {
   setSessionExpiredHandler,
   setTokens,
 } from '../api/client.js';
+import { clearReminders, setReminderCurrency } from '../reminders/schedule.js';
 
 /**
  * The session store.
@@ -132,9 +133,24 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
+/**
+ * Reminders on this phone belong to the signed-in account. Without this, signing out (or
+ * deleting the account, which signs out) left every reminder firing daily for nobody.
+ * A failure here must never keep someone signed in.
+ */
+async function dropReminders(): Promise<void> {
+  await clearReminders().catch(() => undefined);
+}
+
 export const useAuth = create<AuthState>((set) => {
+  /** Reminders word money in the user's currency; they learn it here. */
+  function know(user: User): void {
+    setReminderCurrency(user.currency);
+  }
+
   async function adopt(session: SessionResponse): Promise<void> {
     await setTokens(session.accessToken, session.refreshToken);
+    know(session.user);
     set({ user: session.user, status: 'authed' });
   }
 
@@ -146,7 +162,10 @@ export const useAuth = create<AuthState>((set) => {
       // A refresh that fails means the refresh token was revoked or reused. The client
       // has already cleared the Keychain; all that is left is to drop the UI to signed-out
       // so the router sends the user to sign-in instead of rendering an empty dashboard.
-      setSessionExpiredHandler(() => set({ user: null, status: 'anon' }));
+      setSessionExpiredHandler(() => {
+        void dropReminders();
+        set({ user: null, status: 'anon' });
+      });
     },
 
     async hydrate() {
@@ -159,6 +178,7 @@ export const useAuth = create<AuthState>((set) => {
 
       try {
         const { user } = await api.get<MeResponse>('/me');
+        know(user);
         set({ user, status: 'authed' });
       } catch {
         // The client already attempted a refresh and cleared tokens if it failed.
@@ -189,6 +209,7 @@ export const useAuth = create<AuthState>((set) => {
     async refreshUser() {
       try {
         const { user } = await api.get<MeResponse>('/me');
+        know(user);
         set({ user });
       } catch {
         // Keep what we have. A genuinely dead session is handled by the client's
@@ -318,6 +339,7 @@ export const useAuth = create<AuthState>((set) => {
       } catch {
         // A network failure must not trap the user in a session they asked to leave.
       } finally {
+        await dropReminders();
         await clearTokens();
         set({ user: null, status: 'anon' });
       }

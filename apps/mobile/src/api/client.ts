@@ -129,6 +129,19 @@ export function setSessionExpiredHandler(handler: () => void): void {
   onSessionExpired = handler;
 }
 
+/**
+ * Told after every change the server accepted, from any screen or sync.
+ *
+ * Reminders are worded from today's numbers (src/reminders), so any write may change what
+ * they should say. One hook here catches every write, including the ones screens make
+ * without React Query.
+ */
+let onWrite: (() => void) | null = null;
+
+export function setWriteListener(listener: () => void): void {
+  onWrite = listener;
+}
+
 /** The single-flight guard. Concurrent 401s all await this one promise. */
 let refreshInFlight: Promise<string | null> | null = null;
 
@@ -220,12 +233,15 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     }
   }
 
-  if (res.status === 204) return undefined as T;
-
   if (!res.ok) {
     const errorBody = (await res.json().catch(() => null)) as ApiErrorBody | null;
     throw new ApiError(res.status, errorBody, `Request failed with ${res.status}`);
   }
+
+  const method = (rest.method ?? 'GET').toUpperCase();
+  if (method !== 'GET') onWrite?.();
+
+  if (res.status === 204) return undefined as T;
 
   return (await res.json()) as T;
 }

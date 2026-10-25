@@ -169,3 +169,33 @@ describe('a failed refresh shared by a background and a foreground request', () 
     expect(expired).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('the write listener', () => {
+  it('hears about every change that succeeded', async () => {
+    const heard = vi.fn();
+    client.setWriteListener(heard);
+    fetchMock
+      .mockResolvedValueOnce(json(201, { entry: {} }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    await client.api.post('/water', { amountMl: 250 });
+    await client.api.delete('/water/6a7025c8d36b5e0013390401');
+
+    expect(heard).toHaveBeenCalledTimes(2);
+  });
+
+  it('hears nothing for a read, or for a change the server refused', async () => {
+    const heard = vi.fn();
+    client.setWriteListener(heard);
+    fetchMock
+      .mockResolvedValueOnce(json(200, {}))
+      .mockResolvedValueOnce(
+        json(422, { error: { code: 'validation_failed', message: 'No', requestId: 'r' } }),
+      );
+
+    await client.api.get('/today');
+    await expect(client.api.post('/water', {})).rejects.toThrow();
+
+    expect(heard).not.toHaveBeenCalled();
+  });
+});

@@ -1,6 +1,7 @@
 import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
 import { hasSession } from '../api/client.js';
+import { refreshReminders } from '../reminders/schedule.js';
 import { runContextSync } from './contextSync.js';
 import { shouldRegister } from './registration.js';
 import { readSourcePrefs } from './sourcePrefs.js';
@@ -21,6 +22,9 @@ const MINIMUM_INTERVAL = 30;
 TaskManager.defineTask(CONTEXT_SYNC_TASK, async () => {
   try {
     const outcome = await runContextSync();
+    // Synced steps can complete a habit, and the two-week plan needs topping up anyway.
+    // A reminder failure must not fail the sync; refreshReminders never throws.
+    await refreshReminders({ background: true });
     return outcome === 'failed'
       ? BackgroundTask.BackgroundTaskResult.Failed
       : BackgroundTask.BackgroundTaskResult.Success;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,7 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Notifications from 'expo-notifications';
 import { ArrowLeft, Bell, Minus, Plus, Trash2 } from 'lucide-react-native';
 import type { CreateReminderInput, ReminderKind } from '@synitheia/shared';
 import {
@@ -39,84 +38,11 @@ const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 const KINDS: readonly ReminderKind[] = ['habit', 'water', 'food', 'expense', 'custom'];
 
-/**
- * The domain counts weekdays from Monday (0); expo-notifications counts from Sunday (1).
- * Getting this off by one silently fires every reminder on the wrong day, which is the
- * kind of bug a user experiences as "the app is broken" rather than reports.
+/*
+ * Reminders fire on the device, so they arrive on a plane or with the backend down. They
+ * are not scheduled here: every change goes through the API, and every successful write
+ * re-plans all of them (src/reminders), worded from how the day is going.
  */
-function toExpoWeekday(domainWeekday: number): number {
-  return ((domainWeekday + 1) % 7) + 1;
-}
-
-/** Every notification we schedule carries its reminder id, so we can find and cancel it. */
-interface ReminderNotificationData extends Record<string, unknown> {
-  reminderId: string;
-}
-
-async function cancelFor(reminderId: string): Promise<void> {
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-
-  await Promise.all(
-    scheduled
-      .filter(
-        (n) => (n.content.data as ReminderNotificationData | undefined)?.reminderId === reminderId,
-      )
-      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
-  );
-}
-
-/**
- * Reminders fire on-device. The server stores only the definition — so a reminder still
- * arrives on a plane, in a tunnel, and with the backend down, and no nudge is ever a
- * network round trip.
- *
- * Cancel-then-schedule, always: it is idempotent, which means a re-sync after a
- * reinstall or an edit on another device converges instead of stacking duplicates.
- */
-async function syncReminder(reminder: WireReminder): Promise<void> {
-  await cancelFor(reminder._id);
-  if (!reminder.enabled) return;
-
-  const granted =
-    (await Notifications.getPermissionsAsync()).granted ||
-    (await Notifications.requestPermissionsAsync()).granted;
-
-  if (!granted) return;
-
-  const [hour, minute] = reminder.time.split(':').map(Number) as [number, number];
-
-  const content = {
-    title: reminder.label,
-    body: 'A gentle nudge from Synítheia.',
-    data: { reminderId: reminder._id } satisfies ReminderNotificationData,
-  };
-
-  if (reminder.weekdays.length === 0) {
-    await Notifications.scheduleNotificationAsync({
-      content,
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
-      },
-    });
-    return;
-  }
-
-  await Promise.all(
-    reminder.weekdays.map((day) =>
-      Notifications.scheduleNotificationAsync({
-        content,
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-          weekday: toExpoWeekday(day),
-          hour,
-          minute,
-        },
-      }),
-    ),
-  );
-}
 
 function describe(reminder: WireReminder): string {
   const days =
@@ -142,19 +68,6 @@ export default function Reminders() {
     queryFn: () => api.get<ListResponse<WireReminder>>('/reminders'),
   });
 
-  // The device is the source of truth for *delivery*, and it can fall out of step with
-  // the server (a reinstall, an edit on another phone). One reconciliation per load
-  // brings it back in line; syncReminder is idempotent, so it cannot double-fire.
-  const synced = useRef(false);
-  const items = query.data?.items;
-
-  useEffect(() => {
-    if (!items || synced.current) return;
-    synced.current = true;
-
-    void Promise.all(items.map((reminder) => syncReminder(reminder).catch(() => undefined)));
-  }, [items]);
-
   const toggle = useMutation({
     mutationFn: ({ reminder, enabled }: { reminder: WireReminder; enabled: boolean }) =>
       api.patch<{ reminder: WireReminder }>(`/reminders/${reminder._id}`, { enabled }),
@@ -176,11 +89,8 @@ export default function Reminders() {
       return { previous };
     },
 
-    // Only touch the notification schedule once the server has accepted the change —
-    // a reminder that fires for a state the server rejected is a lie the device tells.
-    onSuccess: (_result, { reminder, enabled }) => {
-      void syncReminder({ ...reminder, enabled }).catch(() => undefined);
-    },
+    // No scheduling here: the reminders are re-planned after the server accepts the
+    // change, so a reminder never fires for a state the server rejected.
 
     onError: (error: unknown, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(REMINDERS_KEY, context.previous);
@@ -196,8 +106,7 @@ export default function Reminders() {
   const remove = useMutation({
     mutationFn: (reminder: WireReminder) => api.delete<void>(`/reminders/${reminder._id}`),
 
-    onSuccess: (_result, reminder) => {
-      void cancelFor(reminder._id).catch(() => undefined);
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: REMINDERS_KEY });
     },
 
@@ -213,8 +122,7 @@ export default function Reminders() {
     mutationFn: (input: CreateReminderInput) =>
       api.post<{ reminder: WireReminder }>('/reminders', input),
 
-    onSuccess: ({ reminder }) => {
-      void syncReminder(reminder).catch(() => undefined);
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: REMINDERS_KEY });
       setComposing(false);
     },

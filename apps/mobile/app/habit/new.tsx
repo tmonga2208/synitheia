@@ -52,32 +52,16 @@ function to24h({ hour, minute, period }: TimeOfDay): string {
 }
 
 /**
- * The notification is scheduled locally rather than pushed from the server. A gentle
- * reminder must fire on time even when the device is offline, and it needs no network
- * round-trip to be trustworthy.
+ * Ask for notification permission while the user is choosing a reminder, the one moment the
+ * question makes sense. The reminder itself is not scheduled here: it is planned with every
+ * other one (src/reminders) from the habit's reminder time, which the server keeps, so it
+ * also comes back on a new phone.
  */
-async function scheduleReminder(habit: Habit, time: TimeOfDay): Promise<void> {
+async function askForReminderPermission(): Promise<void> {
   const existing = await Notifications.getPermissionsAsync();
-  const granted =
-    existing.granted ||
-    (await Notifications.requestPermissionsAsync()).granted;
-
-  if (!granted) return;
-
-  const [hour, minute] = to24h(time).split(':').map(Number) as [number, number];
-
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: habit.name,
-      body: 'A gentle nudge — your ritual is waiting.',
-      data: { habitId: habit.id },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour,
-      minute,
-    },
-  });
+  if (!existing.granted && existing.canAskAgain) {
+    await Notifications.requestPermissionsAsync();
+  }
 }
 
 export default function NewHabit() {
@@ -171,12 +155,10 @@ export default function NewHabit() {
     setSaving(true);
 
     try {
-      const { habit } = await api.post<{ habit: Habit }>('/habits', parsed.data);
+      // Before saving: the save re-plans reminders, and it should know the answer.
+      if (reminderEnabled) await askForReminderPermission().catch(() => undefined);
 
-      if (reminderEnabled) {
-        // A failed reminder must not fail the habit — it already exists on the server.
-        await scheduleReminder(habit, time).catch(() => undefined);
-      }
+      await api.post<{ habit: Habit }>('/habits', parsed.data);
 
       /**
        * The lists are cached. Without this, going back lands on a Habits screen that does

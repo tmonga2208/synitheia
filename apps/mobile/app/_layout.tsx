@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -14,8 +14,11 @@ import {
   useFonts,
 } from '@expo-google-fonts/manrope';
 import * as Notifications from 'expo-notifications';
-import { migrateTokenAccessibility } from '../src/api/client.js';
+import { migrateTokenAccessibility, setWriteListener } from '../src/api/client.js';
 import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
+import type { ReminderRoute } from '../src/reminders/plan.js';
+import { routeForNotification } from '../src/reminders/route.js';
+import { refreshReminders, requestReminderRefresh } from '../src/reminders/schedule.js';
 import { useAuth } from '../src/store/auth.js';
 // Imported for its side effect too: this is what defines the background task.
 import { syncBackgroundRegistration } from '../src/sync/backgroundTask.js';
@@ -24,6 +27,10 @@ import { clearSourcePrefs } from '../src/sync/sourcePrefs.js';
 import { ThemeProvider, useTheme, useThemeHydrated } from '../src/theme/ThemeProvider.js';
 
 void SplashScreen.preventAutoHideAsync();
+
+// Any change the server accepts may change what a reminder should say (water so far, a
+// habit done), so every write asks for the reminders to be re-planned.
+setWriteListener(requestReminderRefresh);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -120,16 +127,47 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     void settle.then(() => syncBackgroundRegistration());
   }, [status]);
 
+  /**
+   * Reminders are planned two weeks ahead from today's numbers, so they are re-planned
+   * whenever the app is opened or comes back to the front. Writes ask too (above).
+   */
   useEffect(() => {
-    // A tap on a suggestion notification lands on Today, where its card already is.
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as
-        | { suggestionId?: unknown }
-        | undefined;
-      if (typeof data?.suggestionId === 'string') router.replace('/');
+    if (status !== 'authed') return;
+
+    void refreshReminders();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshReminders();
     });
     return () => subscription.remove();
-  }, [router]);
+  }, [status]);
+
+  /**
+   * A tapped notification opens what it is about: a water reminder the water screen, a
+   * suggestion Today. Held until the user is signed in and set up, because the tap that
+   * launches the app arrives before either is known.
+   */
+  const [tappedRoute, setTappedRoute] = useState<ReminderRoute | null>(null);
+
+  useEffect(() => {
+    const launch = Notifications.getLastNotificationResponse();
+    const initial = routeForNotification(launch?.notification.request.content.data);
+    if (initial) setTappedRoute(initial);
+
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const route = routeForNotification(response.notification.request.content.data);
+      if (route) setTappedRoute(route);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!tappedRoute || status !== 'authed' || !user?.onboardedAt) return;
+
+    // Handled: the next launch must not open it again.
+    Notifications.clearLastNotificationResponse();
+    setTappedRoute(null);
+    router.navigate(tappedRoute);
+  }, [tappedRoute, status, user?.onboardedAt, router]);
 
   return <>{children}</>;
 }
