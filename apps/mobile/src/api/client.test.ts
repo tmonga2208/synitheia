@@ -258,6 +258,32 @@ describe('when a request fails', () => {
   });
 });
 
+describe('telling the app whether it is online', () => {
+  it('reports a request that could not connect, and the next one that gets any answer', async () => {
+    const { onlineManager } = await import('@tanstack/react-query');
+    onlineManager.setOnline(true);
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+      .mockResolvedValueOnce(json(503, {}));
+
+    await client.api.get('/today').catch(() => undefined);
+    expect(onlineManager.isOnline()).toBe(false);
+
+    // A 503 is the server being unwell, but it answered: the phone is online.
+    await client.api.get('/today').catch(() => undefined);
+    expect(onlineManager.isOnline()).toBe(true);
+  });
+
+  it('checks the server with a plain health request', async () => {
+    fetchMock.mockResolvedValueOnce(json(200, { ok: true }));
+    expect(await client.probeServer()).toBe(true);
+    expect(fetchMock.mock.calls[0]![0]).toBe('https://api.test/health');
+
+    fetchMock.mockRejectedValueOnce(new TypeError('Network request failed'));
+    expect(await client.probeServer()).toBe(false);
+  });
+});
+
 describe('the write listener', () => {
   it('hears about every change that succeeded', async () => {
     const heard = vi.fn();

@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import { noteNetworkFailure, noteNetworkSuccess } from './connectivity.js';
 
 /**
  * The API client.
@@ -86,6 +87,23 @@ export class NetworkError extends Error {
     super(reason === 'offline' ? 'Could not connect' : 'No answer in time');
     this.name = 'NetworkError';
     this.reason = reason;
+  }
+}
+
+/** How long a connectivity check waits for /health before calling it a miss. */
+const PROBE_TIMEOUT_MS = 4000;
+
+/** Whether the server answers at all. For connectivity checks; never throws. */
+export async function probeServer(): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${baseUrl}/health`, { signal: controller.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -269,14 +287,19 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       body: isFormData ? (body as FormData) : hasBody ? JSON.stringify(body) : undefined,
     });
   } catch {
+    noteNetworkFailure();
     throw new NetworkError(controller.signal.aborted ? 'timeout' : 'offline');
   } finally {
     clearTimeout(timer);
   }
 
+  // Any answer, even an error, means the phone can reach the server.
+  noteNetworkSuccess();
+
   if (res.status === 401 && !_retried) {
     // A refresh that cannot connect is a connection problem, not a dead session.
     const fresh = await refreshAccessToken(background === true).catch(() => {
+      noteNetworkFailure();
       throw new NetworkError('offline');
     });
     if (fresh) {

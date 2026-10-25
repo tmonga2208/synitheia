@@ -14,8 +14,10 @@ import {
   useFonts,
 } from '@expo-google-fonts/manrope';
 import * as Notifications from 'expo-notifications';
-import { migrateTokenAccessibility, setWriteListener } from '../src/api/client.js';
+import { migrateTokenAccessibility, probeServer, setWriteListener } from '../src/api/client.js';
+import { checkConnectivityNow, startConnectivity } from '../src/api/connectivity.js';
 import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
+import { OfflineBanner } from '../src/components/OfflineBanner.js';
 import type { ReminderRoute } from '../src/reminders/plan.js';
 import { routeForNotification } from '../src/reminders/route.js';
 import { refreshReminders, requestReminderRefresh } from '../src/reminders/schedule.js';
@@ -32,6 +34,10 @@ void SplashScreen.preventAutoHideAsync();
 // habit done), so every write asks for the reminders to be re-planned.
 setWriteListener(requestReminderRefresh);
 
+// While a request cannot connect, the server is checked until it answers; queries pause
+// meanwhile and refetch the moment it does (src/api/connectivity.ts).
+startConnectivity(probeServer);
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -41,6 +47,11 @@ const queryClient = new QueryClient({
       staleTime: 60_000,
       retry: 2,
       refetchOnWindowFocus: false,
+    },
+    mutations: {
+      // A change made offline fails at once and says so, rather than waiting, paused and
+      // silent, for a connection that may never come while the screen is open.
+      networkMode: 'always',
     },
   },
 });
@@ -141,6 +152,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return () => subscription.remove();
   }, [status]);
 
+  // Back from the background while offline: check now rather than at the next tick.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void checkConnectivityNow();
+    });
+    return () => subscription.remove();
+  }, []);
+
   /**
    * A tapped notification opens what it is about: a water reminder the water screen, a
    * suggestion Today. Held until the user is signed in and set up, because the tap that
@@ -220,6 +239,7 @@ function ThemedShell() {
         <Stack.Screen name="day/[date]" />
         <Stack.Screen name="history" />
       </Stack>
+      <OfflineBanner />
     </>
   );
 }
