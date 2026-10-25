@@ -177,6 +177,47 @@ describe('GET /privacy/export', () => {
   });
 });
 
+describe('GET /data-sources', () => {
+  /**
+   * The count under each source was a counter kept beside the events: Health never added to
+   * it, so it read 0 however much arrived, and Weather added one per sync although a day
+   * keeps one observation. The count is the events, as the timeline and a deletion see them.
+   */
+  it('counts each source’s events as the timeline holds them', async () => {
+    const user = await seedUser();
+    const other = await seedUser();
+    const event = (owner: Seeded, source: string) => ({
+      userId: owner.oid,
+      source,
+      dedupeKey: new Types.ObjectId().toString(),
+    });
+    await mongoose.models.PersonalEvent!.collection.insertMany([
+      event(user, 'health'),
+      event(user, 'health'),
+      event(user, 'health'),
+      event(user, 'weather'),
+      event(other, 'health'),
+      event(other, 'calendar'),
+    ]);
+    // What the old counters said for this user.
+    await mongoose.models.DataSourceConnection!.collection.insertMany([
+      { userId: user.oid, source: 'health', status: 'connected', eventCount: 0 },
+      { userId: user.oid, source: 'weather', status: 'connected', eventCount: 99 },
+    ]);
+
+    const app = await appFor(user);
+    const response = await app.inject({ method: 'GET', url: '/data-sources' });
+    expect(response.statusCode).toBe(200);
+
+    const counts = Object.fromEntries(
+      response
+        .json()
+        .items.map((item: { source: string; eventCount: number }) => [item.source, item.eventCount]),
+    );
+    expect(counts).toEqual({ health: 3, calendar: 0, location: 0, weather: 1, notifications: 0 });
+  });
+});
+
 describe('DELETE /data-sources/:source/data', () => {
   it('forgets the daily health records along with the health events', async () => {
     const user = await seedUser();

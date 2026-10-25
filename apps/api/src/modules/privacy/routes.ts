@@ -174,8 +174,17 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
 
   api.get('/data-sources', { onRequest: [app.requireAuth] }, async (req) => {
     const uid = new Types.ObjectId(req.user.id);
-    const connections = await DataSourceConnectionModel.find({ userId: uid }).lean();
+    const [connections, counted] = await Promise.all([
+      DataSourceConnectionModel.find({ userId: uid }).lean(),
+      // Counted from the events themselves, so the number is what the timeline shows and
+      // what "delete this source's data" removes. A counter kept beside them drifted.
+      PersonalEventModel.aggregate<{ _id: string; count: number }>([
+        { $match: { userId: uid } },
+        { $group: { _id: '$source', count: { $sum: 1 } } },
+      ]),
+    ]);
     const bySource = new Map(connections.map((c) => [c.source, c]));
+    const eventCounts = new Map(counted.map((row) => [row._id, row.count]));
 
     // Every known source is listed, connected or not. A source the user has never
     // enabled must still be visible and explained — a privacy screen that only shows
@@ -190,7 +199,7 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
         status: unavailable ? 'unavailable' : (conn?.status ?? 'disabled'),
         lastSyncedAt: conn?.lastSyncedAt ?? null,
         lastSyncError: conn?.lastSyncError ?? null,
-        eventCount: conn?.eventCount ?? 0,
+        eventCount: eventCounts.get(source) ?? 0,
         aiAllowed: conn?.aiAllowed ?? false,
         connectedAt: conn?.connectedAt ?? null,
       };
@@ -322,7 +331,7 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
 
       await DataSourceConnectionModel.updateOne(
         { userId: uid, source: req.params.source },
-        { $set: { status: 'disabled', aiAllowed: false, eventCount: 0, lastSyncedAt: null } },
+        { $set: { status: 'disabled', aiAllowed: false, lastSyncedAt: null } },
       );
       await mirrorAiChoices(req.user.id);
 

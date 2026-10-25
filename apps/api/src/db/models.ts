@@ -620,7 +620,8 @@ const dataSourceConnectionSchema = new Schema(
     grantedScopes: { type: [String], default: [] },
     lastSyncedAt: { type: Date, default: null },
     lastSyncError: { type: String, default: null },
-    eventCount: { type: Number, required: true, default: 0 },
+    // No event count here: GET /data-sources counts the events themselves. A counter kept
+    // beside them read 0 for Health and grew on every Weather sync.
     /** Consent to *collect* and consent to *reason about* are separate decisions. */
     aiAllowed: { type: Boolean, required: true, default: false },
     connectedAt: { type: Date, default: null },
