@@ -15,12 +15,18 @@ import {
 } from '@expo-google-fonts/manrope';
 import * as Notifications from 'expo-notifications';
 import { migrateTokenAccessibility, probeServer, setWriteListener } from '../src/api/client.js';
-import { checkConnectivityNow, startConnectivity } from '../src/api/connectivity.js';
+import {
+  checkConnectivityNow,
+  holdUntilSynced,
+  startConnectivity,
+} from '../src/api/connectivity.js';
 import { errorLine } from '../src/api/errorCopy.js';
 import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
 import { OfflineBanner } from '../src/components/OfflineBanner.js';
 import { ToastHost } from '../src/components/ToastHost.js';
 import { showToast } from '../src/feedback/toast.js';
+import { loadOutbox, useOutbox } from '../src/offline/outbox.js';
+import { syncNow } from '../src/offline/sync.js';
 import type { ReminderRoute } from '../src/reminders/plan.js';
 import { routeForNotification } from '../src/reminders/route.js';
 import { refreshReminders, requestReminderRefresh } from '../src/reminders/schedule.js';
@@ -36,10 +42,6 @@ void SplashScreen.preventAutoHideAsync();
 // Any change the server accepts may change what a reminder should say (water so far, a
 // habit done), so every write asks for the reminders to be re-planned.
 setWriteListener(requestReminderRefresh);
-
-// While a request cannot connect, the server is checked until it answers; queries pause
-// meanwhile and refetch the moment it does (src/api/connectivity.ts).
-startConnectivity(probeServer);
 
 /**
  * What a mutation may say about itself. `failed` names the action for the toast ("Couldn’t
@@ -76,6 +78,16 @@ const queryClient = new QueryClient({
       networkMode: 'always',
     },
   },
+});
+
+// While a request cannot connect, the server is checked until it answers; queries pause
+// meanwhile. On the way back, the changes made offline are sent first, and only then do
+// the queries refetch (src/api/connectivity.ts, src/offline/sync.ts).
+startConnectivity(probeServer, { beforeOnline: () => syncNow(queryClient) });
+
+// Changes still waiting from last time are sent before the screens fetch anything.
+void loadOutbox().then(() => {
+  if (useOutbox.getState().items.length > 0) void holdUntilSynced();
 });
 
 /**

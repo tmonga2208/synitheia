@@ -70,3 +70,99 @@ describe('connectivity', () => {
     expect(probe).not.toHaveBeenCalled();
   });
 });
+
+function deferred() {
+  let release: () => void = () => undefined;
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
+
+describe('coming back online with changes to send', () => {
+  let gate: ReturnType<typeof deferred>;
+  const beforeOnline = vi.fn<() => Promise<void>>();
+
+  beforeEach(() => {
+    stop();
+    gate = deferred();
+    beforeOnline.mockReset().mockImplementation(() => gate.promise);
+    stop = connectivity.startConnectivity(probe, { beforeOnline });
+  });
+
+  it('sends what waited first, and only then lets queries run', async () => {
+    connectivity.noteNetworkFailure();
+    connectivity.noteNetworkSuccess();
+
+    expect(beforeOnline).toHaveBeenCalledTimes(1);
+    expect(onlineManager.isOnline()).toBe(false);
+
+    gate.release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onlineManager.isOnline()).toBe(true);
+  });
+
+  it('is neither hurried nor repeated by answers that arrive meanwhile', async () => {
+    connectivity.noteNetworkFailure();
+    connectivity.noteNetworkSuccess();
+    connectivity.noteNetworkSuccess();
+    await connectivity.checkConnectivityNow();
+    connectivity.noteNetworkSuccess();
+
+    expect(onlineManager.isOnline()).toBe(false);
+    expect(beforeOnline).toHaveBeenCalledTimes(1);
+
+    gate.release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onlineManager.isOnline()).toBe(true);
+  });
+
+  it('stays offline, and keeps checking, when the connection drops again meanwhile', async () => {
+    connectivity.noteNetworkFailure();
+    connectivity.noteNetworkSuccess();
+    connectivity.noteNetworkFailure();
+
+    gate.release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(beforeOnline).toHaveBeenCalledTimes(1);
+    expect(onlineManager.isOnline()).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets queries run even when sending what waited fails', async () => {
+    beforeOnline.mockRejectedValueOnce(new Error('boom'));
+
+    connectivity.noteNetworkFailure();
+    connectivity.noteNetworkSuccess();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(beforeOnline).toHaveBeenCalledTimes(1);
+    expect(onlineManager.isOnline()).toBe(true);
+  });
+
+  it('finishes a check only once it is back online', async () => {
+    connectivity.noteNetworkFailure();
+    probe.mockResolvedValue(true);
+
+    const checked = connectivity.checkConnectivityNow();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onlineManager.isOnline()).toBe(false);
+
+    gate.release();
+    await checked;
+    expect(onlineManager.isOnline()).toBe(true);
+  });
+
+  it('at launch, holds queries until changes left from last time are sent', async () => {
+    const held = connectivity.holdUntilSynced();
+
+    expect(onlineManager.isOnline()).toBe(false);
+    expect(beforeOnline).toHaveBeenCalledTimes(1);
+
+    gate.release();
+    await held;
+    expect(onlineManager.isOnline()).toBe(true);
+  });
+});
