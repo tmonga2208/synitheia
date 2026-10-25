@@ -43,9 +43,25 @@ export interface ApiErrorBody {
   };
 }
 
+/**
+ * What kind of refusal an answer was, so the words can say whose problem it is
+ * (src/api/errorCopy.ts). Anything without the API's own JSON is the server's: a 502 page
+ * from the host, or a gateway that does not know the app.
+ */
+export type ApiErrorKind = 'server' | 'rate' | 'validation' | 'auth' | 'app';
+
+function kindOf(status: number, body: ApiErrorBody | null): ApiErrorKind {
+  if (status >= 500 || body === null) return 'server';
+  if (status === 429) return 'rate';
+  if (status === 422) return 'validation';
+  if (status === 401) return 'auth';
+  return 'app';
+}
+
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
+  readonly kind: ApiErrorKind;
   readonly details?: unknown;
 
   constructor(status: number, body: ApiErrorBody | null, fallback: string) {
@@ -53,9 +69,30 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
     this.code = body?.error.code ?? 'unknown';
+    this.kind = kindOf(status, body);
     this.details = body?.error.details;
   }
 }
+
+/**
+ * No answer at all: the phone could not connect ('offline'), or the server took too long
+ * ('timeout'). Before this existed, people saw the platform's own "Network request failed",
+ * and a request that never answered left a spinner turning forever.
+ */
+export class NetworkError extends Error {
+  readonly reason: 'offline' | 'timeout';
+
+  constructor(reason: 'offline' | 'timeout') {
+    super(reason === 'offline' ? 'Could not connect' : 'No answer in time');
+    this.name = 'NetworkError';
+    this.reason = reason;
+  }
+}
+
+/** Long enough for a slow mobile connection; short enough that nobody waits on a dead one. */
+const TIMEOUT_MS = 20_000;
+/** A photo or a PDF statement on a slow connection takes longer to send. */
+const UPLOAD_TIMEOUT_MS = 60_000;
 
 export async function setTokens(access: string, refresh: string): Promise<void> {
   await Promise.all([
@@ -216,18 +253,32 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
    * It broke every delete button in the app, and it hid from curl, which does not send
    * the header unless you ask it to. The tests passed; the app did not.
    */
-  const res = await fetch(`${baseUrl}/v1${path}`, {
-    ...rest,
-    headers: {
-      ...(hasBody && !isFormData ? { 'content-type': 'application/json' } : {}),
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: isFormData ? (body as FormData) : hasBody ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), isFormData ? UPLOAD_TIMEOUT_MS : TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/v1${path}`, {
+      ...rest,
+      signal: controller.signal,
+      headers: {
+        ...(hasBody && !isFormData ? { 'content-type': 'application/json' } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+      body: isFormData ? (body as FormData) : hasBody ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new NetworkError(controller.signal.aborted ? 'timeout' : 'offline');
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (res.status === 401 && !_retried) {
-    const fresh = await refreshAccessToken(background === true);
+    // A refresh that cannot connect is a connection problem, not a dead session.
+    const fresh = await refreshAccessToken(background === true).catch(() => {
+      throw new NetworkError('offline');
+    });
     if (fresh) {
       return request<T>(path, { ...options, _retried: true });
     }

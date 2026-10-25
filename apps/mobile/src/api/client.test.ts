@@ -170,6 +170,94 @@ describe('a failed refresh shared by a background and a foreground request', () 
   });
 });
 
+describe('when a request fails', () => {
+  it('calls a failure to connect "offline"', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Network request failed'));
+
+    const error = await client.api.get('/today').catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(client.NetworkError);
+    expect((error as InstanceType<typeof client.NetworkError>).reason).toBe('offline');
+  });
+
+  it('gives up on a request that never answers, after 20 seconds', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementationOnce(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+          }),
+      );
+
+      const pending = client.api.get('/today').catch((caught: unknown) => caught);
+      await vi.advanceTimersByTimeAsync(19_999);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+
+      const error = await pending;
+      expect(error).toBeInstanceOf(client.NetworkError);
+      expect((error as InstanceType<typeof client.NetworkError>).reason).toBe('timeout');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives an upload a minute before giving up', async () => {
+    vi.useFakeTimers();
+    try {
+      let aborted = false;
+      fetchMock.mockImplementationOnce(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              aborted = true;
+              reject(new Error('aborted'));
+            });
+          }),
+      );
+
+      const pending = client.api.upload('/expenses/ingest/image', new FormData()).catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(aborted).toBe(true);
+      await pending;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('says the server is the problem when it answers with an error page', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('<html>Bad Gateway</html>', { status: 502, headers: { 'content-type': 'text/html' } }),
+    );
+
+    const error = await client.api.get('/today').catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(client.ApiError);
+    expect((error as InstanceType<typeof client.ApiError>).kind).toBe('server');
+  });
+
+  it('tells rate limits, refused input and other refusals apart', async () => {
+    const body = (code: string, message: string) => ({ error: { code, message, requestId: 'r' } });
+    fetchMock
+      .mockResolvedValueOnce(json(429, body('rate_limited', 'Too many requests')))
+      .mockResolvedValueOnce(json(422, body('validation_failed', 'Request validation failed')))
+      .mockResolvedValueOnce(json(400, body('bad_request', 'Cannot log a habit for a future date')));
+
+    const kinds = [];
+    for (let i = 0; i < 3; i += 1) {
+      const error = (await client.api.post('/habits/x/log', {}).catch((caught: unknown) => caught)) as InstanceType<
+        typeof client.ApiError
+      >;
+      kinds.push(error.kind);
+    }
+
+    expect(kinds).toEqual(['rate', 'validation', 'app']);
+  });
+});
+
 describe('the write listener', () => {
   it('hears about every change that succeeded', async () => {
     const heard = vi.fn();
