@@ -80,11 +80,13 @@ const SOURCE_COPY: Record<
     platforms: 'iOS and Android',
     reliability: 'Reliable. Uses only your approximate area, never a precise position.',
   },
+  // Android can grant notification access; this used to say store policy forbids it, which
+  // was never checked. What is true is that the app chooses not to ask (see README).
   notifications: {
     title: 'Notifications',
-    why: 'Not available. Reading your notifications is impossible on iOS, and app-store policy does not permit it for expense tracking on Android. Share a payment screenshot instead — it takes two taps and we never have to watch your notifications.',
-    platforms: 'Not available on either platform',
-    reliability: 'Not available.',
+    why: 'Not read. iOS gives apps no way to read your notifications. Android does, if you allow it in Settings, but Synítheia chooses not to ask: it would mean reading every notification you get. Pick a payment screenshot or paste the message instead.',
+    platforms: 'Not possible on iOS · not used on Android',
+    reliability: 'Not collected.',
   },
 };
 
@@ -231,7 +233,7 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
 
       if (source === 'notifications') {
         throw AppError.badRequest(
-          'Notification access is not available: iOS exposes no API for it, and Play Store policy does not permit it for this use case.',
+          'Synítheia does not read notifications. iOS offers no way to, and on Android the app chooses not to ask for that access.',
         );
       }
 
