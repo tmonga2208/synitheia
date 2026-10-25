@@ -7,7 +7,9 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { UserModel } from '../../db/models.js';
+import { asLocalDate } from '@synitheia/shared';
+import { UserModel, UserPreferenceModel } from '../../db/models.js';
+import { buildContext } from '../../ai/context-builder.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 import type * as Env from '../../config/env.js';
 import type * as ImageKit from '../../storage/imagekit.js';
@@ -175,6 +177,47 @@ describe('GET /privacy/export', () => {
   });
 });
 
+describe('GET /data-sources', () => {
+  /**
+   * The count under each source was a counter kept beside the events: Health never added to
+   * it, so it read 0 however much arrived, and Weather added one per sync although a day
+   * keeps one observation. The count is the events, as the timeline and a deletion see them.
+   */
+  it('counts each source’s events as the timeline holds them', async () => {
+    const user = await seedUser();
+    const other = await seedUser();
+    const event = (owner: Seeded, source: string) => ({
+      userId: owner.oid,
+      source,
+      dedupeKey: new Types.ObjectId().toString(),
+    });
+    await mongoose.models.PersonalEvent!.collection.insertMany([
+      event(user, 'health'),
+      event(user, 'health'),
+      event(user, 'health'),
+      event(user, 'weather'),
+      event(other, 'health'),
+      event(other, 'calendar'),
+    ]);
+    // What the old counters said for this user.
+    await mongoose.models.DataSourceConnection!.collection.insertMany([
+      { userId: user.oid, source: 'health', status: 'connected', eventCount: 0 },
+      { userId: user.oid, source: 'weather', status: 'connected', eventCount: 99 },
+    ]);
+
+    const app = await appFor(user);
+    const response = await app.inject({ method: 'GET', url: '/data-sources' });
+    expect(response.statusCode).toBe(200);
+
+    const counts = Object.fromEntries(
+      response
+        .json()
+        .items.map((item: { source: string; eventCount: number }) => [item.source, item.eventCount]),
+    );
+    expect(counts).toEqual({ health: 3, calendar: 0, location: 0, weather: 1, notifications: 0 });
+  });
+});
+
 describe('DELETE /data-sources/:source/data', () => {
   it('forgets the daily health records along with the health events', async () => {
     const user = await seedUser();
@@ -202,5 +245,136 @@ describe('DELETE /data-sources/:source/data', () => {
     await app.inject({ method: 'DELETE', url: '/data-sources/calendar/data' });
 
     expect(await mongoose.models.HealthDay!.countDocuments({ userId: user.oid })).toBe(1);
+  });
+});
+
+/**
+ * The "Let Synítheia AI use it" switch on each source is a promise about what reaches the
+ * model. These tests flip it through the routes the app calls, then ask the real context
+ * builder what it would send.
+ */
+describe('per-source AI consent', () => {
+  const WEEK = [
+    '2026-10-01',
+    '2026-10-02',
+    '2026-10-03',
+    '2026-10-04',
+    '2026-10-05',
+    '2026-10-06',
+    '2026-10-07',
+  ];
+
+  /** A week the builder will reason about: every day has activity, and every day has steps. */
+  async function seedWeekWithSteps(user: Seeded) {
+    await mongoose.models.DailySummary!.collection.insertMany(
+      WEEK.map((localDate, i) => ({
+        userId: user.oid,
+        localDate,
+        expenses: { totalMinor: 0, count: 0, byCategory: {} },
+        habits: { completedIds: [], missedIds: [] },
+        nutrition: { entryCount: 0, totals: { calories: 0 }, calorieTarget: 2000 },
+        water: { entryCount: 0, totalMl: 0, targetMl: 2500 },
+        activity: { steps: 8000 + i, workoutMinutes: 0 },
+        context: { weekday: i, calendarEventCount: 0, lastCalendarEventEndMin: null },
+        eventCount: 1,
+        generatedAt: new Date(),
+      })),
+    );
+  }
+
+  async function stepsReachTheModel(user: Seeded): Promise<boolean> {
+    const context = await buildContext(
+      user.id,
+      user.timezone,
+      'INR',
+      asLocalDate(WEEK[0]!),
+      asLocalDate(WEEK[6]!),
+    );
+    return context.metrics.some((metric) => metric.key === 'steps_avg');
+  }
+
+  async function aiOnFor(user: Seeded) {
+    await UserPreferenceModel.create({ userId: user.oid, aiEnabled: true });
+    return appFor(user);
+  }
+
+  it('stops sending a source to the model once its AI switch is turned off', async () => {
+    const user = await seedUser();
+    const app = await aiOnFor(user);
+    await seedWeekWithSteps(user);
+
+    await app.inject({
+      method: 'PUT',
+      url: '/data-sources/health',
+      payload: { status: 'connected', aiAllowed: true },
+    });
+    expect(await stepsReachTheModel(user)).toBe(true);
+
+    // Collection stays on. Only the AI switch moves, which is all the app sends here.
+    await app.inject({
+      method: 'PUT',
+      url: '/data-sources/health',
+      payload: { status: 'connected', aiAllowed: false },
+    });
+    expect(await stepsReachTheModel(user)).toBe(false);
+  });
+
+  it('does not send a forgotten source to the model when it is collected again', async () => {
+    const user = await seedUser();
+    const app = await aiOnFor(user);
+
+    await app.inject({
+      method: 'PUT',
+      url: '/data-sources/health',
+      payload: { status: 'connected', aiAllowed: true },
+    });
+    await app.inject({ method: 'DELETE', url: '/data-sources/health/data' });
+
+    // Turning collection back on sends the AI switch as the screen now shows it: off.
+    await app.inject({
+      method: 'PUT',
+      url: '/data-sources/health',
+      payload: { status: 'connected', aiAllowed: false },
+    });
+    await seedWeekWithSteps(user);
+
+    expect(await stepsReachTheModel(user)).toBe(false);
+  });
+
+  /**
+   * The preferences carry a copy of the per-source choice, and the export hands it to the
+   * user as "what you allowed the AI". It has to say what the switches say.
+   */
+  it('exports the AI choices the switches show, not stale ones', async () => {
+    const user = await seedUser();
+    const app = await aiOnFor(user);
+    const exportedChoice = async () =>
+      (await app.inject({ method: 'GET', url: '/privacy/export' })).json().preferences
+        .aiAllowedSources;
+
+    for (const source of ['health', 'calendar', 'location']) {
+      await app.inject({
+        method: 'PUT',
+        url: `/data-sources/${source}`,
+        payload: { status: 'connected', aiAllowed: true },
+      });
+    }
+    expect([...(await exportedChoice())].sort()).toEqual(['calendar', 'health', 'location']);
+
+    await app.inject({
+      method: 'PUT',
+      url: '/data-sources/health',
+      payload: { status: 'connected', aiAllowed: false },
+    });
+    await app.inject({ method: 'DELETE', url: '/data-sources/calendar/data' });
+    expect(await exportedChoice()).toEqual(['location']);
+
+    // Nor can the list be written directly to say something no switch says.
+    await app.inject({
+      method: 'PUT',
+      url: '/privacy/ai',
+      payload: { aiEnabled: true, aiAllowedSources: ['health', 'weather'] },
+    });
+    expect(await exportedChoice()).toEqual(['location']);
   });
 });

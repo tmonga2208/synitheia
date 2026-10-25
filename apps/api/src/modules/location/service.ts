@@ -53,7 +53,7 @@ export async function sync(
 
   await DataSourceConnectionModel.updateOne(
     { userId, source: 'location' },
-    { $set: { lastSyncedAt: new Date(), lastSyncError: null }, $inc: { eventCount: added } },
+    { $set: { lastSyncedAt: new Date(), lastSyncError: null } },
   );
 
   return { visits: input.visits.length, added };

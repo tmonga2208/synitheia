@@ -45,6 +45,7 @@ import type {
   ListResponse,
 } from '../src/api/types.js';
 import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
+import { canForget, forgetConfirmation, forgottenNotice } from '../src/privacy/forgetSource.js';
 import { useAuth } from '../src/store/auth.js';
 import { backgroundSyncCopy } from '../src/sync/backgroundCopy.js';
 import { syncBackgroundRegistration } from '../src/sync/backgroundTask.js';
@@ -299,6 +300,41 @@ export default function Privacy() {
     },
   });
 
+  /**
+   * "Delete this data" on a source. The server removes what the source added and turns it
+   * off; the confirmation says what goes and what stays (src/privacy/forgetSource.ts).
+   */
+  const forgetSource = useMutation({
+    mutationFn: (item: DataSourceItem) =>
+      api.delete<{ deletedEvents: number }>(`/data-sources/${item.source}/data`),
+
+    onSuccess: (result, item) => {
+      const notice = forgottenNotice(item.title, result.deletedEvents);
+      Alert.alert(notice.title, notice.message);
+    },
+
+    onError: (error: unknown) => {
+      Alert.alert(
+        'Could not delete',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    },
+
+    // Every query, not a list of keys: the timeline, days, months, the body screen and
+    // insights all show what a source added, and a key missed here would keep showing
+    // deleted data until the app restarted.
+    onSettled: () => queryClient.invalidateQueries(),
+  });
+
+  function confirmForget(item: DataSourceItem): void {
+    const { title, message, confirm } = forgetConfirmation(item, healthSourceName());
+
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: confirm, style: 'destructive', onPress: () => forgetSource.mutate(item) },
+    ]);
+  }
+
   const setAiEnabled = useMutation({
     mutationFn: (aiEnabled: boolean) => api.put<unknown>('/privacy/ai', { aiEnabled }),
 
@@ -492,6 +528,8 @@ export default function Privacy() {
                   aiAllowed,
                 })
               }
+              onForget={() => confirmForget(item)}
+              forgetting={forgetSource.isPending && forgetSource.variables?.source === item.source}
             />
           ))}
         </View>
@@ -590,11 +628,15 @@ function SourceCard({
   aiEnabled,
   onCollectChange,
   onAiChange,
+  onForget,
+  forgetting,
 }: {
   item: DataSourceItem;
   aiEnabled: boolean;
   onCollectChange: (collect: boolean) => void;
   onAiChange: (aiAllowed: boolean) => void;
+  onForget: () => void;
+  forgetting: boolean;
 }) {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -702,6 +744,25 @@ function SourceCard({
           </View>
         </View>
       ) : null}
+
+      {/* Switching a source off stops collection; this removes what it already took.
+          Shown whenever there is something to remove, including after it is off. */}
+      {canForget(item) ? (
+        <Touchable
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${item.title} data`}
+          accessibilityHint="Asks first. Deletes what this source added and turns it off."
+          haptic={false}
+          onPress={onForget}
+          disabled={forgetting}
+          style={styles.forgetRow}
+        >
+          <Trash2 size={18} color={t.danger} strokeWidth={1.6} />
+          <Text variant="bodyMedium" color={t.danger}>
+            {forgetting ? 'Deleting…' : 'Delete this data'}
+          </Text>
+        </Touchable>
+      ) : null}
     </Card>
   );
 }
@@ -758,7 +819,7 @@ function DeleteAccountSheet({
           onPress={onClose}
         />
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView behavior="padding">
           <SafeAreaView style={styles.sheet} edges={['bottom']}>
             <View style={styles.handle} />
 
@@ -887,6 +948,13 @@ const makeStyles = (t: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.xs,
+    },
+    forgetRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: spacing.sm,
+      minHeight: MIN_TAP_TARGET,
     },
     dataCard: { marginTop: spacing.xl, gap: spacing.sm },
     dataRow: {

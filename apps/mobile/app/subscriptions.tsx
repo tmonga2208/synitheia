@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -343,7 +342,7 @@ function AddBillSheet({
       <SafeAreaProvider>
         <SafeAreaView style={styles.sheet} edges={['top', 'bottom']}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior="padding"
             style={{ flex: 1 }}
           >
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">

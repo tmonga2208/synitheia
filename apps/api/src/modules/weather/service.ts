@@ -93,7 +93,7 @@ export async function sync(
 
   await DataSourceConnectionModel.updateOne(
     { userId, source: 'weather' },
-    { $set: { lastSyncedAt: new Date(), lastSyncError: null }, $inc: { eventCount: 1 } },
+    { $set: { lastSyncedAt: new Date(), lastSyncError: null } },
   );
 
   return { observed: true };

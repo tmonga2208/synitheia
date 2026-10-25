@@ -28,6 +28,7 @@ import {
   XpAwardModel,
 } from '../../db/models.js';
 import { AppError } from '../../core/errors.js';
+import { aiAllowedSources } from '../../ai/context-builder.js';
 import { purgeAllReceipts } from '../expenses/receipts.js';
 import { loadEnv } from '../../config/env.js';
 
@@ -79,11 +80,13 @@ const SOURCE_COPY: Record<
     platforms: 'iOS and Android',
     reliability: 'Reliable. Uses only your approximate area, never a precise position.',
   },
+  // Android can grant notification access; this used to say store policy forbids it, which
+  // was never checked. What is true is that the app chooses not to ask (see README).
   notifications: {
     title: 'Notifications',
-    why: 'Not available. Reading your notifications is impossible on iOS, and app-store policy does not permit it for expense tracking on Android. Share a payment screenshot instead — it takes two taps and we never have to watch your notifications.',
-    platforms: 'Not available on either platform',
-    reliability: 'Not available.',
+    why: 'Not read. iOS gives apps no way to read your notifications. Android does, if you allow it in Settings, but Synítheia chooses not to ask: it would mean reading every notification you get. Pick a payment screenshot or paste the message instead.',
+    platforms: 'Not possible on iOS · not used on Android',
+    reliability: 'Not collected.',
   },
 };
 
@@ -150,14 +153,40 @@ const USER_DATA: UserCollection[] = [
   userCollection('refreshTokens', RefreshTokenModel, false),
 ];
 
+/**
+ * Rewrite the preferences' copy of the per-source AI choices from the connection rows.
+ *
+ * The rows are what the switches show and what the context builder obeys. The copy is kept
+ * for the export, where it answers "what did I let the AI use?". It is rebuilt after every
+ * change rather than patched, because patching is how it drifted: switching a source's AI
+ * off left the source on the list.
+ */
+async function mirrorAiChoices(userId: string): Promise<void> {
+  const allowed = await aiAllowedSources(userId);
+
+  await UserPreferenceModel.updateOne(
+    { userId: new Types.ObjectId(userId) },
+    { $set: { aiAllowedSources: [...allowed] } },
+  );
+}
+
 export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void> {
   const api = app.withTypeProvider<ZodTypeProvider>();
   const env = loadEnv();
 
   api.get('/data-sources', { onRequest: [app.requireAuth] }, async (req) => {
     const uid = new Types.ObjectId(req.user.id);
-    const connections = await DataSourceConnectionModel.find({ userId: uid }).lean();
+    const [connections, counted] = await Promise.all([
+      DataSourceConnectionModel.find({ userId: uid }).lean(),
+      // Counted from the events themselves, so the number is what the timeline shows and
+      // what "delete this source's data" removes. A counter kept beside them drifted.
+      PersonalEventModel.aggregate<{ _id: string; count: number }>([
+        { $match: { userId: uid } },
+        { $group: { _id: '$source', count: { $sum: 1 } } },
+      ]),
+    ]);
     const bySource = new Map(connections.map((c) => [c.source, c]));
+    const eventCounts = new Map(counted.map((row) => [row._id, row.count]));
 
     // Every known source is listed, connected or not. A source the user has never
     // enabled must still be visible and explained — a privacy screen that only shows
@@ -172,7 +201,7 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
         status: unavailable ? 'unavailable' : (conn?.status ?? 'disabled'),
         lastSyncedAt: conn?.lastSyncedAt ?? null,
         lastSyncError: conn?.lastSyncError ?? null,
-        eventCount: conn?.eventCount ?? 0,
+        eventCount: eventCounts.get(source) ?? 0,
         aiAllowed: conn?.aiAllowed ?? false,
         connectedAt: conn?.connectedAt ?? null,
       };
@@ -204,9 +233,14 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
 
       if (source === 'notifications') {
         throw AppError.badRequest(
-          'Notification access is not available: iOS exposes no API for it, and Play Store policy does not permit it for this use case.',
+          'Synítheia does not read notifications. iOS offers no way to, and on Android the app chooses not to ask for that access.',
         );
       }
+
+      // Disabling a source withdraws it from the AI too. Leaving aiAllowed set on a
+      // disconnected source would mean a user who turned Location off still had their
+      // historical location data reasoned about — which is not what "off" means.
+      const aiAllowed = req.body.status === 'connected' ? req.body.aiAllowed : false;
 
       const connection = await DataSourceConnectionModel.findOneAndUpdate(
         { userId: new Types.ObjectId(req.user.id), source },
@@ -214,31 +248,14 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
           $set: {
             status: req.body.status,
             grantedScopes: req.body.grantedScopes,
-            ...(req.body.aiAllowed !== undefined ? { aiAllowed: req.body.aiAllowed } : {}),
+            ...(aiAllowed !== undefined ? { aiAllowed } : {}),
             ...(req.body.status === 'connected' ? { connectedAt: new Date() } : {}),
           },
         },
         { upsert: true, new: true },
       ).lean();
 
-      // Disabling a source withdraws it from the AI too. Leaving aiAllowed set on a
-      // disconnected source would mean a user who turned Location off still had their
-      // historical location data reasoned about — which is not what "off" means.
-      if (req.body.status !== 'connected') {
-        await DataSourceConnectionModel.updateOne(
-          { userId: new Types.ObjectId(req.user.id), source },
-          { $set: { aiAllowed: false } },
-        );
-        await UserPreferenceModel.updateOne(
-          { userId: new Types.ObjectId(req.user.id) },
-          { $pull: { aiAllowedSources: source } },
-        );
-      } else if (req.body.aiAllowed) {
-        await UserPreferenceModel.updateOne(
-          { userId: new Types.ObjectId(req.user.id) },
-          { $addToSet: { aiAllowedSources: source } },
-        );
-      }
+      await mirrorAiChoices(req.user.id);
 
       return { connection };
     },
@@ -278,7 +295,8 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
       schema: {
         body: z.object({
           aiEnabled: z.boolean(),
-          aiAllowedSources: z.array(connectableSourceSchema).optional(),
+          // Not `aiAllowedSources`: which sources the AI may use is set one source at a
+          // time, through the switches PUT /data-sources/:source records.
           aiIncludeNotes: z.boolean().optional(),
         }),
       },
@@ -315,8 +333,9 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
 
       await DataSourceConnectionModel.updateOne(
         { userId: uid, source: req.params.source },
-        { $set: { status: 'disabled', aiAllowed: false, eventCount: 0, lastSyncedAt: null } },
+        { $set: { status: 'disabled', aiAllowed: false, lastSyncedAt: null } },
       );
+      await mirrorAiChoices(req.user.id);
 
       // Health also keeps one record per day (steps, sleep, heart rate, workouts) outside the
       // timeline. Forgetting the events and keeping those would be forgetting the summary

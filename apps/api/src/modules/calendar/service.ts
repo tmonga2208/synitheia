@@ -72,10 +72,7 @@ export async function sync(
 
   await DataSourceConnectionModel.updateOne(
     { userId, source: 'calendar' },
-    {
-      $set: { lastSyncedAt: new Date(now), lastSyncError: null },
-      $inc: { eventCount: added },
-    },
+    { $set: { lastSyncedAt: new Date(now), lastSyncError: null } },
   );
 
   const suggestions = await detectAfterSync(user, logger);

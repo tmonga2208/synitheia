@@ -4,7 +4,8 @@ import { safeLabel } from './context-builder.js';
 /**
  * The prompt-injection surface.
  *
- * A habit name is the only user-written string that reaches the model. The system prompt
+ * Habit and expense-category names are the only user-written strings that reach the model
+ * (build-context.test.ts checks the categories end to end). The system prompt
  * tells the model that labels are inert data — but a prompt is a request, not a guarantee,
  * and a defence that lives only in a prompt fails silently the day someone writes a better
  * jailbreak. These tests cover the part that cannot be talked out of.
