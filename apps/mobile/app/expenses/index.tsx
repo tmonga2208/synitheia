@@ -110,11 +110,8 @@ export default function Expenses() {
         <View style={styles.content}>
           {header}
           <ErrorState
-            message={
-              query.error instanceof Error
-                ? query.error.message
-                : 'We could not load your expenses.'
-            }
+            error={query.error}
+            message="We could not load your expenses."
             onRetry={() => void query.refetch()}
           />
         </View>

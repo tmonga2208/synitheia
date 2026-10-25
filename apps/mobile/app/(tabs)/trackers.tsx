@@ -19,7 +19,7 @@ import {
 } from '../../src/components/primitives.js';
 import { SkeletonTrackers } from '../../src/components/Skeleton.js';
 import { TrackerTile } from '../../src/components/TrackerTile.js';
-import { ApiError, api } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
 import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
@@ -78,6 +78,7 @@ export default function Trackers() {
    * on a flaky connection, from logging 500ml twice.
    */
   const addWater = useMutation({
+    meta: { failed: 'Couldn’t log water' },
     mutationFn: (amountMl: number) =>
       api.post<unknown>('/water', { amountMl, clientKey: Crypto.randomUUID() }),
     onMutate: async (amountMl: number) => {
@@ -106,9 +107,8 @@ export default function Trackers() {
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
           <ErrorState
-            message={
-              error instanceof ApiError ? error.message : 'Could not load your trackers.'
-            }
+            error={error}
+            message="Could not load your trackers."
             onRetry={() => void refetch()}
           />
         </View>

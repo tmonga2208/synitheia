@@ -31,7 +31,8 @@ import {
   Touchable,
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
+import { errorLine } from '../src/api/errorCopy.js';
 import type { ListResponse, WireCategory } from '../src/api/types.js';
 import { useAuth } from '../src/store/auth.js';
 import { radius, spacing } from '../src/theme/theme.js';
@@ -93,12 +94,14 @@ export default function SubscriptionsScreen() {
   };
 
   const setAuto = useMutation({
+    meta: { failed: 'Couldn’t update that bill' },
     mutationFn: ({ id, autoPost }: { id: string; autoPost: boolean }) =>
       api.patch<unknown>(`/subscriptions/${id}`, { autoPost }),
     onSettled: invalidate,
   });
 
   const remove = useMutation({
+    meta: { failed: 'Couldn’t delete that bill' },
     mutationFn: (id: string) => api.delete<void>(`/subscriptions/${id}`),
     onSettled: invalidate,
   });
@@ -123,7 +126,8 @@ export default function SubscriptionsScreen() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={error instanceof ApiError ? error.message : 'Could not load your bills.'}
+            error={error}
+            message="Could not load your bills."
             onRetry={() => void refetch()}
           />
         </View>
@@ -309,6 +313,7 @@ function AddBillSheet({
     anchorDay <= (cycle === 'weekly' ? 6 : 31);
 
   const create = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () =>
       api.post<unknown>('/subscriptions', {
         name: name.trim(),
@@ -332,7 +337,7 @@ function AddBillSheet({
     },
 
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : 'Could not add that bill.');
+      setError(errorLine(err, 'Couldn’t add that bill'));
     },
   });
 

@@ -30,6 +30,7 @@ export function ReceiptConsentSheet({
   const queryClient = useQueryClient();
 
   const allow = useMutation({
+    meta: { failed: 'Couldn’t turn on keeping receipts' },
     mutationFn: () => api.put<unknown>('/privacy/receipts', { storeReceipts: true }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });

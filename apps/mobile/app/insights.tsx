@@ -22,6 +22,7 @@ import {
 } from '../src/components/primitives.js';
 import { Skeleton, SkeletonList } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
+import { errorLine } from '../src/api/errorCopy.js';
 import type {
   InsightAvailability,
   InsightEvidence,
@@ -99,6 +100,7 @@ export default function Insights() {
    * being flattened into "Something went wrong".
    */
   const generate = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () => api.post<{ generated: number }>('/insights/generate', { days: 30 }),
 
     onMutate: () => setGenerateError(null),
@@ -113,19 +115,16 @@ export default function Insights() {
     },
 
     onError: (error: unknown) => {
-      if (error instanceof ApiError) {
-        setGenerateError(error.message);
-        // The user may have revoked consent on another device.
-        if (error.code === 'ai_disabled') {
-          void queryClient.invalidateQueries({ queryKey: AVAILABILITY_KEY });
-        }
-        return;
+      setGenerateError(errorLine(error, 'Couldn’t look for insights'));
+      // The user may have revoked consent on another device.
+      if (error instanceof ApiError && error.code === 'ai_disabled') {
+        void queryClient.invalidateQueries({ queryKey: AVAILABILITY_KEY });
       }
-      setGenerateError('Could not reach Synítheia right now. Please try again.');
     },
   });
 
   const feedback = useMutation({
+    meta: { failed: 'Couldn’t save your feedback' },
     mutationFn: ({ id, value }: { id: string; value: InsightFeedback }) =>
       api.post<unknown>(`/insights/${id}/feedback`, { feedback: value }),
 
@@ -154,6 +153,7 @@ export default function Insights() {
   });
 
   const dismiss = useMutation({
+    meta: { failed: 'Couldn’t dismiss that insight' },
     mutationFn: (id: string) =>
       api.post<unknown>(`/insights/${id}/status`, { status: 'dismissed' }),
 
@@ -213,11 +213,8 @@ export default function Insights() {
           {back}
           {header}
           <ErrorState
-            message={
-              availability.error instanceof Error
-                ? availability.error.message
-                : 'We could not reach Synítheia.'
-            }
+            error={availability.error}
+            message="We could not reach Synítheia."
             onRetry={() => void availability.refetch()}
           />
         </View>
@@ -277,11 +274,8 @@ export default function Insights() {
           <SkeletonList rows={3} />
         ) : insights.error ? (
           <ErrorState
-            message={
-              insights.error instanceof Error
-                ? insights.error.message
-                : 'We could not load your insights.'
-            }
+            error={insights.error}
+            message="We could not load your insights."
             onRetry={() => void insights.refetch()}
           />
         ) : items.length === 0 ? (
@@ -399,9 +393,7 @@ function InsightCard({
             </View>
           ) : evidence.error || !evidence.data ? (
             <Text variant="caption" color={t.danger}>
-              {evidence.error instanceof Error
-                ? evidence.error.message
-                : 'We could not load the evidence for this insight.'}
+              {errorLine(evidence.error, 'Couldn’t load the evidence for this insight')}
             </Text>
           ) : (
             <>

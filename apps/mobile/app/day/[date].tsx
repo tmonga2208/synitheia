@@ -100,6 +100,7 @@ export default function Day() {
         <SkeletonList rows={4} />
       ) : query.isError ? (
         <ErrorState
+          error={query.error}
           message="Couldn't load this day."
           onRetry={() => void query.refetch()}
         />

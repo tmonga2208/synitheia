@@ -36,7 +36,7 @@ import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { HabitCard, type TodayHabit } from '../../src/components/HabitCard.js';
 import { WeeklyChart } from '../../src/components/WeeklyChart.js';
 import { Timeline } from '../../src/components/Timeline.js';
-import { ApiError, api } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
 import { useCalendarSync } from '../../src/calendar/useCalendarSync.js';
 import { useSourcePrefsMirror } from '../../src/sync/useSourcePrefsMirror.js';
 import { useHealthSync } from '../../src/health/useHealthSync.js';
@@ -112,6 +112,7 @@ export default function Today() {
    * owns the next 300ms.
    */
   const logHabit = useMutation({
+    meta: { failed: 'Couldn’t log that habit' },
     mutationFn: (habit: TodayHabit) =>
       // One tap adds one STEP of this habit's measure, not one unit. A step goal that
       // moved 1 at a time would need 8,000 taps.
@@ -147,6 +148,7 @@ export default function Today() {
   });
 
   const resolveSuggestion = useMutation({
+    meta: { failed: 'Couldn’t save your answer' },
     mutationFn: ({ id, action }: { id: string; action: 'confirm' | 'reject' }) =>
       api.post<unknown>(`/inferences/${id}/resolve`, { action }),
 
@@ -195,11 +197,8 @@ export default function Today() {
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
           <ErrorState
-            message={
-              error instanceof ApiError || error instanceof Error
-                ? error.message
-                : 'We could not load your day.'
-            }
+            error={error}
+            message="We could not load your day."
             onRetry={() => void refetch()}
           />
         </View>

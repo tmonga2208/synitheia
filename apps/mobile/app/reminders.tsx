@@ -26,7 +26,8 @@ import {
   Touchable,
 } from '../src/components/primitives.js';
 import { SkeletonList } from '../src/components/Skeleton.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
+import { describeError, errorLine } from '../src/api/errorCopy.js';
 import type { ListResponse, WireReminder } from '../src/api/types.js';
 import {
   accessCopy,
@@ -95,6 +96,7 @@ export default function Reminders() {
   });
 
   const toggle = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: ({ reminder, enabled }: { reminder: WireReminder; enabled: boolean }) =>
       api.patch<{ reminder: WireReminder }>(`/reminders/${reminder._id}`, { enabled }),
 
@@ -120,16 +122,14 @@ export default function Reminders() {
 
     onError: (error: unknown, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(REMINDERS_KEY, context.previous);
-      Alert.alert(
-        'Could not update',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      Alert.alert('Couldn’t update this reminder', describeError(error).message);
     },
 
     onSettled: () => queryClient.invalidateQueries({ queryKey: REMINDERS_KEY }),
   });
 
   const remove = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: (reminder: WireReminder) => api.delete<void>(`/reminders/${reminder._id}`),
 
     onSuccess: () => {
@@ -137,14 +137,12 @@ export default function Reminders() {
     },
 
     onError: (error: unknown) => {
-      Alert.alert(
-        'Could not delete',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      Alert.alert('Couldn’t delete this reminder', describeError(error).message);
     },
   });
 
   const create = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: (input: CreateReminderInput) =>
       api.post<{ reminder: WireReminder }>('/reminders', input),
 
@@ -210,11 +208,8 @@ export default function Reminders() {
           {back}
           {header}
           <ErrorState
-            message={
-              query.error instanceof Error
-                ? query.error.message
-                : 'We could not load your reminders.'
-            }
+            error={query.error}
+            message="We could not load your reminders."
             onRetry={() => void query.refetch()}
           />
         </View>
@@ -309,11 +304,7 @@ export default function Reminders() {
       <ComposeSheet
         visible={composing}
         saving={create.isPending}
-        error={
-          create.error instanceof ApiError || create.error instanceof Error
-            ? create.error.message
-            : null
-        }
+        error={create.error ? errorLine(create.error, 'Couldn’t save this reminder') : null}
         onClose={() => setComposing(false)}
         onSubmit={(input) => create.mutate(input)}
       />

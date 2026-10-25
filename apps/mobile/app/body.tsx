@@ -20,7 +20,7 @@ import {
   Touchable,
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
 import { missingSentence } from '../src/health/bodyCopy.js';
 import { BodyDetails } from '../src/health/BodyDetails.js';
 import { BodyDetailsForm } from '../src/health/BodyDetailsForm.js';
@@ -75,6 +75,7 @@ export default function Body() {
   });
 
   const pickGoal = useMutation({
+    meta: { failed: 'Couldn’t set your calorie goal' },
     mutationFn: (goal: CalorieGoal) => api.put<BodyReport>('/health/calorie-goal', { goal }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: KEY });
@@ -102,7 +103,8 @@ export default function Body() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={error instanceof ApiError ? error.message : 'Could not load your body.'}
+            error={error}
+            message="Could not load your body."
             onRetry={() => void refetch()}
           />
         </View>

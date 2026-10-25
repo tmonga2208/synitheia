@@ -13,7 +13,8 @@ import {
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
-import { ApiError, api } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
+import { errorLine } from '../../src/api/errorCopy.js';
 import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
@@ -68,6 +69,7 @@ export default function NewFood() {
   const valid = name.trim().length > 0 && perServing.calories > 0;
 
   const create = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () =>
       api.post<unknown>('/food', {
         name: name.trim(),
@@ -83,7 +85,7 @@ export default function NewFood() {
     },
 
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : 'Could not log that meal.');
+      setError(errorLine(err, 'Couldn’t log that meal'));
     },
   });
 

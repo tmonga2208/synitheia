@@ -15,7 +15,7 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ProgressRing } from '../src/components/ProgressRing.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
@@ -62,12 +62,14 @@ export default function WaterScreen() {
   };
 
   const add = useMutation({
+    meta: { failed: 'Couldn’t log water' },
     mutationFn: (amountMl: number) =>
       api.post<unknown>('/water', { amountMl, clientKey: Crypto.randomUUID() }),
     onSettled: invalidate,
   });
 
   const remove = useMutation({
+    meta: { failed: 'Couldn’t remove that entry' },
     mutationFn: (id: string) => api.delete<void>(`/water/${id}`),
     onSettled: invalidate,
   });
@@ -98,7 +100,8 @@ export default function WaterScreen() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={error instanceof ApiError ? error.message : 'Could not load your water.'}
+            error={error}
+            message="Could not load your water."
             onRetry={() => void refetch()}
           />
         </View>

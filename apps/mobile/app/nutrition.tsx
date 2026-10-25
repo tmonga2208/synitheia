@@ -21,7 +21,7 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ProgressRing } from '../src/components/ProgressRing.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
@@ -82,6 +82,7 @@ export default function NutritionScreen() {
   const target = today.data?.nutrition.calorieTarget ?? 2000;
 
   const remove = useMutation({
+    meta: { failed: 'Couldn’t delete that meal' },
     mutationFn: (id: string) => api.delete<void>(`/food/${id}`),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: FOOD_KEY });
@@ -115,7 +116,8 @@ export default function NutritionScreen() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={error instanceof ApiError ? error.message : 'Could not load your meals.'}
+            error={error}
+            message="Could not load your meals."
             onRetry={() => void refetch()}
           />
         </View>

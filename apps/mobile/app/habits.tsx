@@ -63,6 +63,7 @@ export default function Habits() {
 
   /** The same optimistic contract as Today: the checkbox never waits on a round trip. */
   const logHabit = useMutation({
+    meta: { failed: 'Couldn’t log that habit' },
     mutationFn: (habit: TodayHabit) =>
       // One tap adds one STEP of this habit's measure, not one unit. A step goal that
       // moved 1 at a time would need 8,000 taps.
@@ -157,11 +158,8 @@ export default function Habits() {
           {back}
           {header}
           <ErrorState
-            message={
-              habitsQuery.error instanceof Error
-                ? habitsQuery.error.message
-                : 'We could not load your habits.'
-            }
+            error={habitsQuery.error}
+            message="We could not load your habits."
             onRetry={() => void habitsQuery.refetch()}
           />
         </View>

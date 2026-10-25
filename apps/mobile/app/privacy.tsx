@@ -31,7 +31,8 @@ import {
   Touchable,
 } from '../src/components/primitives.js';
 import { SkeletonList } from '../src/components/Skeleton.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
+import { describeError, errorLine } from '../src/api/errorCopy.js';
 import { nothingAllowedAlert } from '../src/health/healthCopy.js';
 import { connectHealth, healthSourceName } from '../src/health/healthStore.js';
 import { useHealthSync } from '../src/health/useHealthSync.js';
@@ -169,6 +170,7 @@ export default function Privacy() {
   });
 
   const setReceipts = useMutation({
+    meta: { failed: 'Couldn’t change whether receipts are kept' },
     mutationFn: (storeReceipts: boolean) =>
       api.put<unknown>('/privacy/receipts', { storeReceipts }),
     onSettled: () => {
@@ -184,6 +186,7 @@ export default function Privacy() {
   const { sync: syncLocation } = useLocationSync();
 
   const updateSource = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: async (input: {
       source: string;
       status: DataSourceStatus;
@@ -293,10 +296,7 @@ export default function Privacy() {
     onError: (error: unknown) => {
       if (error instanceof AlreadyExplained) return;
 
-      Alert.alert(
-        'Could not update',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      Alert.alert('Couldn’t update this source', describeError(error).message);
     },
   });
 
@@ -305,6 +305,7 @@ export default function Privacy() {
    * off; the confirmation says what goes and what stays (src/privacy/forgetSource.ts).
    */
   const forgetSource = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: (item: DataSourceItem) =>
       api.delete<{ deletedEvents: number }>(`/data-sources/${item.source}/data`),
 
@@ -314,10 +315,7 @@ export default function Privacy() {
     },
 
     onError: (error: unknown) => {
-      Alert.alert(
-        'Could not delete',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      Alert.alert('Couldn’t delete this data', describeError(error).message);
     },
 
     // Every query, not a list of keys: the timeline, days, months, the body screen and
@@ -336,6 +334,7 @@ export default function Privacy() {
   }
 
   const setAiEnabled = useMutation({
+    meta: { failed: 'Couldn’t switch Synítheia AI' },
     mutationFn: (aiEnabled: boolean) => api.put<unknown>('/privacy/ai', { aiEnabled }),
 
     onMutate: async (aiEnabled: boolean) => {
@@ -369,10 +368,7 @@ export default function Privacy() {
       const payload = await api.get<unknown>('/privacy/export');
       await Share.share({ message: JSON.stringify(payload, null, 2) });
     } catch (error) {
-      Alert.alert(
-        'Export failed',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      Alert.alert('Couldn’t export your data', describeError(error).message);
     } finally {
       setExporting(false);
     }
@@ -405,11 +401,8 @@ export default function Privacy() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={
-              sources.error instanceof Error
-                ? sources.error.message
-                : 'We could not load your connected context.'
-            }
+            error={sources.error}
+            message="We could not load your connected context."
             onRetry={() => void sources.refetch()}
           />
         </View>
@@ -788,6 +781,7 @@ function DeleteAccountSheet({
   const [error, setError] = useState<string | null>(null);
 
   const remove = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () => api.delete<void>('/privacy/account', { confirmEmail: confirmEmail.trim() }),
 
     onSuccess: () => {
@@ -798,11 +792,7 @@ function DeleteAccountSheet({
     },
 
     onError: (err: unknown) => {
-      setError(
-        err instanceof ApiError || err instanceof Error
-          ? err.message
-          : 'Could not delete this account.',
-      );
+      setError(errorLine(err, 'Couldn’t delete this account'));
     },
   });
 

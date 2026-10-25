@@ -20,7 +20,8 @@ import {
   Touchable,
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
+import { errorLine } from '../src/api/errorCopy.js';
 import { spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -55,6 +56,7 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
   const [error, setError] = useState<string | null>(null);
 
   const save = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () => {
       const body: UpdateTargetsInput = {};
       if (tracks('water')) body.waterTargetMl = Number(water) || initial.waterTargetMl;
@@ -73,11 +75,7 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
       router.back();
     },
     onError: (err: unknown) => {
-      setError(
-        err instanceof ApiError || err instanceof Error
-          ? err.message
-          : 'Could not save your targets.',
-      );
+      setError(errorLine(err, 'Couldn’t save your targets'));
     },
   });
 
@@ -173,11 +171,8 @@ export default function Targets() {
             <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
           </Touchable>
           <ErrorState
-            message={
-              query.error instanceof ApiError
-                ? query.error.message
-                : 'Could not load your targets.'
-            }
+            error={query.error}
+            message="Could not load your targets."
             onRetry={() => void query.refetch()}
           />
         </View>

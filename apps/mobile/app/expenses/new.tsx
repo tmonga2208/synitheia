@@ -40,6 +40,7 @@ import {
   type SplitState,
 } from '../../src/components/SplitWith.js';
 import { ApiError, api } from '../../src/api/client.js';
+import { errorLine } from '../../src/api/errorCopy.js';
 import type {
   ListResponse,
   WireCategory,
@@ -189,6 +190,7 @@ export default function NewExpense() {
    * palette is the habit-accent set, so a custom category looks like it belongs.
    */
   const createCategory = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () =>
       api.post<{ category: WireCategory }>('/expense-categories', {
         name: (newCategory ?? '').trim(),
@@ -203,11 +205,7 @@ export default function NewExpense() {
     },
 
     onError: (err: unknown) => {
-      setError(
-        err instanceof ApiError || err instanceof Error
-          ? err.message
-          : 'Could not create that category.',
-      );
+      setError(errorLine(err, 'Couldn’t create that category'));
     },
   });
 
@@ -237,6 +235,7 @@ export default function NewExpense() {
   }
 
   const create = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () =>
       api.post<unknown>('/expenses', {
         // What YOU are out — the bill if you paid it, your share if someone else did.
@@ -258,11 +257,7 @@ export default function NewExpense() {
     },
 
     onError: (err: unknown) => {
-      setError(
-        err instanceof ApiError || err instanceof Error
-          ? err.message
-          : 'Could not save this expense.',
-      );
+      setError(errorLine(err, 'Couldn’t save this expense'));
     },
   });
 
@@ -294,11 +289,7 @@ export default function NewExpense() {
       const result = await load();
       if (result) receive(result);
     } catch (err) {
-      setError(
-        err instanceof ApiError || err instanceof Error
-          ? err.message
-          : 'We could not read that. You can still add it by hand.',
-      );
+      setError(`${errorLine(err, 'Couldn’t read that')} You can still add it by hand.`);
     } finally {
       setIngesting(false);
     }
@@ -334,11 +325,7 @@ export default function NewExpense() {
 
       setLocked(null);
       setPassword('');
-      setError(
-        err instanceof ApiError || err instanceof Error
-          ? err.message
-          : 'We could not read that statement. You can still add it by hand.',
-      );
+      setError(`${errorLine(err, 'Couldn’t read that statement')} You can still add it by hand.`);
     } finally {
       setIngesting(false);
     }
@@ -390,6 +377,7 @@ export default function NewExpense() {
   }
 
   const confirm = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () => {
       if (!ingestion) throw new Error('Nothing to confirm');
 
@@ -428,11 +416,7 @@ export default function NewExpense() {
     },
 
     onError: (err: unknown) => {
-      setError(
-        err instanceof ApiError || err instanceof Error
-          ? err.message
-          : 'Could not add these expenses.',
-      );
+      setError(errorLine(err, 'Couldn’t add these expenses'));
     },
   });
 
@@ -468,11 +452,8 @@ export default function NewExpense() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={
-              categories.error instanceof Error
-                ? categories.error.message
-                : 'We could not load your categories.'
-            }
+            error={categories.error}
+            message="We could not load your categories."
             onRetry={() => void categories.refetch()}
           />
         </View>

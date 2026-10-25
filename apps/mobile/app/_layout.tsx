@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
@@ -16,8 +16,11 @@ import {
 import * as Notifications from 'expo-notifications';
 import { migrateTokenAccessibility, probeServer, setWriteListener } from '../src/api/client.js';
 import { checkConnectivityNow, startConnectivity } from '../src/api/connectivity.js';
+import { errorLine } from '../src/api/errorCopy.js';
 import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
 import { OfflineBanner } from '../src/components/OfflineBanner.js';
+import { ToastHost } from '../src/components/ToastHost.js';
+import { showToast } from '../src/feedback/toast.js';
 import type { ReminderRoute } from '../src/reminders/plan.js';
 import { routeForNotification } from '../src/reminders/route.js';
 import { refreshReminders, requestReminderRefresh } from '../src/reminders/schedule.js';
@@ -38,7 +41,26 @@ setWriteListener(requestReminderRefresh);
 // meanwhile and refetch the moment it does (src/api/connectivity.ts).
 startConnectivity(probeServer);
 
+/**
+ * What a mutation may say about itself. `failed` names the action for the toast ("Couldn’t
+ * log water"); `reportsOwnError` marks a screen that shows its own error, inline or in an
+ * alert, so the same failure is not reported twice.
+ */
+interface MutationMeta {
+  failed?: string;
+  reportsOwnError?: boolean;
+}
+
 const queryClient = new QueryClient({
+  // A failed change always says so. Many used to fail in silence: a glass of water that
+  // did not log, an expense that did not delete, with nothing on screen to show it.
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      const meta = (mutation.meta ?? {}) as MutationMeta;
+      if (meta.reportsOwnError) return;
+      showToast({ message: errorLine(error, meta.failed), tone: 'error' });
+    },
+  }),
   defaultOptions: {
     queries: {
       // Personal tracking data changes slowly and mostly from this device. A minute of
@@ -240,6 +262,7 @@ function ThemedShell() {
         <Stack.Screen name="history" />
       </Stack>
       <OfflineBanner />
+      <ToastHost />
     </>
   );
 }

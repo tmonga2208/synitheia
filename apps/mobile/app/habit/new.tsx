@@ -30,7 +30,8 @@ import {
   Touchable,
 } from '../../src/components/primitives.js';
 import { DEFAULT_ICON, IconPicker, iconFor } from '../../src/components/IconPicker.js';
-import { ApiError, api } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
+import { errorLine } from '../../src/api/errorCopy.js';
 import { askForNotifications, type NotificationAccess } from '../../src/reminders/permission.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
@@ -179,11 +180,7 @@ export default function NewHabit() {
 
       router.back();
     } catch (error) {
-      setFormError(
-        error instanceof ApiError || error instanceof Error
-          ? error.message
-          : 'Could not create this habit. Please try again.',
-      );
+      setFormError(errorLine(error, 'Couldn’t create this habit'));
     } finally {
       setSaving(false);
     }

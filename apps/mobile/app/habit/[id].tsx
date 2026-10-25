@@ -22,6 +22,7 @@ import { SkeletonList } from '../../src/components/Skeleton.js';
 import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { iconFor } from '../../src/components/IconPicker.js';
 import { api } from '../../src/api/client.js';
+import { describeError } from '../../src/api/errorCopy.js';
 import type { HabitHistory, ListResponse, WireHabit } from '../../src/api/types.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
@@ -67,6 +68,7 @@ export default function HabitDetail() {
    * every morning for six weeks.
    */
   const archive = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () => api.delete<void>(`/habits/${id}`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: HABITS_KEY });
@@ -74,10 +76,7 @@ export default function HabitDetail() {
       router.back();
     },
     onError: (error: unknown) => {
-      Alert.alert(
-        'Could not archive',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      Alert.alert('Couldn’t archive this habit', describeError(error).message);
     },
   });
 
@@ -120,11 +119,8 @@ export default function HabitDetail() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={
-              habitsQuery.error instanceof Error
-                ? habitsQuery.error.message
-                : 'This habit no longer exists.'
-            }
+            error={habitsQuery.error}
+            message="This habit no longer exists."
             onRetry={() => void habitsQuery.refetch()}
           />
         </View>

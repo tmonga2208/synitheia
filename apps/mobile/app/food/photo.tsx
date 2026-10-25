@@ -21,7 +21,8 @@ import {
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
-import { api, ApiError } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
+import { errorLine } from '../../src/api/errorCopy.js';
 import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
@@ -58,6 +59,7 @@ export default function FoodPhotoScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const analyze = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: async (asset: ImagePicker.ImagePickerAsset) => {
       const form = new FormData();
       form.append('mealType', mealType);
@@ -78,11 +80,12 @@ export default function FoodPhotoScreen() {
       );
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : 'Could not read that photo.');
+      setError(errorLine(err, 'Couldn’t read that photo'));
     },
   });
 
   const confirm = useMutation({
+    meta: { failed: 'Couldn’t log that meal' },
     mutationFn: async () => {
       if (!ingestion) return;
       await api.post(`/food/photo/${ingestion._id}/confirm`, {

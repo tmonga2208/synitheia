@@ -163,6 +163,7 @@ export default function History() {
       ) : query.isError ? (
         <View style={styles.state}>
           <ErrorState
+            error={query.error}
             message="Couldn't load this month."
             onRetry={() => void query.refetch()}
           />
