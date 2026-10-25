@@ -819,7 +819,7 @@ function DeleteAccountSheet({
           onPress={onClose}
         />
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView behavior="padding">
           <SafeAreaView style={styles.sheet} edges={['bottom']}>
             <View style={styles.handle} />
 
