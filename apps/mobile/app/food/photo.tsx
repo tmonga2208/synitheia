@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,7 +16,6 @@ import {
   Button,
   Card,
   Chip,
-  ErrorState,
   SectionHeader,
   Text,
   Touchable,
@@ -56,7 +55,14 @@ export default function FoodPhotoScreen() {
   const [mealType, setMealType] = useState<MealType>(guessMeal());
   const [ingestion, setIngestion] = useState<WireIngestion | null>(null);
   const [edits, setEdits] = useState<ItemEdit[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * What went wrong, and the way on: read the same photo again, or (photo access refused
+   * for good) open Settings. "Try again" used to only close the message.
+   */
+  const [failure, setFailure] = useState<{ message: string; next: 'retry' | 'settings' | null } | null>(
+    null,
+  );
+  const [lastPhoto, setLastPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   const analyze = useMutation({
     meta: { reportsOwnError: true },
@@ -72,15 +78,15 @@ export default function FoodPhotoScreen() {
       const res = await api.upload<{ ingestion: WireIngestion }>('/food/photo', form);
       return res.ingestion;
     },
+    onMutate: () => setFailure(null),
     onSuccess: (result) => {
-      setError(null);
       setIngestion(result);
       setEdits(
         result.items.map((i) => ({ include: true, portionQty: i.portionQty })),
       );
     },
     onError: (err) => {
-      setError(errorLine(err, 'Couldn’t read that photo'));
+      setFailure({ message: errorLine(err, 'Couldn’t read that photo'), next: 'retry' });
     },
   });
 
@@ -113,11 +119,15 @@ export default function FoodPhotoScreen() {
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!perm.granted) {
-      setError(
-        source === 'camera'
-          ? 'Camera access is needed to photograph your meal.'
-          : 'Photo access is needed to pick a picture of your meal.',
-      );
+      setFailure({
+        message:
+          source === 'camera'
+            ? 'Camera access is needed to photograph your meal.'
+            : 'Photo access is needed to pick a picture of your meal.',
+        // While the phone can still ask, the same button asks again; after that, only
+        // Settings can change it.
+        next: perm.canAskAgain ? null : 'settings',
+      });
       return;
     }
 
@@ -127,7 +137,10 @@ export default function FoodPhotoScreen() {
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
 
     const asset = result.assets?.[0];
-    if (!result.canceled && asset) analyze.mutate(asset);
+    if (!result.canceled && asset) {
+      setLastPhoto(asset);
+      analyze.mutate(asset);
+    }
   }
 
   // Preview totals update live as the user drags a portion — computed with the SAME
@@ -209,8 +222,25 @@ export default function FoodPhotoScreen() {
               </View>
             ) : null}
 
-            {error ? (
-              <ErrorState message={error} onRetry={() => setError(null)} />
+            {failure ? (
+              <Card style={styles.failure} accessibilityLiveRegion="polite">
+                <Text variant="body">{failure.message}</Text>
+                {failure.next === 'retry' && lastPhoto ? (
+                  <Button
+                    label="Try again"
+                    variant="secondary"
+                    onPress={() => analyze.mutate(lastPhoto)}
+                    loading={analyze.isPending}
+                  />
+                ) : null}
+                {failure.next === 'settings' ? (
+                  <Button
+                    label="Open Settings"
+                    variant="secondary"
+                    onPress={() => void Linking.openSettings()}
+                  />
+                ) : null}
+              </Card>
             ) : null}
 
             {/*
@@ -424,6 +454,7 @@ const makeStyles = (t: Theme) =>
       gap: spacing.sm,
       paddingVertical: spacing.xl,
     },
+    failure: { gap: spacing.md, marginTop: spacing.base },
     manualRow: {
       flexDirection: 'row',
       alignItems: 'center',
