@@ -7,6 +7,10 @@ export interface WireExpenseTotals {
   byCategory: Record<string, number>;
   largestMinor: number | null;
   owedMinor: number;
+  /** Net per local date, for the days that had spending. */
+  byDay: Record<string, number>;
+  /** The biggest payees by net, at most six. */
+  topPayees: { name: string; totalMinor: number; count: number; categoryName: string }[];
 }
 
 /** "₹4,820.50 spent", or null while loading and for an empty month the screen already explains. */
