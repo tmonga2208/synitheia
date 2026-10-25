@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { asLocalDate, type TodayResponse } from '@synitheia/shared';
 import type { WireReminder } from '../api/types.js';
 import type { PlannedNotification } from './plan.js';
+import type * as ScheduleModule from './schedule.js';
 
 const mocks = vi.hoisted(() => ({
   getAllScheduledNotificationsAsync: vi.fn(),
@@ -25,8 +26,7 @@ vi.mock('../api/client.js', () => ({
   hasSession: mocks.hasSession,
 }));
 
-type Schedule = typeof import('./schedule.js');
-let schedule: Schedule;
+let schedule: typeof ScheduleModule;
 
 // Monday 26 October 2026, 09:00 on the device.
 const NOW = new Date(2026, 9, 26, 9, 0, 0);
