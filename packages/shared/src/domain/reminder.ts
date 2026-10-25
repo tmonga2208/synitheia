@@ -162,6 +162,21 @@ function refineReminder(
   }
 }
 
+/**
+ * A reminder's timing as it will be stored. An update is checked against this after it
+ * is applied, because a partial update can break the rules without naming `repeat`:
+ * `{ windowStart: '23:00' }` alone can leave a window that ends before it starts.
+ */
+export const reminderShapeSchema = z
+  .object({
+    repeat: reminderRepeatSchema,
+    time: timeOfDaySchema.nullable(),
+    intervalMinutes: z.number().int().min(MIN_INTERVAL_MINUTES).max(MAX_INTERVAL_MINUTES).nullable(),
+    windowStart: timeOfDaySchema.nullable(),
+    windowEnd: timeOfDaySchema.nullable(),
+  })
+  .superRefine(refineReminder);
+
 export const createReminderSchema = z
   .object({
     kind: reminderKindSchema,

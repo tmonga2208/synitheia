@@ -6,6 +6,7 @@ import {
   clientIdSchema,
   createReminderSchema,
   objectIdSchema,
+  reminderShapeSchema,
   todayLocalDate,
   updateReminderSchema,
 } from '@synitheia/shared';
@@ -94,6 +95,19 @@ export async function registerReminderRoutes(app: FastifyInstance): Promise<void
       if (req.body.windowStart !== undefined) reminder.windowStart = req.body.windowStart;
       if (req.body.windowEnd !== undefined) reminder.windowEnd = req.body.windowEnd;
       if (req.body.enabled !== undefined) reminder.enabled = req.body.enabled;
+
+      // Check the reminder as it will be stored, not just the fields sent: the phone plans
+      // from what is stored, and a window that ends before it starts would never fire.
+      const shape = reminderShapeSchema.safeParse({
+        repeat: reminder.repeat,
+        time: reminder.time ?? null,
+        intervalMinutes: reminder.intervalMinutes ?? null,
+        windowStart: reminder.windowStart ?? null,
+        windowEnd: reminder.windowEnd ?? null,
+      });
+      if (!shape.success) {
+        throw AppError.badRequest(shape.error.issues[0]?.message ?? 'That reminder would never fire.');
+      }
 
       await reminder.save();
       return { reminder };

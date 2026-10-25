@@ -2,10 +2,33 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_INTERVAL_SLOTS,
   createReminderSchema,
+  reminderShapeSchema,
   slotCount,
   slotTimes,
   updateReminderSchema,
 } from './reminder.js';
+
+describe('reminderShapeSchema', () => {
+  const stored = {
+    repeat: 'interval' as const,
+    time: null,
+    intervalMinutes: 60,
+    windowStart: '09:00',
+    windowEnd: '21:00',
+  };
+
+  it('accepts a stored interval reminder that fires', () => {
+    expect(reminderShapeSchema.safeParse(stored).success).toBe(true);
+  });
+
+  it('refuses a stored window that ends before it starts', () => {
+    expect(reminderShapeSchema.safeParse({ ...stored, windowStart: '23:00' }).success).toBe(false);
+  });
+
+  it('refuses a stored daily reminder with no time', () => {
+    expect(reminderShapeSchema.safeParse({ ...stored, repeat: 'daily', time: null }).success).toBe(false);
+  });
+});
 
 describe('slotTimes', () => {
   it('steps from start through end, inclusive', () => {
