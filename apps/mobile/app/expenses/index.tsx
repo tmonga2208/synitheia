@@ -33,6 +33,7 @@ import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 import { BillsRow, OwedBanner } from '../../src/components/OwedBanner.js';
+import { monthSpentLine, type WireExpenseTotals } from '../../src/expenses/monthTotal.js';
 
 function expenseQuery(month: MonthKey) {
   const from = firstOfMonth(month);
@@ -42,6 +43,20 @@ function expenseQuery(month: MonthKey) {
     queryKey: ['expenses', month] as const,
     queryFn: () =>
       api.get<ListResponse<WireExpense>>(`/expenses?from=${from}&to=${to}&limit=200`),
+  };
+}
+
+/**
+ * The month's total comes from the server, not from adding up the list: the list stops at
+ * 200 expenses, and a total quietly short by the rest would be worse than none.
+ */
+function monthTotalQuery(month: MonthKey) {
+  return {
+    queryKey: ['expenses', 'totals', month] as const,
+    queryFn: () =>
+      api.get<WireExpenseTotals>(
+        `/expenses/totals?from=${firstOfMonth(month)}&to=${lastOfMonth(month)}`,
+      ),
   };
 }
 
@@ -93,6 +108,8 @@ export default function Expenses() {
   const atLatest = month >= monthKeyOf(today);
 
   const query = useQuery(expenseQuery(month));
+  const totals = useQuery(monthTotalQuery(month));
+  const spent = monthSpentLine(totals.data, currency);
 
   const days = useMemo(() => groupByDay(query.data?.items ?? []), [query.data]);
 
@@ -150,7 +167,10 @@ export default function Expenses() {
         refreshControl={
           <RefreshControl
             refreshing={query.isRefetching}
-            onRefresh={() => void query.refetch()}
+            onRefresh={() => {
+              void query.refetch();
+              void totals.refetch();
+            }}
             tintColor={t.accent}
           />
         }
@@ -175,7 +195,19 @@ export default function Expenses() {
             <ChevronLeft size={20} color={t.textMuted} strokeWidth={1.8} />
           </Touchable>
 
-          <Text variant="section">{formatMonthLabel(month)}</Text>
+          <View
+            style={styles.monthTitle}
+            accessible
+            accessibilityLabel={
+              spent ? `${formatMonthLabel(month)}, ${spent}` : formatMonthLabel(month)
+            }
+          >
+            <Text variant="section">{formatMonthLabel(month)}</Text>
+            {/* Always laid out, so the bar does not jump when the total arrives. */}
+            <Text variant="bodyMedium" color={t.textMuted}>
+              {spent ?? ' '}
+            </Text>
+          </View>
 
           <Touchable
             accessibilityRole="button"
@@ -305,6 +337,7 @@ const makeStyles = (t: Theme) =>
       justifyContent: 'space-between',
       marginTop: spacing.md,
     },
+    monthTitle: { alignItems: 'center', gap: spacing.xs },
     empty: { marginTop: spacing.xl },
     day: { marginTop: spacing.xl },
     dayHeader: {
