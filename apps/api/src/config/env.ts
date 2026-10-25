@@ -67,6 +67,13 @@ const envSchema = z
     RATE_LIMIT_WINDOW: z.string().default('1 minute'),
 
     /**
+     * UPI Lens API — external statement parser service.
+     * Parses bank statements (PDF, CSV, XLS, XLSX) into structured transactions
+     * with Indian UPI recognition, merchants, and categories.
+     */
+    UPI_LENS_API_URL: z.string().url().default('https://upi-lens-api.onrender.com'),
+
+    /**
      * Statement Inbox — inbound email ingestion. Optional: absent, the inbox endpoints
      * return 400 and the webhook no-ops. INBOUND_DOMAIN is the domain whose MX points at
      * the inbound provider (e.g. "in.synitheia.app"); the secret authenticates the
@@ -161,6 +168,10 @@ export function isImageKitConfigured(env: Env): boolean {
 
 export function isInboundConfigured(env: Env): boolean {
   return Boolean(env.INBOUND_DOMAIN && env.INBOUND_WEBHOOK_SECRET);
+}
+
+export function isUpiLensConfigured(env: Env): boolean {
+  return Boolean(env.UPI_LENS_API_URL);
 }
 
 export function isAiConfigured(env: Env): boolean {

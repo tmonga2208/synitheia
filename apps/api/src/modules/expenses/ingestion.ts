@@ -12,6 +12,7 @@ import {
 import { AppError } from '../../core/errors.js';
 import { ExpenseIngestionModel, ExpenseModel } from '../../db/models.js';
 import { callStructured, type AiContent } from '../../ai/client.js';
+import { normalizeUpiLensTransaction, parseStatementWithUpiLens } from './upi-lens.js';
 import type { Env } from '../../config/env.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 
@@ -321,12 +322,73 @@ export async function ingestPdf(
     );
   }
 
+  // 1. Try deterministic statement parsing via UPI Lens API (https://upi-lens-api.onrender.com).
+  // This extracts Indian bank/UPI transactions without consuming LLM token quota or hallucinating.
+  try {
+    const upiTxs = await parseStatementWithUpiLens(env, {
+      buffer,
+      filename: 'statement.pdf',
+      mimeType: 'application/pdf',
+    });
+
+    if (upiTxs && upiTxs.length > 0) {
+      const drafts = upiTxs
+        .map((tx) => normalizeUpiLensTransaction(tx, user.currency))
+        .filter((d): d is DraftTransaction => d !== null);
+
+      if (drafts.length > 0) {
+        return persist(
+          user,
+          meta?.channel ?? 'pdf',
+          await markDuplicates(user.id, drafts),
+          meta,
+        );
+      }
+    }
+  } catch {
+    // Service failure or timeout: fall through to the LLM structured extractor
+  }
+
+  // 2. Fallback: LLM structured extractor
   return runIngestion(env, user, meta?.channel ?? 'pdf', [
     {
       type: 'text',
       text: `Extract every transaction from this bank/card statement:\n\n${text.slice(0, 60_000)}`,
     },
   ], meta);
+}
+
+/**
+ * Excel statements (.xlsx, .xls) parsed deterministically via UPI Lens API.
+ */
+export async function ingestSpreadsheet(
+  env: Env,
+  user: AuthedUser,
+  buffer: Buffer,
+  filename: string,
+  mimeType: string,
+) {
+  const upiTxs = await parseStatementWithUpiLens(env, {
+    buffer,
+    filename,
+    mimeType,
+  });
+
+  if (!upiTxs || upiTxs.length === 0) {
+    throw AppError.ingestionFailed(
+      'Could not extract transactions from that spreadsheet. Try a CSV export instead.',
+    );
+  }
+
+  const drafts = upiTxs
+    .map((tx) => normalizeUpiLensTransaction(tx, user.currency))
+    .filter((d): d is DraftTransaction => d !== null);
+
+  if (drafts.length === 0) {
+    throw AppError.ingestionFailed('No debit transactions were found in that spreadsheet.');
+  }
+
+  return persist(user, 'csv', await markDuplicates(user.id, drafts));
 }
 
 /**

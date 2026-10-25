@@ -176,6 +176,11 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
           ? String(passwordField.value)
           : undefined;
 
+      const isExcel =
+        /\.(xlsx?)$/i.test(file.filename) ||
+        mime.includes('spreadsheet') ||
+        mime.includes('excel');
+
       const result = mime.startsWith('image/')
         ? await ingestion.ingestScreenshot(env, req.user, {
             base64: buffer.toString('base64'),
@@ -185,11 +190,13 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
           ? await ingestion.ingestPdf(env, req.user, buffer, password)
           : mime === 'text/csv' || file.filename.toLowerCase().endsWith('.csv')
             ? await ingestion.ingestCsv(req.user, buffer.toString('utf8'))
-            : null;
+            : isExcel
+              ? await ingestion.ingestSpreadsheet(env, req.user, buffer, file.filename, mime)
+              : null;
 
       if (!result) {
         throw AppError.badRequest(
-          `Unsupported file type "${mime}". Share a screenshot, a PDF statement, or a CSV.`,
+          `Unsupported file type "${mime}". Share a screenshot, a PDF statement, CSV, or Excel sheet.`,
         );
       }
 
