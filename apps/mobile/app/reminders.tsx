@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import { ArrowLeft, Bell, Minus, Plus, Trash2 } from 'lucide-react-native';
-import type { CreateReminderInput, ReminderKind } from '@synitheia/shared';
+import { slotTimes, type CreateReminderInput, type ReminderKind } from '@synitheia/shared';
 import {
   Button,
   Card,
@@ -83,13 +83,45 @@ async function syncReminder(reminder: WireReminder): Promise<void> {
 
   if (!granted) return;
 
-  const [hour, minute] = reminder.time.split(':').map(Number) as [number, number];
-
   const content = {
     title: reminder.label,
     body: 'A gentle nudge from Synítheia.',
     data: { reminderId: reminder._id } satisfies ReminderNotificationData,
   };
+
+  if (reminder.repeat === 'interval') {
+    if (reminder.intervalMinutes == null) return;
+
+    if (reminder.windowStart != null && reminder.windowEnd != null) {
+      await Promise.all(
+        slotTimes(reminder.windowStart, reminder.windowEnd, reminder.intervalMinutes).map((time) => {
+          const [hour, minute] = time.split(':').map(Number) as [number, number];
+          return Notifications.scheduleNotificationAsync({
+            content,
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DAILY,
+              hour,
+              minute,
+            },
+          });
+        }),
+      );
+      return;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content,
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: reminder.intervalMinutes * 60,
+        repeats: true,
+      },
+    });
+    return;
+  }
+
+  if (reminder.time == null) return;
+  const [hour, minute] = reminder.time.split(':').map(Number) as [number, number];
 
   if (reminder.weekdays.length === 0) {
     await Notifications.scheduleNotificationAsync({
@@ -119,6 +151,15 @@ async function syncReminder(reminder: WireReminder): Promise<void> {
 }
 
 function describe(reminder: WireReminder): string {
+  if (reminder.repeat === 'interval') {
+    const interval = reminder.intervalMinutes == null ? 'Interval' : `Every ${reminder.intervalMinutes}m`;
+    const window =
+      reminder.windowStart != null && reminder.windowEnd != null
+        ? `${reminder.windowStart}–${reminder.windowEnd}`
+        : 'All day';
+    return `${interval} · ${window}`;
+  }
+
   const days =
     reminder.weekdays.length === 0
       ? 'Every day'
@@ -128,7 +169,7 @@ function describe(reminder: WireReminder): string {
           .map((d) => WEEKDAY_LABELS[d])
           .join(' · ');
 
-  return `${reminder.time} · ${days}`;
+  return `${reminder.time ?? 'Time unavailable'} · ${days}`;
 }
 
 export default function Reminders() {
@@ -494,6 +535,7 @@ function ComposeSheet({
                   onSubmit({
                     kind,
                     label: label.trim(),
+                    repeat: 'daily',
                     time: `${pad(hour)}:${pad(minute)}`,
                     weekdays,
                     enabled: true,
