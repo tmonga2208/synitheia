@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -9,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Minus, Plus } from 'lucide-react-native';
 import {
@@ -30,6 +31,7 @@ import {
 } from '../../src/components/primitives.js';
 import { DEFAULT_ICON, IconPicker, iconFor } from '../../src/components/IconPicker.js';
 import { ApiError, api } from '../../src/api/client.js';
+import { askForNotifications, type NotificationAccess } from '../../src/reminders/permission.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
@@ -51,18 +53,11 @@ function to24h({ hour, minute, period }: TimeOfDay): string {
   return `${pad(h)}:${pad(minute)}`;
 }
 
-/**
- * Ask for notification permission while the user is choosing a reminder, the one moment the
- * question makes sense. The reminder itself is not scheduled here: it is planned with every
- * other one (src/reminders) from the habit's reminder time, which the server keeps, so it
- * also comes back on a new phone.
+/*
+ * The habit's reminder is not scheduled here: it is planned with every other one
+ * (src/reminders) from the habit's reminder time, which the server keeps, so it also comes
+ * back on a new phone. This screen only asks for permission, the one moment it makes sense.
  */
-async function askForReminderPermission(): Promise<void> {
-  const existing = await Notifications.getPermissionsAsync();
-  if (!existing.granted && existing.canAskAgain) {
-    await Notifications.requestPermissionsAsync();
-  }
-}
 
 export default function NewHabit() {
   const t = useTheme();
@@ -156,9 +151,23 @@ export default function NewHabit() {
 
     try {
       // Before saving: the save re-plans reminders, and it should know the answer.
-      if (reminderEnabled) await askForReminderPermission().catch(() => undefined);
+      const access: NotificationAccess | null = reminderEnabled
+        ? await askForNotifications().catch(() => null)
+        : null;
 
       await api.post<{ habit: Habit }>('/habits', parsed.data);
+
+      if (access === 'blocked') {
+        // The habit is fine; its reminder is what cannot arrive. Say so, with the way out.
+        Alert.alert(
+          'Notifications are off',
+          "The habit is saved, but notifications are off for Synítheia, so its reminder won't appear. You can turn them on in Settings.",
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+          ],
+        );
+      }
 
       /**
        * The lists are cached. Without this, going back lands on a Habits screen that does

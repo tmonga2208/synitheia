@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -27,6 +28,13 @@ import {
 import { SkeletonList } from '../src/components/Skeleton.js';
 import { ApiError, api } from '../src/api/client.js';
 import type { ListResponse, WireReminder } from '../src/api/types.js';
+import {
+  accessCopy,
+  askForNotifications,
+  type NotificationAccess,
+} from '../src/reminders/permission.js';
+import { requestReminderRefresh } from '../src/reminders/schedule.js';
+import { useNotificationAccess } from '../src/reminders/useNotificationAccess.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -62,6 +70,24 @@ export default function Reminders() {
   const styles = useThemedStyles(makeStyles);
   const queryClient = useQueryClient();
   const [composing, setComposing] = useState(false);
+  const [access, setAccess] = useNotificationAccess();
+
+  /**
+   * Ask, or send to Settings once asking no longer works. Allowed now means the reminders
+   * can be put on the phone, so they are re-planned straight away.
+   */
+  function unblock(action: 'ask' | 'settings') {
+    if (action === 'settings') {
+      void Linking.openSettings();
+      return;
+    }
+    void askForNotifications()
+      .then((next: NotificationAccess) => {
+        setAccess(next);
+        if (next === 'granted') requestReminderRefresh();
+      })
+      .catch(() => undefined);
+  }
 
   const query = useQuery({
     queryKey: REMINDERS_KEY,
@@ -125,6 +151,8 @@ export default function Reminders() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: REMINDERS_KEY });
       setComposing(false);
+      // The moment someone sets a reminder is the moment to ask if it may reach them.
+      unblock('ask');
     },
   });
 
@@ -195,6 +223,8 @@ export default function Reminders() {
   }
 
   const reminders = query.data?.items ?? [];
+  // Only worth saying once there is a reminder that would have arrived.
+  const blocked = access && reminders.some((r) => r.enabled) ? accessCopy(access) : null;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -212,11 +242,26 @@ export default function Reminders() {
         {back}
         {header}
 
+        {blocked ? (
+          <Card style={styles.blocked} accessibilityLiveRegion="polite">
+            <Text variant="cardTitle">{blocked.title}</Text>
+            <Text variant="body" color={t.textMuted}>
+              {blocked.body}
+            </Text>
+            <Button
+              label={blocked.actionLabel}
+              variant="secondary"
+              onPress={() => unblock(blocked.action)}
+              style={styles.blockedAction}
+            />
+          </Card>
+        ) : null}
+
         {reminders.length === 0 ? (
           <EmptyState
             icon={<Bell size={30} color={t.onAccent} strokeWidth={1.5} />}
             title="No reminders yet"
-            body="A gentle nudge at the right moment does more than a streak ever will. They fire on this device, even offline."
+            body="Pick a time, and Synítheia reminds you with how your day is going: water so far, habits still to do. They arrive even when you're offline."
             actionLabel="+ Add a reminder"
             onAction={() => setComposing(true)}
           />
@@ -253,6 +298,10 @@ export default function Reminders() {
                 </Touchable>
               </Card>
             ))}
+
+            <Text variant="caption" color={t.textFaint} style={styles.footnote}>
+              Planned two weeks ahead, and refreshed whenever you open Synítheia.
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -491,6 +540,9 @@ const makeStyles = (t: Theme) =>
       backgroundColor: t.accent,
     },
     list: { gap: spacing.md },
+    blocked: { gap: spacing.sm, marginBottom: spacing.base },
+    blockedAction: { marginTop: spacing.sm, alignSelf: 'flex-start' },
+    footnote: { marginTop: spacing.sm, textAlign: 'center' },
     reminder: {
       flexDirection: 'row',
       alignItems: 'center',
