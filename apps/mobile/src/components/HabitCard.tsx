@@ -31,6 +31,11 @@ interface HabitCardProps {
   /** Logs one occurrence. The parent owns the optimistic update. */
   onLog: (habit: TodayHabit) => void;
   /**
+   * Takes one step back. Given, a tap on a completed habit undoes the last step, so a
+   * habit ticked by mistake can be unticked; without it the check is a status, as before.
+   */
+  onUnlog?: (habit: TodayHabit) => void;
+  /**
    * A past day. The affordance becomes a status glyph rather than a control —
    * history is a record, and a tappable checkbox on a finished day would be an
    * invitation to rewrite it.
@@ -78,7 +83,7 @@ function metadataFor(habit: TodayHabit, readOnly: boolean): string {
  * completion affordance. It is the most distinctive thing in the design language:
  * a list of habits should read as a list of individual rituals, not as rows in a table.
  */
-export function HabitCard({ habit, onPress, onLog, readOnly = false }: HabitCardProps) {
+export function HabitCard({ habit, onPress, onLog, onUnlog, readOnly = false }: HabitCardProps) {
   const t = useTheme();
   const accent = accentFor(habit.color, t);
   const { Icon } = iconFor(habit.icon);
@@ -147,11 +152,19 @@ export function HabitCard({ habit, onPress, onLog, readOnly = false }: HabitCard
                     ? `Add ${HABIT_MEASURES[measure].step} to ${habit.name}, ${formatHabitProgress(habit, habit.todayCount)}`
                     : `Complete ${habit.name}`
             }
-            accessibilityState={{ checked: habit.todayComplete, disabled: habit.todayComplete }}
+            accessibilityHint={
+              !readOnly && habit.todayComplete && onUnlog ? 'Takes the last step back' : undefined
+            }
+            accessibilityState={{
+              checked: habit.todayComplete,
+              disabled: habit.todayComplete && !onUnlog,
+            }}
             // Guarded rather than `disabled`: Touchable dims disabled targets to 45%, and a
             // completed habit's check should read as an achievement, not a greyed-out control.
             onPress={() => {
-              if (!readOnly && !habit.todayComplete) onLog(habit);
+              if (readOnly) return;
+              if (!habit.todayComplete) onLog(habit);
+              else onUnlog?.(habit);
             }}
             style={styles.affordanceTarget}
           >

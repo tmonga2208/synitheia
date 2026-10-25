@@ -148,6 +148,25 @@ export async function retractByRef(
 }
 
 /**
+ * Retract the one event a dedupe key names.
+ *
+ * For a fact that stops being true without its record going away: a habit stepped back
+ * below its target is still logged, but it is no longer completed that day. `retractByRef`
+ * would take every day's completion of the habit with it.
+ */
+export async function retractByDedupeKey(
+  userId: string | Types.ObjectId,
+  key: string,
+  session?: ClientSession,
+): Promise<number> {
+  const result = await PersonalEventModel.deleteOne(
+    { userId: new Types.ObjectId(userId), dedupeKey: key },
+    { session },
+  );
+  return result.deletedCount ?? 0;
+}
+
+/**
  * The timeline as the CLIENT is promised it — `id`, not `_id`.
  *
  * `todayResponseSchema` in @synitheia/shared declares `id`, and that schema is the

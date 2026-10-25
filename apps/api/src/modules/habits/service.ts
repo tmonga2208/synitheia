@@ -24,7 +24,7 @@ import {
   type HabitLogDoc,
 } from '../../db/models.js';
 import { invalidateDailySummary } from '../../context/aggregator.js';
-import { dedupeKey, emit } from '../../context/engine.js';
+import { dedupeKey, emit, retractByDedupeKey } from '../../context/engine.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 import { grantAwards } from '../xp/service.js';
 
@@ -255,6 +255,14 @@ export async function logHabit(
   const updated = await recomputeStreak(user.id, habitId, user.timezone);
 
   await invalidateDailySummary(user.id, localDate);
+
+  // Stepped back below the target (an undo in the app): that day is no longer completed,
+  // so its completion leaves the timeline. XP stays; awards are keyed per habit and day, so
+  // ticking it again does not pay twice.
+  const wasComplete = existing !== null && existing.count >= habit.targetCount;
+  if (wasComplete && !complete) {
+    await retractByDedupeKey(user.id, dedupeKey('manual', 'habit', `${habitId}:${localDate}`));
+  }
 
   if (complete) {
     await grantHabitCompletionAwards({

@@ -18,8 +18,6 @@ import {
   formatMoney,
   type SupportingMetric,
   type TodayResponse,
-  HABIT_MEASURES,
-  measureOf,
 } from '@synitheia/shared';
 import {
   Button,
@@ -38,6 +36,7 @@ import { WeeklyChart } from '../../src/components/WeeklyChart.js';
 import { Timeline } from '../../src/components/Timeline.js';
 import { api } from '../../src/api/client.js';
 import { useCalendarSync } from '../../src/calendar/useCalendarSync.js';
+import { useHabitLog } from '../../src/habits/useHabitLog.js';
 import { useSourcePrefsMirror } from '../../src/sync/useSourcePrefsMirror.js';
 import { useHealthSync } from '../../src/health/useHealthSync.js';
 import { useAuth } from '../../src/store/auth.js';
@@ -103,49 +102,8 @@ export default function Today() {
     queryFn: () => api.get<TodayResponse>('/today'),
   });
 
-  /**
-   * The optimistic log.
-   *
-   * A checkbox that waits on a round trip is a checkbox that feels broken. The cache is
-   * updated before the request leaves, rolled back on failure, and reconciled from the
-   * server once it settles — the server owns the streak and the ring, the client only
-   * owns the next 300ms.
-   */
-  const logHabit = useMutation({
-    meta: { failed: 'Couldn’t log that habit' },
-    mutationFn: (habit: TodayHabit) =>
-      // One tap adds one STEP of this habit's measure, not one unit. A step goal that
-      // moved 1 at a time would need 8,000 taps.
-      api.post<unknown>(`/habits/${habit.id}/log`, {
-        increment: HABIT_MEASURES[measureOf(habit)].step,
-      }),
-
-    onMutate: async (habit: TodayHabit) => {
-      await queryClient.cancelQueries({ queryKey: TODAY_KEY });
-      const previous = queryClient.getQueryData<TodayResponse>(TODAY_KEY);
-
-      queryClient.setQueryData<TodayResponse>(TODAY_KEY, (current) =>
-        current
-          ? {
-              ...current,
-              habits: current.habits.map((h) => {
-                if (h.id !== habit.id) return h;
-                const todayCount = h.todayCount + HABIT_MEASURES[measureOf(h)].step;
-                return { ...h, todayCount, todayComplete: todayCount >= h.targetCount };
-              }),
-            }
-          : current,
-      );
-
-      return { previous };
-    },
-
-    onError: (_error, _habit, context) => {
-      if (context?.previous) queryClient.setQueryData(TODAY_KEY, context.previous);
-    },
-
-    onSettled: () => queryClient.invalidateQueries({ queryKey: TODAY_KEY }),
-  });
+  // Ticks are optimistic and offer Undo; a tap on a ticked habit takes the step back.
+  const habitLog = useHabitLog();
 
   const resolveSuggestion = useMutation({
     meta: { failed: 'Couldn’t save your answer' },
@@ -323,7 +281,8 @@ export default function Today() {
                   key={habit.id}
                   habit={habit}
                   onPress={openHabit}
-                  onLog={(h) => logHabit.mutate(h)}
+                  onLog={habitLog.log}
+                  onUnlog={habitLog.unlog}
                 />
               ))}
             </View>

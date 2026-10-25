@@ -2,9 +2,9 @@ import { useCallback, useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Leaf, Plus } from 'lucide-react-native';
-import { HABIT_MEASURES, measureOf, type TodayResponse } from '@synitheia/shared';
+import type { TodayResponse } from '@synitheia/shared';
 import {
   EmptyState,
   ErrorState,
@@ -15,6 +15,7 @@ import { SkeletonList } from '../src/components/Skeleton.js';
 import { HabitCard, type TodayHabit } from '../src/components/HabitCard.js';
 import { api } from '../src/api/client.js';
 import type { ListResponse, WireHabit } from '../src/api/types.js';
+import { useHabitLog } from '../src/habits/useHabitLog.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -49,7 +50,6 @@ function merge(habits: WireHabit[], today: TodayResponse | undefined): TodayHabi
 export default function Habits() {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const queryClient = useQueryClient();
 
   const habitsQuery = useQuery({
     queryKey: HABITS_KEY,
@@ -61,46 +61,8 @@ export default function Habits() {
     queryFn: () => api.get<TodayResponse>('/today'),
   });
 
-  /** The same optimistic contract as Today: the checkbox never waits on a round trip. */
-  const logHabit = useMutation({
-    meta: { failed: 'Couldn’t log that habit' },
-    mutationFn: (habit: TodayHabit) =>
-      // One tap adds one STEP of this habit's measure, not one unit. A step goal that
-      // moved 1 at a time would need 8,000 taps.
-      api.post<unknown>(`/habits/${habit.id}/log`, {
-        increment: HABIT_MEASURES[measureOf(habit)].step,
-      }),
-
-    onMutate: async (habit: TodayHabit) => {
-      await queryClient.cancelQueries({ queryKey: TODAY_KEY });
-      const previous = queryClient.getQueryData<TodayResponse>(TODAY_KEY);
-
-      queryClient.setQueryData<TodayResponse>(TODAY_KEY, (current) =>
-        current
-          ? {
-              ...current,
-              habits: current.habits.map((h) => {
-                if (h.id !== habit.id) return h;
-                const todayCount = h.todayCount + HABIT_MEASURES[measureOf(h)].step;
-                return { ...h, todayCount, todayComplete: todayCount >= h.targetCount };
-              }),
-            }
-          : current,
-      );
-
-      return { previous };
-    },
-
-    onError: (_error, _habit, context) => {
-      if (context?.previous) queryClient.setQueryData(TODAY_KEY, context.previous);
-    },
-
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: TODAY_KEY });
-      // The log recomputes the streak, which the list renders.
-      void queryClient.invalidateQueries({ queryKey: HABITS_KEY });
-    },
-  });
+  // The same ticking as Today: optimistic, with Undo, and a tap on a ticked habit steps back.
+  const habitLog = useHabitLog();
 
   const openHabit = useCallback((habit: TodayHabit) => {
     router.push(`/habit/${habit.id}`);
@@ -198,7 +160,8 @@ export default function Habits() {
                 key={habit.id}
                 habit={habit}
                 onPress={openHabit}
-                onLog={(h) => logHabit.mutate(h)}
+                onLog={habitLog.log}
+                onUnlog={habitLog.unlog}
               />
             ))}
           </View>

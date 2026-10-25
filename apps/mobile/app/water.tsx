@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import { ArrowLeft, Droplets, Trash2 } from 'lucide-react-native';
-import { WATER_PRESETS_ML } from '@synitheia/shared';
+import { WATER_PRESETS_ML, formatVolume } from '@synitheia/shared';
 import {
   Card,
   EmptyState,
@@ -16,6 +16,7 @@ import {
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ProgressRing } from '../src/components/ProgressRing.js';
 import { api } from '../src/api/client.js';
+import { deferWithUndo } from '../src/feedback/undo.js';
 import { useAuth } from '../src/store/auth.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
@@ -61,18 +62,70 @@ export default function WaterScreen() {
     void queryClient.invalidateQueries({ queryKey: ['today'] });
   };
 
+  /**
+   * A glass moves the ring at once. Waiting on the server made every tap feel unheard;
+   * if the server refuses, the ring goes back and the failure is reported (app/_layout).
+   */
   const add = useMutation({
     meta: { failed: 'Couldn’t log water' },
     mutationFn: (amountMl: number) =>
       api.post<unknown>('/water', { amountMl, clientKey: Crypto.randomUUID() }),
+
+    onMutate: async (amountMl: number) => {
+      await queryClient.cancelQueries({ queryKey: WATER_KEY });
+      const previous = queryClient.getQueryData<WaterResponse>(WATER_KEY);
+      const pending: WireWaterEntry = {
+        _id: `pending-${Crypto.randomUUID()}`,
+        amountMl,
+        loggedAt: new Date().toISOString(),
+      };
+
+      // Newest first, as the server lists them.
+      queryClient.setQueryData<WaterResponse>(WATER_KEY, (current) =>
+        current
+          ? { ...current, items: [pending, ...current.items], totalMl: current.totalMl + amountMl }
+          : current,
+      );
+      return { previous };
+    },
+
+    onError: (_error, _amount, context) => {
+      if (context?.previous) queryClient.setQueryData(WATER_KEY, context.previous);
+    },
+
     onSettled: invalidate,
   });
 
-  const remove = useMutation({
-    meta: { failed: 'Couldn’t remove that entry' },
-    mutationFn: (id: string) => api.delete<void>(`/water/${id}`),
-    onSettled: invalidate,
-  });
+  /**
+   * One tap on the bin removes the entry from the screen and offers Undo; the server is
+   * told only once the offer has gone (src/feedback/undo.ts).
+   */
+  function removeEntry(entry: WireWaterEntry) {
+    let index = 0;
+
+    deferWithUndo({
+      message: `Removed ${formatVolume(entry.amountMl)}`,
+      failed: 'Couldn’t remove that entry',
+      apply: () =>
+        queryClient.setQueryData<WaterResponse>(WATER_KEY, (current) => {
+          if (!current) return current;
+          index = Math.max(0, current.items.findIndex((item) => item._id === entry._id));
+          return {
+            ...current,
+            items: current.items.filter((item) => item._id !== entry._id),
+            totalMl: Math.max(0, current.totalMl - entry.amountMl),
+          };
+        }),
+      revert: () =>
+        queryClient.setQueryData<WaterResponse>(WATER_KEY, (current) => {
+          if (!current || current.items.some((item) => item._id === entry._id)) return current;
+          const items = [...current.items];
+          items.splice(Math.min(index, items.length), 0, entry);
+          return { ...current, items, totalMl: current.totalMl + entry.amountMl };
+        }),
+      commit: () => api.delete<void>(`/water/${entry._id}`).then(invalidate),
+    });
+  }
 
   const time = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
@@ -179,7 +232,9 @@ export default function WaterScreen() {
                   {time.format(new Date(entry.loggedAt))}
                 </Text>
                 <Touchable
-                  onPress={() => remove.mutate(entry._id)}
+                  onPress={() => removeEntry(entry)}
+                  // A glass still on its way to the server has nothing to delete yet.
+                  disabled={entry._id.startsWith('pending-')}
                   style={styles.delete}
                   accessibilityRole="button"
                   accessibilityLabel={`Remove ${entry.amountMl} millilitres logged at ${time.format(new Date(entry.loggedAt))}`}
