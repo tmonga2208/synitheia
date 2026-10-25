@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -25,7 +26,8 @@ import {
 import { SkeletonScreen } from '../../src/components/Skeleton.js';
 import { DateField } from '../../src/components/DateField.js';
 import { ReceiptConsentSheet } from '../../src/components/ReceiptConsentSheet.js';
-import { ApiError, api } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
+import { errorLine } from '../../src/api/errorCopy.js';
 import { useAuth } from '../../src/store/auth.js';
 import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
@@ -123,6 +125,7 @@ export default function ExpenseDetail() {
   };
 
   const upload = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: (asset: ImagePicker.ImagePickerAsset) => {
       const form = new FormData();
       form.append('file', {
@@ -137,6 +140,7 @@ export default function ExpenseDetail() {
   });
 
   const removeReceipt = useMutation({
+    meta: { failed: 'Couldn’t remove the receipt' },
     mutationFn: () => api.delete<void>(`/expenses/${id}/receipt`),
     onSuccess: invalidate,
   });
@@ -152,22 +156,25 @@ export default function ExpenseDetail() {
    * days: leaving either stale shows the expense on two dates at once, or on neither.
    */
   const reschedule = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: (occurredAt: Date) =>
       api.patch<unknown>(`/expenses/${id}`, { occurredAt: occurredAt.toISOString() }),
     onSuccess: invalidate,
   });
 
   const settle = useMutation({
+    meta: { failed: 'Couldn’t update who has paid' },
     mutationFn: ({ index, settled }: { index: number; settled: boolean }) =>
       api.post<unknown>(`/expenses/${id}/settle`, { index, settled }),
     onSuccess: invalidate,
   });
 
   const remove = useMutation({
+    meta: { failed: 'Couldn’t delete this expense' },
     mutationFn: () => api.delete<void>(`/expenses/${id}`),
     onSuccess: () => {
       invalidate();
-      router.back();
+      goBackOrHome(router);
     },
   });
 
@@ -202,7 +209,7 @@ export default function ExpenseDetail() {
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"
@@ -220,7 +227,8 @@ export default function ExpenseDetail() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={error instanceof ApiError ? error.message : 'Could not load this expense.'}
+            error={error}
+            message="Could not load this expense."
             onRetry={() => void refetch()}
           />
         </View>
@@ -263,9 +271,7 @@ export default function ExpenseDetail() {
 
           {reschedule.error ? (
             <Text variant="caption" color={t.danger} style={{ marginTop: spacing.sm }}>
-              {reschedule.error instanceof ApiError
-                ? reschedule.error.message
-                : 'Could not move this expense.'}
+              {errorLine(reschedule.error, 'Couldn’t move this expense')}
             </Text>
           ) : null}
         </View>
@@ -450,9 +456,7 @@ export default function ExpenseDetail() {
 
         {upload.error ? (
           <Text variant="caption" color={t.danger} style={{ marginTop: spacing.sm }}>
-            {upload.error instanceof ApiError
-              ? upload.error.message
-              : 'Could not save that image.'}
+            {errorLine(upload.error, 'Couldn’t save that image')}
           </Text>
         ) : null}
 

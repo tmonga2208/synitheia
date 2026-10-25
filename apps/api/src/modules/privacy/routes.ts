@@ -16,7 +16,9 @@ import {
   HabitLogModel,
   HabitModel,
   HealthDayModel,
+  IdempotencyRecordModel,
   InferredContextModel,
+  PasswordResetModel,
   PersonalEventModel,
   ReceiptModel,
   RefreshTokenModel,
@@ -151,6 +153,10 @@ const USER_DATA: UserCollection[] = [
   userCollection('connections', DataSourceConnectionModel),
   userCollection('xpAwards', XpAwardModel),
   userCollection('refreshTokens', RefreshTokenModel, false),
+  // A reset code is a credential too: deleted with the account, never exported.
+  userCollection('passwordResets', PasswordResetModel, false),
+  // Stored answers to resent changes (core/idempotency.ts): a cache, deleted, not exported.
+  userCollection('idempotencyRecords', IdempotencyRecordModel, false),
 ];
 
 /**

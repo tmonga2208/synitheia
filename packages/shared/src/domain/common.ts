@@ -8,6 +8,15 @@ export const objectIdSchema = z
   .string()
   .regex(/^[a-f\d]{24}$/i, 'Expected a 24-character hex id');
 
+/**
+ * An id the app chose for something it creates. Something made offline gets its id on the
+ * phone, so it can be ticked, edited or deleted before it reaches the server; the server
+ * keeps that id. Added to create routes only (`createXSchema.and(clientIdSchema)`), never
+ * to update schemas, which are partials of the create ones and must not move an `_id`.
+ */
+export const clientIdSchema = z.object({ id: objectIdSchema.optional() });
+export type ClientId = z.infer<typeof clientIdSchema>;
+
 export const localDateSchema = z
   .string()
   .refine(isLocalDate, 'Expected a calendar date as YYYY-MM-DD');

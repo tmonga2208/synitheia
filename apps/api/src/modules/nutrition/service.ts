@@ -4,6 +4,7 @@ import {
   sumMacros,
   toLocalDate,
   ZERO_MACROS,
+  type ClientId,
   type CreateFoodEntryInput,
   type DataSource,
   type LocalDate,
@@ -18,6 +19,7 @@ import {
 } from '../../db/models.js';
 import { invalidateDailySummary } from '../../context/aggregator.js';
 import { dedupeKey, emit } from '../../context/engine.js';
+import { rethrowTakenId, withClientId } from '../../core/clientId.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 
 export type FoodEntryWithId = FoodEntryDoc & { _id: Types.ObjectId };
@@ -118,25 +120,27 @@ export async function emitFoodLogged(
  */
 export async function createFoodEntry(
   user: AuthedUser,
-  input: CreateFoodEntryInput,
+  input: CreateFoodEntryInput & ClientId,
   source: DataSource = 'manual',
 ): Promise<{ entry: FoodEntryWithId; daily: DailyNutritionWithId }> {
   const loggedAt = input.loggedAt ?? new Date();
   const localDate = toLocalDate(loggedAt, user.timezone);
 
-  const entry = (await FoodEntryModel.create({
-    userId: new Types.ObjectId(user.id),
-    name: input.name,
-    mealType: input.mealType,
-    servings: input.servings,
-    // The snapshot: totals for `servings`, not a live lookup. See nutrition.ts.
-    macros: scaleMacros(input.macrosPerServing, input.servings),
-    foodRef: input.foodRef ?? null,
-    loggedAt,
-    timezone: user.timezone,
-    localDate,
-    source,
-  })) as FoodEntryWithId;
+  const entry = (await FoodEntryModel.create(
+    withClientId(input.id, {
+      userId: new Types.ObjectId(user.id),
+      name: input.name,
+      mealType: input.mealType,
+      servings: input.servings,
+      // The snapshot: totals for `servings`, not a live lookup. See nutrition.ts.
+      macros: scaleMacros(input.macrosPerServing, input.servings),
+      foodRef: input.foodRef ?? null,
+      loggedAt,
+      timezone: user.timezone,
+      localDate,
+      source,
+    }),
+  ).catch(rethrowTakenId)) as FoodEntryWithId;
 
   await emitFoodLogged(user, entry, source);
   const daily = await rebuildDaily(user.id, localDate);

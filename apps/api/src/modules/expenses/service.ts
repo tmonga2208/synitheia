@@ -6,6 +6,7 @@ import {
   startOfLocalMonth,
   sumMoney,
   toLocalDate,
+  type ClientId,
   type CreateExpenseInput,
   type DataSource,
   type LocalDate,
@@ -14,6 +15,7 @@ import {
   type UpdateExpenseInput,
 } from '@synitheia/shared';
 import { AppError } from '../../core/errors.js';
+import { rethrowTakenId, withClientId } from '../../core/clientId.js';
 import {
   ExpenseCategoryModel,
   ExpenseModel,
@@ -70,7 +72,7 @@ async function resolveCategory(userId: string, categoryId: string) {
  */
 export async function createExpense(
   user: AuthedUser,
-  input: CreateExpenseInput,
+  input: CreateExpenseInput & ClientId,
   /**
    * Where this came from. Defaults to how it was typed; a recurring bill posts itself
    * with 'subscription' so the app can always say which charges it added on the user's
@@ -82,7 +84,7 @@ export async function createExpense(
   const category = await resolveCategory(user.id, input.categoryId);
   const occurredAt = input.occurredAt ?? new Date();
 
-  const expense = await ExpenseModel.create({
+  const expense = await ExpenseModel.create(withClientId(input.id, {
     userId: new Types.ObjectId(user.id),
     amountMinor: input.amountMinor,
     currency: user.currency,
@@ -110,7 +112,7 @@ export async function createExpense(
       shareMinor: p.shareMinor,
       settledAt: p.settledAt ?? null,
     })),
-  });
+  })).catch(rethrowTakenId);
 
   // Invalidate before the event emit, not after: emit is a second write that can
   // throw (or be down) once the expense itself has safely landed, and a stale summary

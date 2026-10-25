@@ -18,8 +18,7 @@ import {
   formatMoney,
   type SupportingMetric,
   type TodayResponse,
-  HABIT_MEASURES,
-  measureOf,
+  formatVolume,
 } from '@synitheia/shared';
 import {
   Button,
@@ -36,8 +35,9 @@ import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { HabitCard, type TodayHabit } from '../../src/components/HabitCard.js';
 import { WeeklyChart } from '../../src/components/WeeklyChart.js';
 import { Timeline } from '../../src/components/Timeline.js';
-import { ApiError, api } from '../../src/api/client.js';
+import { api, isQueued } from '../../src/api/client.js';
 import { useCalendarSync } from '../../src/calendar/useCalendarSync.js';
+import { useHabitLog } from '../../src/habits/useHabitLog.js';
 import { useSourcePrefsMirror } from '../../src/sync/useSourcePrefsMirror.js';
 import { useHealthSync } from '../../src/health/useHealthSync.js';
 import { useAuth } from '../../src/store/auth.js';
@@ -47,12 +47,19 @@ import type { Theme } from '../../src/theme/theme.js';
 
 const TODAY_KEY = ['today'] as const;
 
+interface SuggestionAnswer {
+  id: string;
+  action: 'confirm' | 'reject';
+  /** Names the answer if the server refuses it when it syncs. */
+  title: string;
+}
+
 function formatMetric(metric: SupportingMetric, currency: string): string {
   switch (metric.unit) {
     case 'minor_currency':
       return formatMoney(asMinor(Math.round(metric.value)), currency);
     case 'ml':
-      return `${Math.round(metric.value)} ml`;
+      return formatVolume(metric.value);
     case 'kcal':
       return `${Math.round(metric.value)} kcal`;
     case 'percent':
@@ -103,52 +110,13 @@ export default function Today() {
     queryFn: () => api.get<TodayResponse>('/today'),
   });
 
-  /**
-   * The optimistic log.
-   *
-   * A checkbox that waits on a round trip is a checkbox that feels broken. The cache is
-   * updated before the request leaves, rolled back on failure, and reconciled from the
-   * server once it settles — the server owns the streak and the ring, the client only
-   * owns the next 300ms.
-   */
-  const logHabit = useMutation({
-    mutationFn: (habit: TodayHabit) =>
-      // One tap adds one STEP of this habit's measure, not one unit. A step goal that
-      // moved 1 at a time would need 8,000 taps.
-      api.post<unknown>(`/habits/${habit.id}/log`, {
-        increment: HABIT_MEASURES[measureOf(habit)].step,
-      }),
-
-    onMutate: async (habit: TodayHabit) => {
-      await queryClient.cancelQueries({ queryKey: TODAY_KEY });
-      const previous = queryClient.getQueryData<TodayResponse>(TODAY_KEY);
-
-      queryClient.setQueryData<TodayResponse>(TODAY_KEY, (current) =>
-        current
-          ? {
-              ...current,
-              habits: current.habits.map((h) => {
-                if (h.id !== habit.id) return h;
-                const todayCount = h.todayCount + HABIT_MEASURES[measureOf(h)].step;
-                return { ...h, todayCount, todayComplete: todayCount >= h.targetCount };
-              }),
-            }
-          : current,
-      );
-
-      return { previous };
-    },
-
-    onError: (_error, _habit, context) => {
-      if (context?.previous) queryClient.setQueryData(TODAY_KEY, context.previous);
-    },
-
-    onSettled: () => queryClient.invalidateQueries({ queryKey: TODAY_KEY }),
-  });
+  // Ticks are optimistic and offer Undo; a tap on a ticked habit takes the step back.
+  const habitLog = useHabitLog();
 
   const resolveSuggestion = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'confirm' | 'reject' }) =>
-      api.post<unknown>(`/inferences/${id}/resolve`, { action }),
+    meta: { failed: 'Couldn’t save your answer' },
+    mutationFn: ({ id, action, title }: SuggestionAnswer) =>
+      api.offline.post<unknown>(`/inferences/${id}/resolve`, { action }, title),
 
     onMutate: async ({ id }) => {
       await queryClient.cancelQueries({ queryKey: TODAY_KEY });
@@ -169,7 +137,9 @@ export default function Today() {
       if (context?.previous) queryClient.setQueryData(TODAY_KEY, context.previous);
     },
 
-    onSettled: () => queryClient.invalidateQueries({ queryKey: TODAY_KEY }),
+    // Still on the phone: the card has already gone, and the sync refetches when it lands.
+    onSettled: (result) =>
+      isQueued(result) ? undefined : queryClient.invalidateQueries({ queryKey: TODAY_KEY }),
   });
 
   const openHabit = useCallback((habit: TodayHabit) => {
@@ -195,11 +165,8 @@ export default function Today() {
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
           <ErrorState
-            message={
-              error instanceof ApiError || error instanceof Error
-                ? error.message
-                : 'We could not load your day.'
-            }
+            error={error}
+            message="We could not load your day."
             onRetry={() => void refetch()}
           />
         </View>
@@ -312,9 +279,9 @@ export default function Today() {
           {data.habits.length === 0 ? (
             <EmptyState
               icon={<Leaf size={30} color={t.onAccent} strokeWidth={1.5} />}
-              title="No Rituals Yet"
-              body="Your ritual is a blank canvas. Start small to build a life of intention."
-              actionLabel="+ Add A New Habit"
+              title="No habits yet"
+              body="Add one small thing you want to do each day, then tick it off here."
+              actionLabel="+ Add a habit"
               onAction={() => router.push('/habit/new')}
             />
           ) : (
@@ -324,7 +291,8 @@ export default function Today() {
                   key={habit.id}
                   habit={habit}
                   onPress={openHabit}
-                  onLog={(h) => logHabit.mutate(h)}
+                  onLog={habitLog.log}
+                  onUnlog={habitLog.unlog}
                 />
               ))}
             </View>
@@ -371,7 +339,11 @@ export default function Today() {
                     fullWidth={false}
                     style={styles.suggestionButton}
                     onPress={() =>
-                      resolveSuggestion.mutate({ id: suggestion.id, action: 'reject' })
+                      resolveSuggestion.mutate({
+                        id: suggestion.id,
+                        action: 'reject',
+                        title: suggestion.title,
+                      })
                     }
                   />
                   <Button
@@ -379,7 +351,11 @@ export default function Today() {
                     fullWidth={false}
                     style={styles.suggestionButton}
                     onPress={() =>
-                      resolveSuggestion.mutate({ id: suggestion.id, action: 'confirm' })
+                      resolveSuggestion.mutate({
+                        id: suggestion.id,
+                        action: 'confirm',
+                        title: suggestion.title,
+                      })
                     }
                   />
                 </View>

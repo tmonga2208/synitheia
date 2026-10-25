@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  clientIdSchema,
   createExpenseSchema,
   localDateSchema,
   objectIdSchema,
@@ -47,7 +48,7 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
     '/expenses',
     {
       onRequest: [app.requireAuth],
-      schema: { body: createExpenseSchema },
+      schema: { body: createExpenseSchema.and(clientIdSchema) },
     },
     async (req, reply) => {
       const expense = await service.createExpense(req.user, req.body);

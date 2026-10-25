@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { ArrowLeft, Info, Minus, PenLine, Plus } from 'lucide-react-native';
@@ -16,12 +17,12 @@ import {
   Button,
   Card,
   Chip,
-  ErrorState,
   SectionHeader,
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
-import { api, ApiError } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
+import { errorLine } from '../../src/api/errorCopy.js';
 import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
@@ -55,9 +56,17 @@ export default function FoodPhotoScreen() {
   const [mealType, setMealType] = useState<MealType>(guessMeal());
   const [ingestion, setIngestion] = useState<WireIngestion | null>(null);
   const [edits, setEdits] = useState<ItemEdit[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * What went wrong, and the way on: read the same photo again, or (photo access refused
+   * for good) open Settings. "Try again" used to only close the message.
+   */
+  const [failure, setFailure] = useState<{ message: string; next: 'retry' | 'settings' | null } | null>(
+    null,
+  );
+  const [lastPhoto, setLastPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   const analyze = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: async (asset: ImagePicker.ImagePickerAsset) => {
       const form = new FormData();
       form.append('mealType', mealType);
@@ -70,19 +79,20 @@ export default function FoodPhotoScreen() {
       const res = await api.upload<{ ingestion: WireIngestion }>('/food/photo', form);
       return res.ingestion;
     },
+    onMutate: () => setFailure(null),
     onSuccess: (result) => {
-      setError(null);
       setIngestion(result);
       setEdits(
         result.items.map((i) => ({ include: true, portionQty: i.portionQty })),
       );
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : 'Could not read that photo.');
+      setFailure({ message: errorLine(err, 'Couldn’t read that photo'), next: 'retry' });
     },
   });
 
   const confirm = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: async () => {
       if (!ingestion) return;
       await api.post(`/food/photo/${ingestion._id}/confirm`, {
@@ -99,7 +109,7 @@ export default function FoodPhotoScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['today'] });
       await queryClient.invalidateQueries({ queryKey: ['food'] });
-      router.back();
+      goBackOrHome(router);
     },
   });
 
@@ -110,11 +120,15 @@ export default function FoodPhotoScreen() {
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!perm.granted) {
-      setError(
-        source === 'camera'
-          ? 'Camera access is needed to photograph your meal.'
-          : 'Photo access is needed to pick a picture of your meal.',
-      );
+      setFailure({
+        message:
+          source === 'camera'
+            ? 'Camera access is needed to photograph your meal.'
+            : 'Photo access is needed to pick a picture of your meal.',
+        // While the phone can still ask, the same button asks again; after that, only
+        // Settings can change it.
+        next: perm.canAskAgain ? null : 'settings',
+      });
       return;
     }
 
@@ -124,7 +138,10 @@ export default function FoodPhotoScreen() {
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
 
     const asset = result.assets?.[0];
-    if (!result.canceled && asset) analyze.mutate(asset);
+    if (!result.canceled && asset) {
+      setLastPhoto(asset);
+      analyze.mutate(asset);
+    }
   }
 
   // Preview totals update live as the user drags a portion — computed with the SAME
@@ -150,7 +167,7 @@ export default function FoodPhotoScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Touchable
-          onPress={() => router.back()}
+          onPress={() => goBackOrHome(router)}
           accessibilityRole="button"
           accessibilityLabel="Go back"
           style={styles.back}
@@ -206,8 +223,25 @@ export default function FoodPhotoScreen() {
               </View>
             ) : null}
 
-            {error ? (
-              <ErrorState message={error} onRetry={() => setError(null)} />
+            {failure ? (
+              <Card style={styles.failure} accessibilityLiveRegion="polite">
+                <Text variant="body">{failure.message}</Text>
+                {failure.next === 'retry' && lastPhoto ? (
+                  <Button
+                    label="Try again"
+                    variant="secondary"
+                    onPress={() => analyze.mutate(lastPhoto)}
+                    loading={analyze.isPending}
+                  />
+                ) : null}
+                {failure.next === 'settings' ? (
+                  <Button
+                    label="Open Settings"
+                    variant="secondary"
+                    onPress={() => void Linking.openSettings()}
+                  />
+                ) : null}
+              </Card>
             ) : null}
 
             {/*
@@ -365,6 +399,19 @@ export default function FoodPhotoScreen() {
               </Text>
             </Card>
 
+            {/* Inline, not a toast: this screen is a modal, which sits above the toast layer
+                on iOS, so a toast here would go unseen. */}
+            {confirm.error ? (
+              <Text
+                variant="caption"
+                color={t.danger}
+                style={{ marginTop: spacing.lg }}
+                accessibilityLiveRegion="polite"
+              >
+                {errorLine(confirm.error, 'Couldn’t log that meal')}
+              </Text>
+            ) : null}
+
             <Button
               label={anyIncluded ? 'Log this meal' : 'Nothing selected'}
               onPress={() => confirm.mutate()}
@@ -421,6 +468,7 @@ const makeStyles = (t: Theme) =>
       gap: spacing.sm,
       paddingVertical: spacing.xl,
     },
+    failure: { gap: spacing.md, marginTop: spacing.base },
     manualRow: {
       flexDirection: 'row',
       alignItems: 'center',

@@ -10,12 +10,14 @@ import {
   startOfLocalWeek,
   toLocalDate,
   todayLocalDate,
+  type ClientId,
   type CreateHabitInput,
   type LocalDate,
   type LogHabitInput,
   type UpdateHabitInput,
 } from '@synitheia/shared';
 import { AppError } from '../../core/errors.js';
+import { rethrowTakenId, withClientId } from '../../core/clientId.js';
 import {
   HabitLogModel,
   HabitModel,
@@ -24,7 +26,7 @@ import {
   type HabitLogDoc,
 } from '../../db/models.js';
 import { invalidateDailySummary } from '../../context/aggregator.js';
-import { dedupeKey, emit } from '../../context/engine.js';
+import { dedupeKey, emit, retractByDedupeKey } from '../../context/engine.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 import { grantAwards } from '../xp/service.js';
 
@@ -41,17 +43,20 @@ export async function listHabits(userId: string, includeArchived = false) {
   return HabitModel.find(query).sort({ createdAt: 1 }).lean<HabitLean[]>();
 }
 
-export async function createHabit(user: AuthedUser, input: CreateHabitInput) {
-  const habit = await HabitModel.create({
-    userId: new Types.ObjectId(user.id),
-    ...input,
-    category: input.category ?? null,
-    unit: input.unit ?? null,
-    reminderTime: input.reminderTime ?? null,
-    currentStreak: 0,
-    longestStreak: 0,
-    archivedAt: null,
-  });
+export async function createHabit(user: AuthedUser, input: CreateHabitInput & ClientId) {
+  const { id, ...fields } = input;
+  const habit = await HabitModel.create(
+    withClientId(id, {
+      userId: new Types.ObjectId(user.id),
+      ...fields,
+      category: fields.category ?? null,
+      unit: fields.unit ?? null,
+      reminderTime: fields.reminderTime ?? null,
+      currentStreak: 0,
+      longestStreak: 0,
+      archivedAt: null,
+    }),
+  ).catch(rethrowTakenId);
 
   /**
    * A new habit is scheduled from today, which moves `habits.scheduled` and therefore
@@ -255,6 +260,14 @@ export async function logHabit(
   const updated = await recomputeStreak(user.id, habitId, user.timezone);
 
   await invalidateDailySummary(user.id, localDate);
+
+  // Stepped back below the target (an undo in the app): that day is no longer completed,
+  // so its completion leaves the timeline. XP stays; awards are keyed per habit and day, so
+  // ticking it again does not pay twice.
+  const wasComplete = existing !== null && existing.count >= habit.targetCount;
+  if (wasComplete && !complete) {
+    await retractByDedupeKey(user.id, dedupeKey('manual', 'habit', `${habitId}:${localDate}`));
+  }
 
   if (complete) {
     await grantHabitCompletionAwards({

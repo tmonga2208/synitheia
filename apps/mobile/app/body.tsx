@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, HeartPulse } from 'lucide-react-native';
 import type { BmiBand, BodyInsight, BodyMetrics, CalorieGoal, CalorieTarget } from '@synitheia/shared';
@@ -20,7 +21,7 @@ import {
   Touchable,
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
 import { missingSentence } from '../src/health/bodyCopy.js';
 import { BodyDetails } from '../src/health/BodyDetails.js';
 import { BodyDetailsForm } from '../src/health/BodyDetailsForm.js';
@@ -75,6 +76,7 @@ export default function Body() {
   });
 
   const pickGoal = useMutation({
+    meta: { failed: 'Couldn’t set your calorie goal' },
     mutationFn: (goal: CalorieGoal) => api.put<BodyReport>('/health/calorie-goal', { goal }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: KEY });
@@ -84,7 +86,7 @@ export default function Body() {
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"
@@ -102,7 +104,8 @@ export default function Body() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={error instanceof ApiError ? error.message : 'Could not load your body.'}
+            error={error}
+            message="Could not load your body."
             onRetry={() => void refetch()}
           />
         </View>
@@ -269,7 +272,7 @@ export default function Body() {
 
               <Button
                 label="Done"
-                onPress={() => router.back()}
+                onPress={() => goBackOrHome(router)}
                 style={{ marginTop: spacing.lg }}
               />
             </>

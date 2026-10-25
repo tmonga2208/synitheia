@@ -4,14 +4,17 @@ import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   awardsForWaterEntry,
+  clientIdSchema,
   createWaterEntrySchema,
   localDateSchema,
   objectIdSchema,
   toLocalDate,
   todayLocalDate,
+  type ClientId,
   type CreateWaterEntryInput,
   type LocalDate,
 } from '@synitheia/shared';
+import { rethrowTakenId, withClientId } from '../../core/clientId.js';
 import { AppError } from '../../core/errors.js';
 import { UserPreferenceModel, WaterEntryModel, type WaterEntryDoc } from '../../db/models.js';
 import { invalidateDailySummary } from '../../context/aggregator.js';
@@ -64,7 +67,7 @@ async function totalMlOn(userId: string, localDate: LocalDate): Promise<number> 
 /** Exported so it is reachable from a test without standing up a Fastify instance. */
 export async function createEntry(
   user: AuthedUser,
-  input: CreateWaterEntryInput,
+  input: CreateWaterEntryInput & ClientId,
   /**
    * Optional so every direct caller in this codebase's tests keeps compiling
    * unchanged; the real route passes `req.log`, the same facility `today/routes.ts`
@@ -97,10 +100,12 @@ export async function createEntry(
   const entry = input.clientKey
     ? ((await WaterEntryModel.findOneAndUpdate(
         { userId: new Types.ObjectId(user.id), clientKey: input.clientKey },
-        { $setOnInsert: doc },
+        { $setOnInsert: withClientId(input.id, doc) },
         { upsert: true, new: true },
-      )) as WaterEntryWithId)
-    : ((await WaterEntryModel.create(doc)) as WaterEntryWithId);
+      ).catch(rethrowTakenId)) as WaterEntryWithId)
+    : ((await WaterEntryModel.create(withClientId(input.id, doc)).catch(
+        rethrowTakenId,
+      )) as WaterEntryWithId);
 
   // Computed after the insert, because the event's metadata reports the day total as
   // of this glass — and on a deduped retry that total must not move.
@@ -168,7 +173,7 @@ export async function registerWaterRoutes(app: FastifyInstance): Promise<void> {
     '/water',
     {
       onRequest: [app.requireAuth],
-      schema: { body: createWaterEntrySchema },
+      schema: { body: createWaterEntrySchema.and(clientIdSchema) },
     },
     async (req, reply) => {
       const result = await createEntry(req.user, req.body, req.log);

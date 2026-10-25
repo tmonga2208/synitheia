@@ -20,6 +20,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { describeError } from '../api/errorCopy.js';
 import { MIN_TAP_TARGET, motion, radius, spacing, type } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
@@ -364,13 +365,28 @@ export function EmptyState({
   );
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+/**
+ * A screen that could not load. Headed by the cause when it is about reaching the server
+ * ("You're offline", "Synítheia isn't answering"); otherwise "Couldn't load this" over the
+ * server's reason or `message`, which says what was being loaded.
+ */
+export function ErrorState({
+  error,
+  message,
+  onRetry,
+}: {
+  error?: unknown;
+  message: string;
+  onRetry?: () => void;
+}) {
   const t = useTheme();
+  const copy = describeError(error, message);
+  const answered = copy.cause === 'refused' || copy.cause === 'input' || copy.cause === 'other';
 
   return (
     <Card style={{ alignItems: 'center', paddingVertical: spacing['2xl'] }}>
       <Text variant="cardTitle" center>
-        Something went wrong
+        {answered ? 'Couldn’t load this' : copy.title}
       </Text>
       <Text
         variant="body"
@@ -378,7 +394,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
         center
         style={{ marginTop: spacing.sm, maxWidth: 280 }}
       >
-        {message}
+        {copy.message}
       </Text>
       {onRetry ? (
         <Button

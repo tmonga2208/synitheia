@@ -127,6 +127,56 @@ export const RefreshTokenModel = model(
   refreshTokenSchema,
 );
 
+// ─── Idempotency ────────────────────────────────────────────────────────────
+
+/**
+ * The answer given to each change, by the key the app sent with it (core/idempotency.ts).
+ *
+ * The app queues changes made offline and sends them when the connection returns. A change
+ * whose answer was lost (a dropped connection, a timeout) is sent again with the same key,
+ * and gets this stored answer instead of being applied twice. Kept for two days.
+ */
+const idempotencyRecordSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    key: { type: String, required: true },
+    method: { type: String, required: true },
+    path: { type: String, required: true },
+    state: { type: String, required: true, enum: ['pending', 'done'] },
+    responseStatus: { type: Number, default: null },
+    responseBody: { type: Schema.Types.Mixed, default: null },
+    expiresAt: { type: Date, required: true },
+  },
+  opts,
+);
+
+idempotencyRecordSchema.index({ userId: 1, key: 1 }, { unique: true });
+idempotencyRecordSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const IdempotencyRecordModel = model('IdempotencyRecord', idempotencyRecordSchema);
+
+// ─── Password resets ────────────────────────────────────────────────────────
+
+/**
+ * A password reset in progress: one per user, the emailed six-digit code stored only as a
+ * hash, a count of wrong tries, and gone fifteen minutes after it was asked for.
+ */
+const passwordResetSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    codeHash: { type: String, required: true },
+    attempts: { type: Number, required: true, default: 0 },
+    expiresAt: { type: Date, required: true },
+  },
+  opts,
+);
+
+// Asking again replaces the code rather than adding a second live one.
+passwordResetSchema.index({ userId: 1 }, { unique: true });
+passwordResetSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const PasswordResetModel = model('PasswordReset', passwordResetSchema);
+
 // ─── Preferences ────────────────────────────────────────────────────────────
 
 const userPreferenceSchema = new Schema(

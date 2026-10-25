@@ -18,7 +18,7 @@ import {
 } from '../../db/models.js';
 import type { Env } from '../../config/env.js';
 
-type UserWithId = UserDoc & { _id: Types.ObjectId };
+export type UserWithId = UserDoc & { _id: Types.ObjectId };
 
 /**
  * Argon2id: memory-hard, so a GPU farm gains far less advantage than it would

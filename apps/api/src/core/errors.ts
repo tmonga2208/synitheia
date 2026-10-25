@@ -18,6 +18,7 @@ export type ErrorCode =
   | 'ai_unavailable'
   | 'ingestion_failed'
   | 'pdf_password_required'
+  | 'mail_unavailable'
   | 'internal';
 
 const STATUS: Record<ErrorCode, number> = {
@@ -32,6 +33,7 @@ const STATUS: Record<ErrorCode, number> = {
   ai_unavailable: 503,
   ingestion_failed: 422,
   pdf_password_required: 422,
+  mail_unavailable: 503,
   internal: 500,
 };
 
@@ -83,6 +85,11 @@ export class AppError extends Error {
    */
   static pdfPasswordRequired(message: string) {
     return new AppError('pdf_password_required', message);
+  }
+
+  /** Email is not set up on this server, or the provider refused the message. */
+  static mailUnavailable(message: string) {
+    return new AppError('mail_unavailable', message);
   }
 }
 

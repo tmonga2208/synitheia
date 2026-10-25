@@ -1,10 +1,10 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Crypto from 'expo-crypto';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Droplets, Trash2 } from 'lucide-react-native';
-import { WATER_PRESETS_ML } from '@synitheia/shared';
+import { WATER_PRESETS_ML, formatVolume } from '@synitheia/shared';
 import {
   Card,
   EmptyState,
@@ -15,26 +15,23 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ProgressRing } from '../src/components/ProgressRing.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api, isQueued } from '../src/api/client.js';
+import { deferWithUndo } from '../src/feedback/undo.js';
+import { useAddWater } from '../src/water/useAddWater.js';
+import {
+  WATER_KEY,
+  hideGlass,
+  putGlassBack,
+  refetchWater,
+  type WaterResponse,
+  type WireWaterEntry,
+} from '../src/water/waterCache.js';
 import { useAuth } from '../src/store/auth.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
 
-const WATER_KEY = ['water'] as const;
 const ACCENT_COLOR = '#8A9AA9';
-
-interface WireWaterEntry {
-  _id: string;
-  amountMl: number;
-  loggedAt: string;
-}
-
-interface WaterResponse {
-  items: WireWaterEntry[];
-  totalMl: number;
-  targetMl: number;
-}
 
 /**
  * Water, in detail.
@@ -56,21 +53,35 @@ export default function WaterScreen() {
     queryFn: () => api.get<WaterResponse>('/water'),
   });
 
-  const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: WATER_KEY });
-    void queryClient.invalidateQueries({ queryKey: ['today'] });
-  };
+  // A glass shows at once, here and on Today, with or without a connection.
+  const addWater = useAddWater();
 
-  const add = useMutation({
-    mutationFn: (amountMl: number) =>
-      api.post<unknown>('/water', { amountMl, clientKey: Crypto.randomUUID() }),
-    onSettled: invalidate,
-  });
+  /**
+   * One tap on the bin removes the entry from the screen and offers Undo; the server is
+   * told only once the offer has gone (src/feedback/undo.ts), or, offline, on the way back.
+   */
+  function removeEntry(entry: WireWaterEntry) {
+    let index = 0;
 
-  const remove = useMutation({
-    mutationFn: (id: string) => api.delete<void>(`/water/${id}`),
-    onSettled: invalidate,
-  });
+    deferWithUndo({
+      message: `Removed ${formatVolume(entry.amountMl)}`,
+      failed: 'Couldn’t remove that entry',
+      apply: () => {
+        index = hideGlass(queryClient, entry);
+      },
+      revert: () => putGlassBack(queryClient, entry, index),
+      commit: () =>
+        api.offline
+          .delete<void>(
+            `/water/${entry._id}`,
+            undefined,
+            `Removing ${formatVolume(entry.amountMl)} of water`,
+          )
+          .then((result) => {
+            if (!isQueued(result)) refetchWater(queryClient);
+          }),
+    });
+  }
 
   const time = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
@@ -80,7 +91,7 @@ export default function WaterScreen() {
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"
@@ -98,7 +109,8 @@ export default function WaterScreen() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={error instanceof ApiError ? error.message : 'Could not load your water.'}
+            error={error}
+            message="Could not load your water."
             onRetry={() => void refetch()}
           />
         </View>
@@ -130,9 +142,9 @@ export default function WaterScreen() {
 
         <View style={styles.ring}>
           <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={18}>
-            <Text variant="title">{data.totalMl}</Text>
+            <Text variant="title">{formatVolume(data.totalMl)}</Text>
             <Text variant="caption" color={t.textMuted}>
-              of {data.targetMl.toLocaleString()} ml
+              of {formatVolume(data.targetMl)}
             </Text>
           </ProgressRing>
         </View>
@@ -142,7 +154,7 @@ export default function WaterScreen() {
             <Touchable
               key={ml}
               style={styles.preset}
-              onPress={() => add.mutate(ml)}
+              onPress={() => addWater(ml)}
               accessibilityRole="button"
               accessibilityLabel={`Log ${ml} millilitres`}
             >
@@ -170,13 +182,13 @@ export default function WaterScreen() {
               <View style={styles.entryRow}>
                 <View style={[styles.dot, { backgroundColor: ACCENT.base }]} />
                 <Text variant="cardTitle" style={{ flex: 1 }}>
-                  {entry.amountMl} ml
+                  {formatVolume(entry.amountMl)}
                 </Text>
                 <Text variant="caption" color={t.textMuted}>
                   {time.format(new Date(entry.loggedAt))}
                 </Text>
                 <Touchable
-                  onPress={() => remove.mutate(entry._id)}
+                  onPress={() => removeEntry(entry)}
                   style={styles.delete}
                   accessibilityRole="button"
                   accessibilityLabel={`Remove ${entry.amountMl} millilitres logged at ${time.format(new Date(entry.loggedAt))}`}

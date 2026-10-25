@@ -8,9 +8,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { Lock, Mail } from 'lucide-react-native';
 import { Button, Input, Text, Touchable } from '../../src/components/primitives.js';
-import { ApiError } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
+import { errorLine } from '../../src/api/errorCopy.js';
 import { useAuth } from '../../src/store/auth.js';
 import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
@@ -26,6 +28,14 @@ export default function SignIn() {
   const signIn = useAuth((s) => s.signIn);
   const signInWithApple = useAuth((s) => s.signInWithApple);
   const signInWithGoogle = useAuth((s) => s.signInWithGoogle);
+  const expired = useAuth((s) => s.signedOutReason === 'expired');
+
+  // What this server offers before sign-in; a failure simply hides the reset link.
+  const options = useQuery({
+    queryKey: ['auth-options'],
+    queryFn: () => api.get<{ passwordReset: boolean }>('/auth/options'),
+    staleTime: 10 * 60_000,
+  });
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,11 +60,7 @@ export default function SignIn() {
       await action();
       router.replace('/');
     } catch (error) {
-      setFormError(
-        error instanceof ApiError || error instanceof Error
-          ? error.message
-          : 'Something went wrong. Please try again.',
-      );
+      setFormError(errorLine(error, 'Couldn’t sign in'));
     } finally {
       setPending(null);
     }
@@ -71,9 +77,18 @@ export default function SignIn() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {expired ? (
+            <View style={styles.notice} accessibilityLiveRegion="polite">
+              <Text variant="bodyMedium">You were signed out</Text>
+              <Text variant="caption" color={t.textMuted}>
+                Sign in again to pick up where you left off. Nothing you logged is lost.
+              </Text>
+            </View>
+          ) : null}
+
           <Text variant="title">Welcome back</Text>
           <Text variant="body" color={t.textMuted} style={styles.subtitle}>
-            Pick your rituals back up where you left them.
+            Pick your habits back up where you left them.
           </Text>
 
           <View style={styles.fields}>
@@ -101,6 +116,23 @@ export default function SignIn() {
               textContentType="password"
               leading={<Lock size={18} color={t.textFaint} />}
             />
+
+            {/* Only where the server can send the code; elsewhere it would be a dead end. */}
+            {options.data?.passwordReset ? (
+              <Touchable
+                onPress={() =>
+                  router.push({ pathname: '/(auth)/reset-password', params: { email: email.trim() } })
+                }
+                haptic={false}
+                accessibilityRole="link"
+                accessibilityLabel="Forgot password? Reset it with a code by email"
+                style={styles.forgot}
+              >
+                <Text variant="bodyMedium" color={t.accent}>
+                  Forgot password?
+                </Text>
+              </Touchable>
+            ) : null}
           </View>
 
           {formError ? (
@@ -194,7 +226,17 @@ const makeStyles = (t: Theme) =>
       borderWidth: 1,
       borderColor: t.danger,
     },
+    notice: {
+      gap: spacing.xs,
+      marginBottom: spacing.xl,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
     cta: { marginTop: spacing.xl },
+    forgot: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center' },
     divider: {
       flexDirection: 'row',
       alignItems: 'center',

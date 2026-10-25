@@ -1,6 +1,7 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Check, HandCoins } from 'lucide-react-native';
 import { asMinor, formatMoney } from '@synitheia/shared';
@@ -12,7 +13,7 @@ import {
   Touchable,
 } from '../../src/components/primitives.js';
 import { SkeletonScreen } from '../../src/components/Skeleton.js';
-import { ApiError, api } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
 import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
@@ -63,6 +64,7 @@ export default function OwedScreen() {
   });
 
   const settle = useMutation({
+    meta: { failed: 'Couldn’t update who has paid' },
     mutationFn: (entry: OwedEntry) =>
       api.post<unknown>(`/expenses/${entry.expenseId}/settle`, {
         index: entry.index,
@@ -100,7 +102,7 @@ export default function OwedScreen() {
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"
@@ -118,7 +120,8 @@ export default function OwedScreen() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={error instanceof ApiError ? error.message : 'Could not load what you are owed.'}
+            error={error}
+            message="Could not load what you are owed."
             onRetry={() => void refetch()}
           />
         </View>

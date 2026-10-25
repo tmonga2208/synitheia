@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
 import { Lock, Mail, User as UserIcon } from 'lucide-react-native';
 import { Button, Input, Text, Touchable } from '../../src/components/primitives.js';
-import { ApiError } from '../../src/api/client.js';
+import { errorLine } from '../../src/api/errorCopy.js';
 import { useAuth } from '../../src/store/auth.js';
 import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
@@ -57,11 +57,7 @@ export default function SignUp() {
       await action();
       router.replace('/');
     } catch (error) {
-      setFormError(
-        error instanceof ApiError || error instanceof Error
-          ? error.message
-          : 'Something went wrong. Please try again.',
-      );
+      setFormError(errorLine(error, 'Couldn’t create your account'));
     } finally {
       setPending(null);
     }
@@ -80,7 +76,7 @@ export default function SignUp() {
         >
           <Text variant="title">Begin gently</Text>
           <Text variant="body" color={t.textMuted} style={styles.subtitle}>
-            A few small rituals, kept quietly, every day.
+            A few small habits, kept quietly, every day.
           </Text>
 
           <View style={styles.fields}>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Info, Sparkles } from 'lucide-react-native';
 import {
@@ -10,6 +11,7 @@ import {
   type InsightFeedback,
   type InsightSeverity,
   type SupportingMetric,
+  formatVolume,
 } from '@synitheia/shared';
 import {
   Button,
@@ -21,7 +23,8 @@ import {
   Touchable,
 } from '../src/components/primitives.js';
 import { Skeleton, SkeletonList } from '../src/components/Skeleton.js';
-import { ApiError, api } from '../src/api/client.js';
+import { ApiError, api, isQueued } from '../src/api/client.js';
+import { errorLine } from '../src/api/errorCopy.js';
 import type {
   InsightAvailability,
   InsightEvidence,
@@ -54,7 +57,7 @@ function formatMetric(metric: SupportingMetric, currency: string): string {
     case 'minor_currency':
       return formatMoney(asMinor(Math.round(metric.value)), currency);
     case 'ml':
-      return `${Math.round(metric.value)} ml`;
+      return formatVolume(metric.value);
     case 'kcal':
       return `${Math.round(metric.value)} kcal`;
     case 'percent':
@@ -99,6 +102,7 @@ export default function Insights() {
    * being flattened into "Something went wrong".
    */
   const generate = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () => api.post<{ generated: number }>('/insights/generate', { days: 30 }),
 
     onMutate: () => setGenerateError(null),
@@ -113,21 +117,18 @@ export default function Insights() {
     },
 
     onError: (error: unknown) => {
-      if (error instanceof ApiError) {
-        setGenerateError(error.message);
-        // The user may have revoked consent on another device.
-        if (error.code === 'ai_disabled') {
-          void queryClient.invalidateQueries({ queryKey: AVAILABILITY_KEY });
-        }
-        return;
+      setGenerateError(errorLine(error, 'Couldn’t look for insights'));
+      // The user may have revoked consent on another device.
+      if (error instanceof ApiError && error.code === 'ai_disabled') {
+        void queryClient.invalidateQueries({ queryKey: AVAILABILITY_KEY });
       }
-      setGenerateError('Could not reach Synítheia right now. Please try again.');
     },
   });
 
   const feedback = useMutation({
-    mutationFn: ({ id, value }: { id: string; value: InsightFeedback }) =>
-      api.post<unknown>(`/insights/${id}/feedback`, { feedback: value }),
+    meta: { failed: 'Couldn’t save your feedback' },
+    mutationFn: ({ id, value, title }: { id: string; value: InsightFeedback; title: string }) =>
+      api.offline.post<unknown>(`/insights/${id}/feedback`, { feedback: value }, title),
 
     onMutate: async ({ id, value }) => {
       await queryClient.cancelQueries({ queryKey: INSIGHTS_KEY });
@@ -150,14 +151,17 @@ export default function Insights() {
       if (context?.previous) queryClient.setQueryData(INSIGHTS_KEY, context.previous);
     },
 
-    onSettled: () => queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
+    // Still on the phone: the card already shows it, and the sync refetches when it lands.
+    onSettled: (result) =>
+      isQueued(result) ? undefined : queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
   });
 
   const dismiss = useMutation({
-    mutationFn: (id: string) =>
-      api.post<unknown>(`/insights/${id}/status`, { status: 'dismissed' }),
+    meta: { failed: 'Couldn’t dismiss that insight' },
+    mutationFn: ({ id, title }: { id: string; title: string }) =>
+      api.offline.post<unknown>(`/insights/${id}/status`, { status: 'dismissed' }, title),
 
-    onMutate: async (id: string) => {
+    onMutate: async ({ id }: { id: string; title: string }) => {
       await queryClient.cancelQueries({ queryKey: INSIGHTS_KEY });
       const previous = queryClient.getQueryData<ListResponse<WireInsight>>(INSIGHTS_KEY);
 
@@ -174,12 +178,13 @@ export default function Insights() {
       if (context?.previous) queryClient.setQueryData(INSIGHTS_KEY, context.previous);
     },
 
-    onSettled: () => queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
+    onSettled: (result) =>
+      isQueued(result) ? undefined : queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
   });
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"
@@ -213,11 +218,8 @@ export default function Insights() {
           {back}
           {header}
           <ErrorState
-            message={
-              availability.error instanceof Error
-                ? availability.error.message
-                : 'We could not reach Synítheia.'
-            }
+            error={availability.error}
+            message="We could not reach Synítheia."
             onRetry={() => void availability.refetch()}
           />
         </View>
@@ -277,11 +279,8 @@ export default function Insights() {
           <SkeletonList rows={3} />
         ) : insights.error ? (
           <ErrorState
-            message={
-              insights.error instanceof Error
-                ? insights.error.message
-                : 'We could not load your insights.'
-            }
+            error={insights.error}
+            message="We could not load your insights."
             onRetry={() => void insights.refetch()}
           />
         ) : items.length === 0 ? (
@@ -297,8 +296,10 @@ export default function Insights() {
                 key={insight._id}
                 insight={insight}
                 currency={currency}
-                onFeedback={(value) => feedback.mutate({ id: insight._id, value })}
-                onDismiss={() => dismiss.mutate(insight._id)}
+                onFeedback={(value) =>
+                  feedback.mutate({ id: insight._id, value, title: insight.title })
+                }
+                onDismiss={() => dismiss.mutate({ id: insight._id, title: insight.title })}
               />
             ))}
           </View>
@@ -399,9 +400,7 @@ function InsightCard({
             </View>
           ) : evidence.error || !evidence.data ? (
             <Text variant="caption" color={t.danger}>
-              {evidence.error instanceof Error
-                ? evidence.error.message
-                : 'We could not load the evidence for this insight.'}
+              {errorLine(evidence.error, 'Couldn’t load the evidence for this insight')}
             </Text>
           ) : (
             <>

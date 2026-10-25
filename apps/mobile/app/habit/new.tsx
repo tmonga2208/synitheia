@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -9,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import * as Notifications from 'expo-notifications';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Minus, Plus } from 'lucide-react-native';
 import {
@@ -29,7 +31,9 @@ import {
   Touchable,
 } from '../../src/components/primitives.js';
 import { DEFAULT_ICON, IconPicker, iconFor } from '../../src/components/IconPicker.js';
-import { ApiError, api } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
+import { errorLine } from '../../src/api/errorCopy.js';
+import { askForNotifications, type NotificationAccess } from '../../src/reminders/permission.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
@@ -51,34 +55,11 @@ function to24h({ hour, minute, period }: TimeOfDay): string {
   return `${pad(h)}:${pad(minute)}`;
 }
 
-/**
- * The notification is scheduled locally rather than pushed from the server. A gentle
- * reminder must fire on time even when the device is offline, and it needs no network
- * round-trip to be trustworthy.
+/*
+ * The habit's reminder is not scheduled here: it is planned with every other one
+ * (src/reminders) from the habit's reminder time, which the server keeps, so it also comes
+ * back on a new phone. This screen only asks for permission, the one moment it makes sense.
  */
-async function scheduleReminder(habit: Habit, time: TimeOfDay): Promise<void> {
-  const existing = await Notifications.getPermissionsAsync();
-  const granted =
-    existing.granted ||
-    (await Notifications.requestPermissionsAsync()).granted;
-
-  if (!granted) return;
-
-  const [hour, minute] = to24h(time).split(':').map(Number) as [number, number];
-
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: habit.name,
-      body: 'A gentle nudge — your ritual is waiting.',
-      data: { habitId: habit.id },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour,
-      minute,
-    },
-  });
-}
 
 export default function NewHabit() {
   const t = useTheme();
@@ -171,11 +152,23 @@ export default function NewHabit() {
     setSaving(true);
 
     try {
-      const { habit } = await api.post<{ habit: Habit }>('/habits', parsed.data);
+      // Before saving: the save re-plans reminders, and it should know the answer.
+      const access: NotificationAccess | null = reminderEnabled
+        ? await askForNotifications().catch(() => null)
+        : null;
 
-      if (reminderEnabled) {
-        // A failed reminder must not fail the habit — it already exists on the server.
-        await scheduleReminder(habit, time).catch(() => undefined);
+      await api.post<{ habit: Habit }>('/habits', parsed.data);
+
+      if (access === 'blocked') {
+        // The habit is fine; its reminder is what cannot arrive. Say so, with the way out.
+        Alert.alert(
+          'Notifications are off',
+          "The habit is saved, but notifications are off for Synítheia, so its reminder won't appear. You can turn them on in Settings.",
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+          ],
+        );
       }
 
       /**
@@ -186,13 +179,9 @@ export default function NewHabit() {
       await queryClient.invalidateQueries({ queryKey: ['habits'] });
       await queryClient.invalidateQueries({ queryKey: ['today'] });
 
-      router.back();
+      goBackOrHome(router);
     } catch (error) {
-      setFormError(
-        error instanceof ApiError || error instanceof Error
-          ? error.message
-          : 'Could not create this habit. Please try again.',
-      );
+      setFormError(errorLine(error, 'Couldn’t create this habit'));
     } finally {
       setSaving(false);
     }
@@ -215,7 +204,7 @@ export default function NewHabit() {
               accessibilityRole="button"
               accessibilityLabel="Go back"
               haptic={false}
-              onPress={() => router.back()}
+              onPress={() => goBackOrHome(router)}
             >
               <ArrowLeft size={22} color={t.textPrimary} />
             </Touchable>

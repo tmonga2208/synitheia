@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { BodyMetrics } from '@synitheia/shared';
-import { ApiError, api } from '../api/client.js';
+import { api } from '../api/client.js';
+import { errorLine } from '../api/errorCopy.js';
 import { Button, Card, Chip, Input, Text } from '../components/primitives.js';
 import { useTheme } from '../theme/ThemeProvider.js';
 import { spacing } from '../theme/theme.js';
@@ -68,6 +69,7 @@ export function BodyDetailsForm({ stored, mode, onDone }: BodyDetailsFormProps) 
     : ALL_FIELDS.filter((field) => !storedFields(stored).includes(field));
 
   const save = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: (patch: Partial<BodyMetrics>) => api.patch<unknown>('/health/body', patch),
     onSuccess: async () => {
       // The calorie target on Today is derived from these.
@@ -79,7 +81,7 @@ export function BodyDetailsForm({ stored, mode, onDone }: BodyDetailsFormProps) 
       onDone?.();
     },
     onError: (err: unknown) => {
-      setError(err instanceof ApiError ? err.message : 'Could not save. Please try again.');
+      setError(errorLine(err, 'Couldn’t save your details'));
     },
   });
 

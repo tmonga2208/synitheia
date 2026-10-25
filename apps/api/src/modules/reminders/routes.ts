@@ -3,12 +3,14 @@ import { Types } from 'mongoose';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  clientIdSchema,
   createReminderSchema,
   objectIdSchema,
   todayLocalDate,
   updateReminderSchema,
 } from '@synitheia/shared';
 import { AppError } from '../../core/errors.js';
+import { rethrowTakenId, withClientId } from '../../core/clientId.js';
 import { ReminderModel, type ReminderDoc } from '../../db/models.js';
 import { dedupeKey, emit } from '../../context/engine.js';
 
@@ -38,22 +40,24 @@ export async function registerReminderRoutes(app: FastifyInstance): Promise<void
     '/reminders',
     {
       onRequest: [app.requireAuth],
-      schema: { body: createReminderSchema },
+      schema: { body: createReminderSchema.and(clientIdSchema) },
     },
     async (req, reply) => {
-      const reminder = await ReminderModel.create({
-        userId: new Types.ObjectId(req.user.id),
-        kind: req.body.kind,
-        refId: req.body.refId ? new Types.ObjectId(req.body.refId) : null,
-        label: req.body.label,
-        repeat: req.body.repeat,
-        time: req.body.time ?? null,
-        weekdays: req.body.weekdays,
-        intervalMinutes: req.body.intervalMinutes ?? null,
-        windowStart: req.body.windowStart ?? null,
-        windowEnd: req.body.windowEnd ?? null,
-        enabled: req.body.enabled,
-      });
+      const reminder = await ReminderModel.create(
+        withClientId(req.body.id, {
+          userId: new Types.ObjectId(req.user.id),
+          kind: req.body.kind,
+          refId: req.body.refId ? new Types.ObjectId(req.body.refId) : null,
+          label: req.body.label,
+          repeat: req.body.repeat,
+          time: req.body.time ?? null,
+          weekdays: req.body.weekdays,
+          intervalMinutes: req.body.intervalMinutes ?? null,
+          windowStart: req.body.windowStart ?? null,
+          windowEnd: req.body.windowEnd ?? null,
+          enabled: req.body.enabled,
+        }),
+      ).catch(rethrowTakenId);
 
       return reply.status(201).send({ reminder });
     },

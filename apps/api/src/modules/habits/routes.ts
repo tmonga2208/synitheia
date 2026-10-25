@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  clientIdSchema,
   createHabitSchema,
   logHabitSchema,
   objectIdSchema,
@@ -32,7 +33,7 @@ export async function registerHabitRoutes(app: FastifyInstance): Promise<void> {
     '/habits',
     {
       onRequest: [app.requireAuth],
-      schema: { body: createHabitSchema },
+      schema: { body: createHabitSchema.and(clientIdSchema) },
     },
     async (req, reply) => {
       const habit = await service.createHabit(req.user, req.body);

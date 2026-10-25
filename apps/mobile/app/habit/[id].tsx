@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArrowLeft, Flame, Trophy, Zap } from 'lucide-react-native';
 import {
@@ -22,6 +23,7 @@ import { SkeletonList } from '../../src/components/Skeleton.js';
 import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { iconFor } from '../../src/components/IconPicker.js';
 import { api } from '../../src/api/client.js';
+import { describeError } from '../../src/api/errorCopy.js';
 import type { HabitHistory, ListResponse, WireHabit } from '../../src/api/types.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
@@ -67,17 +69,15 @@ export default function HabitDetail() {
    * every morning for six weeks.
    */
   const archive = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () => api.delete<void>(`/habits/${id}`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: HABITS_KEY });
       void queryClient.invalidateQueries({ queryKey: TODAY_KEY });
-      router.back();
+      goBackOrHome(router);
     },
     onError: (error: unknown) => {
-      Alert.alert(
-        'Could not archive',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      Alert.alert('Couldn’t archive this habit', describeError(error).message);
     },
   });
 
@@ -100,7 +100,7 @@ export default function HabitDetail() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
       haptic={false}
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
     >
       <ArrowLeft size={22} color={t.textPrimary} />
     </Touchable>
@@ -120,11 +120,8 @@ export default function HabitDetail() {
         <View style={styles.content}>
           {back}
           <ErrorState
-            message={
-              habitsQuery.error instanceof Error
-                ? habitsQuery.error.message
-                : 'This habit no longer exists.'
-            }
+            error={habitsQuery.error}
+            message="This habit no longer exists."
             onRetry={() => void habitsQuery.refetch()}
           />
         </View>

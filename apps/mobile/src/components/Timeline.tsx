@@ -14,6 +14,7 @@ import {
   formatMoney,
   type EventMetadata,
   type PersonalEvent,
+  formatVolume,
 } from '@synitheia/shared';
 import { Card, Text, Touchable } from './primitives.js';
 import { motion, radius, spacing } from '../theme/theme.js';
@@ -74,7 +75,7 @@ function describe(metadata: EventMetadata, numbers: Intl.NumberFormat): string {
         roundedInt(metadata.calories),
       )} kcal`;
     case 'water.logged':
-      return `${numbers.format(metadata.amountMl)} ml water`;
+      return `${formatVolume(metadata.amountMl)} water`;
     case 'workout.detected':
       return `${metadata.activity} · ${durationText(metadata.durationMin)}`;
     case 'steps.recorded':
@@ -179,7 +180,7 @@ function summarize(bucket: Bucket, numbers: Intl.NumberFormat): string {
     parts.push(
       bucket.waterMl >= 1000
         ? `${(bucket.waterMl / 1000).toFixed(1)} L water`
-        : `${bucket.waterMl} ml water`,
+        : `${formatVolume(bucket.waterMl)} water`,
     );
   }
 
@@ -407,7 +408,7 @@ function PartBlock({
                 </Text>
                 <View style={[styles.rowDot, { backgroundColor: DOMAIN_COLOR.water }]} />
                 <Text variant="body" color={t.textPrimary} style={styles.sentence}>
-                  {numbers.format(bucket.waterMl)} ml water · {bucket.waterLogs} glass
+                  {formatVolume(bucket.waterMl)} water · {bucket.waterLogs} glass
                   {bucket.waterLogs === 1 ? '' : 'es'}
                 </Text>
               </View>

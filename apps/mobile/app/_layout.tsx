@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
@@ -14,8 +14,22 @@ import {
   useFonts,
 } from '@expo-google-fonts/manrope';
 import * as Notifications from 'expo-notifications';
-import { migrateTokenAccessibility } from '../src/api/client.js';
+import { migrateTokenAccessibility, probeServer, setWriteListener } from '../src/api/client.js';
+import {
+  checkConnectivityNow,
+  holdUntilSynced,
+  startConnectivity,
+} from '../src/api/connectivity.js';
+import { forgetLocalData, persistOptions, queryClient } from '../src/api/queryClient.js';
 import { ErrorBoundary } from '../src/components/ErrorBoundary.js';
+import { OfflineBanner } from '../src/components/OfflineBanner.js';
+import { ToastHost } from '../src/components/ToastHost.js';
+import { startNewDay } from '../src/offline/newDay.js';
+import { loadOutbox, useOutbox } from '../src/offline/outbox.js';
+import { startSavedOfflineNotice, syncNow } from '../src/offline/sync.js';
+import type { ReminderRoute } from '../src/reminders/plan.js';
+import { routeForNotification } from '../src/reminders/route.js';
+import { refreshReminders, requestReminderRefresh } from '../src/reminders/schedule.js';
 import { useAuth } from '../src/store/auth.js';
 // Imported for its side effect too: this is what defines the background task.
 import { syncBackgroundRegistration } from '../src/sync/backgroundTask.js';
@@ -25,18 +39,39 @@ import { ThemeProvider, useTheme, useThemeHydrated } from '../src/theme/ThemePro
 
 void SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Personal tracking data changes slowly and mostly from this device. A minute of
-      // staleness avoids a refetch storm on every tab switch without ever showing the
-      // user a number they'd call wrong.
-      staleTime: 60_000,
-      retry: 2,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+// Any change the server accepts may change what a reminder should say (water so far, a
+// habit done), so every write asks for the reminders to be re-planned.
+setWriteListener(requestReminderRefresh);
+
+// While a request cannot connect, the server is checked until it answers; queries pause
+// meanwhile. On the way back, the changes made offline are sent first, and only then do
+// the queries refetch (src/api/connectivity.ts, src/offline/sync.ts).
+startConnectivity(probeServer, { beforeOnline: () => syncNow(queryClient) });
+startSavedOfflineNotice();
+
+/**
+ * A new day starts Today's numbers afresh, even offline, and with the app left open past
+ * midnight (src/offline/newDay.ts). What starts afresh is refetched as soon as it can be.
+ */
+function bringCacheToToday(): void {
+  const zone =
+    useAuth.getState().user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  for (const queryKey of startNewDay(queryClient, zone)) {
+    void queryClient.invalidateQueries({ queryKey });
+  }
+}
+setInterval(bringCacheToToday, 60_000);
+
+/**
+ * Runs once the saved cache has been read back, before any query may fetch: the cache is
+ * brought to today, and changes still waiting from last time are sent first, so the first
+ * data the screens fetch has them.
+ */
+async function holdIfWaiting(): Promise<void> {
+  bringCacheToToday();
+  await loadOutbox();
+  if (useOutbox.getState().items.length > 0) void holdUntilSynced();
+}
 
 /**
  * Routes the user to the right place once we know who they are.
@@ -49,6 +84,7 @@ const queryClient = new QueryClient({
 function AuthGate({ children }: { children: React.ReactNode }) {
   const status = useAuth((s) => s.status);
   const user = useAuth((s) => s.user);
+  const signedOutReason = useAuth((s) => s.signedOutReason);
   const hydrate = useAuth((s) => s.hydrate);
   const init = useAuth((s) => s.init);
 
@@ -85,7 +121,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inSetup = segments[0] === 'setup';
 
     if (status === 'anon' && !inAuthGroup && !inOnboarding) {
-      router.replace('/onboarding');
+      // Someone whose session ended goes to sign-in, which says why. The welcome screen is
+      // for someone new, and landing there looked like the app had forgotten them.
+      router.replace(signedOutReason === 'expired' ? '/(auth)/sign-in' : '/onboarding');
       return;
     }
 
@@ -109,27 +147,73 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (inAuthGroup || inOnboarding || inSetup) {
       router.replace('/');
     }
-  }, [status, segments, router, user?.onboardedAt]);
+  }, [status, segments, router, user?.onboardedAt, signedOutReason]);
 
   useEffect(() => {
     if (status === 'loading') return;
 
     // Signed out: the mirror must not outlive the session, or the next account on this
-    // phone would inherit the last one's "connected" sources.
-    const settle = status === 'anon' ? clearSourcePrefs() : Promise.resolve();
+    // phone would inherit the last one's "connected" sources. Nor may the saved data, or
+    // the changes made offline: the next account would see the one, and send the other.
+    const settle =
+      status === 'anon'
+        ? Promise.all([clearSourcePrefs(), forgetLocalData()])
+        : Promise.resolve();
     void settle.then(() => syncBackgroundRegistration());
   }, [status]);
 
+  /**
+   * Reminders are planned two weeks ahead from today's numbers, so they are re-planned
+   * whenever the app is opened or comes back to the front. Writes ask too (above).
+   */
   useEffect(() => {
-    // A tap on a suggestion notification lands on Today, where its card already is.
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as
-        | { suggestionId?: unknown }
-        | undefined;
-      if (typeof data?.suggestionId === 'string') router.replace('/');
+    if (status !== 'authed') return;
+
+    void refreshReminders();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshReminders();
     });
     return () => subscription.remove();
-  }, [router]);
+  }, [status]);
+
+  // Back from the background: a new day may have started, and, offline, the connection
+  // is checked now rather than at the next tick.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      bringCacheToToday();
+      void checkConnectivityNow();
+    });
+    return () => subscription.remove();
+  }, []);
+
+  /**
+   * A tapped notification opens what it is about: a water reminder the water screen, a
+   * suggestion Today. Held until the user is signed in and set up, because the tap that
+   * launches the app arrives before either is known.
+   */
+  const [tappedRoute, setTappedRoute] = useState<ReminderRoute | null>(null);
+
+  useEffect(() => {
+    const launch = Notifications.getLastNotificationResponse();
+    const initial = routeForNotification(launch?.notification.request.content.data);
+    if (initial) setTappedRoute(initial);
+
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const route = routeForNotification(response.notification.request.content.data);
+      if (route) setTappedRoute(route);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!tappedRoute || status !== 'authed' || !user?.onboardedAt) return;
+
+    // Handled: the next launch must not open it again.
+    Notifications.clearLastNotificationResponse();
+    setTappedRoute(null);
+    router.navigate(tappedRoute);
+  }, [tappedRoute, status, user?.onboardedAt, router]);
 
   return <>{children}</>;
 }
@@ -182,6 +266,8 @@ function ThemedShell() {
         <Stack.Screen name="day/[date]" />
         <Stack.Screen name="history" />
       </Stack>
+      <OfflineBanner />
+      <ToastHost />
     </>
   );
 }
@@ -218,7 +304,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          {/* Outside QueryClientProvider so every consumer below — including AuthGate's
+          {/* Outside PersistQueryClientProvider so every consumer below — including AuthGate's
               screens — can call useTheme(). */}
           <ThemeProvider>
             {/* The INNER boundary — themed. Catches every crash below this point, which is
@@ -226,11 +312,16 @@ export default function RootLayout() {
                 than the outer boundary's static-light one. See the doc on
                 ErrorBoundary's `themed` prop for why both instances exist. */}
             <ErrorBoundary themed>
-              <QueryClientProvider client={queryClient}>
+              <PersistQueryClientProvider
+                client={queryClient}
+                persistOptions={persistOptions}
+                onSuccess={holdIfWaiting}
+                onError={holdIfWaiting}
+              >
                 <AuthGate>
                   <ThemedShell />
                 </AuthGate>
-              </QueryClientProvider>
+              </PersistQueryClientProvider>
             </ErrorBoundary>
           </ThemeProvider>
         </SafeAreaProvider>

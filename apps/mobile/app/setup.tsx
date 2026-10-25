@@ -8,7 +8,8 @@ import { ArrowLeft, Check } from 'lucide-react-native';
 import { STARTER_HABITS, parseMoneyInput, type TrackedDomain } from '@synitheia/shared';
 import { Button, Card, Chip, Input, Text, Touchable } from '../src/components/primitives.js';
 import { iconFor } from '../src/components/IconPicker.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
+import { errorLine } from '../src/api/errorCopy.js';
 import { useAuth } from '../src/store/auth.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
@@ -38,7 +39,7 @@ import { accentFor, type Theme } from '../src/theme/theme.js';
  */
 
 const DOMAINS: { key: TrackedDomain; label: string; blurb: string }[] = [
-  { key: 'habits', label: 'Habits', blurb: 'Daily rituals and streaks' },
+  { key: 'habits', label: 'Habits', blurb: 'Daily habits and streaks' },
   { key: 'expenses', label: 'Money', blurb: 'Spending, bills, splits' },
   { key: 'nutrition', label: 'Food', blurb: 'Meals and calories' },
   { key: 'water', label: 'Water', blurb: 'Daily hydration' },
@@ -84,6 +85,7 @@ export default function Setup() {
   const isLast = step >= steps.length - 1;
 
   const finish = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () =>
       api.post<unknown>('/me/onboarded', {
         trackedDomains: domains,
@@ -107,7 +109,7 @@ export default function Setup() {
     },
 
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : 'Could not save your setup.');
+      setError(errorLine(err, 'Couldn’t save your setup'));
     },
   });
 

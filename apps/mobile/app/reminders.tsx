@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -11,10 +12,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Notifications from 'expo-notifications';
 import { ArrowLeft, Bell, Minus, Plus, Trash2 } from 'lucide-react-native';
-import { slotTimes, type CreateReminderInput, type ReminderKind } from '@synitheia/shared';
+import type { CreateReminderInput, ReminderKind } from '@synitheia/shared';
 import {
   Button,
   Card,
@@ -26,8 +27,16 @@ import {
   Touchable,
 } from '../src/components/primitives.js';
 import { SkeletonList } from '../src/components/Skeleton.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
+import { describeError, errorLine } from '../src/api/errorCopy.js';
 import type { ListResponse, WireReminder } from '../src/api/types.js';
+import {
+  accessCopy,
+  askForNotifications,
+  type NotificationAccess,
+} from '../src/reminders/permission.js';
+import { requestReminderRefresh } from '../src/reminders/schedule.js';
+import { useNotificationAccess } from '../src/reminders/useNotificationAccess.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -39,116 +48,11 @@ const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 const KINDS: readonly ReminderKind[] = ['habit', 'water', 'food', 'expense', 'custom'];
 
-/**
- * The domain counts weekdays from Monday (0); expo-notifications counts from Sunday (1).
- * Getting this off by one silently fires every reminder on the wrong day, which is the
- * kind of bug a user experiences as "the app is broken" rather than reports.
+/*
+ * Reminders fire on the device, so they arrive on a plane or with the backend down. They
+ * are not scheduled here: every change goes through the API, and every successful write
+ * re-plans all of them (src/reminders), worded from how the day is going.
  */
-function toExpoWeekday(domainWeekday: number): number {
-  return ((domainWeekday + 1) % 7) + 1;
-}
-
-/** Every notification we schedule carries its reminder id, so we can find and cancel it. */
-interface ReminderNotificationData extends Record<string, unknown> {
-  reminderId: string;
-}
-
-async function cancelFor(reminderId: string): Promise<void> {
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-
-  await Promise.all(
-    scheduled
-      .filter(
-        (n) => (n.content.data as ReminderNotificationData | undefined)?.reminderId === reminderId,
-      )
-      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
-  );
-}
-
-/**
- * Reminders fire on-device. The server stores only the definition — so a reminder still
- * arrives on a plane, in a tunnel, and with the backend down, and no nudge is ever a
- * network round trip.
- *
- * Cancel-then-schedule, always: it is idempotent, which means a re-sync after a
- * reinstall or an edit on another device converges instead of stacking duplicates.
- */
-async function syncReminder(reminder: WireReminder): Promise<void> {
-  await cancelFor(reminder._id);
-  if (!reminder.enabled) return;
-
-  const granted =
-    (await Notifications.getPermissionsAsync()).granted ||
-    (await Notifications.requestPermissionsAsync()).granted;
-
-  if (!granted) return;
-
-  const content = {
-    title: reminder.label,
-    body: 'A gentle nudge from Synítheia.',
-    data: { reminderId: reminder._id } satisfies ReminderNotificationData,
-  };
-
-  if (reminder.repeat === 'interval') {
-    if (reminder.intervalMinutes == null) return;
-
-    if (reminder.windowStart != null && reminder.windowEnd != null) {
-      await Promise.all(
-        slotTimes(reminder.windowStart, reminder.windowEnd, reminder.intervalMinutes).map((time) => {
-          const [hour, minute] = time.split(':').map(Number) as [number, number];
-          return Notifications.scheduleNotificationAsync({
-            content,
-            trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.DAILY,
-              hour,
-              minute,
-            },
-          });
-        }),
-      );
-      return;
-    }
-
-    await Notifications.scheduleNotificationAsync({
-      content,
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: reminder.intervalMinutes * 60,
-        repeats: true,
-      },
-    });
-    return;
-  }
-
-  if (reminder.time == null) return;
-  const [hour, minute] = reminder.time.split(':').map(Number) as [number, number];
-
-  if (reminder.weekdays.length === 0) {
-    await Notifications.scheduleNotificationAsync({
-      content,
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
-      },
-    });
-    return;
-  }
-
-  await Promise.all(
-    reminder.weekdays.map((day) =>
-      Notifications.scheduleNotificationAsync({
-        content,
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-          weekday: toExpoWeekday(day),
-          hour,
-          minute,
-        },
-      }),
-    ),
-  );
-}
 
 function describe(reminder: WireReminder): string {
   if (reminder.repeat === 'interval') {
@@ -177,26 +81,32 @@ export default function Reminders() {
   const styles = useThemedStyles(makeStyles);
   const queryClient = useQueryClient();
   const [composing, setComposing] = useState(false);
+  const [access, setAccess] = useNotificationAccess();
+
+  /**
+   * Ask, or send to Settings once asking no longer works. Allowed now means the reminders
+   * can be put on the phone, so they are re-planned straight away.
+   */
+  function unblock(action: 'ask' | 'settings') {
+    if (action === 'settings') {
+      void Linking.openSettings();
+      return;
+    }
+    void askForNotifications()
+      .then((next: NotificationAccess) => {
+        setAccess(next);
+        if (next === 'granted') requestReminderRefresh();
+      })
+      .catch(() => undefined);
+  }
 
   const query = useQuery({
     queryKey: REMINDERS_KEY,
     queryFn: () => api.get<ListResponse<WireReminder>>('/reminders'),
   });
 
-  // The device is the source of truth for *delivery*, and it can fall out of step with
-  // the server (a reinstall, an edit on another phone). One reconciliation per load
-  // brings it back in line; syncReminder is idempotent, so it cannot double-fire.
-  const synced = useRef(false);
-  const items = query.data?.items;
-
-  useEffect(() => {
-    if (!items || synced.current) return;
-    synced.current = true;
-
-    void Promise.all(items.map((reminder) => syncReminder(reminder).catch(() => undefined)));
-  }, [items]);
-
   const toggle = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: ({ reminder, enabled }: { reminder: WireReminder; enabled: boolean }) =>
       api.patch<{ reminder: WireReminder }>(`/reminders/${reminder._id}`, { enabled }),
 
@@ -217,47 +127,40 @@ export default function Reminders() {
       return { previous };
     },
 
-    // Only touch the notification schedule once the server has accepted the change —
-    // a reminder that fires for a state the server rejected is a lie the device tells.
-    onSuccess: (_result, { reminder, enabled }) => {
-      void syncReminder({ ...reminder, enabled }).catch(() => undefined);
-    },
+    // No scheduling here: the reminders are re-planned after the server accepts the
+    // change, so a reminder never fires for a state the server rejected.
 
     onError: (error: unknown, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(REMINDERS_KEY, context.previous);
-      Alert.alert(
-        'Could not update',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      Alert.alert('Couldn’t update this reminder', describeError(error).message);
     },
 
     onSettled: () => queryClient.invalidateQueries({ queryKey: REMINDERS_KEY }),
   });
 
   const remove = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: (reminder: WireReminder) => api.delete<void>(`/reminders/${reminder._id}`),
 
-    onSuccess: (_result, reminder) => {
-      void cancelFor(reminder._id).catch(() => undefined);
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: REMINDERS_KEY });
     },
 
     onError: (error: unknown) => {
-      Alert.alert(
-        'Could not delete',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      Alert.alert('Couldn’t delete this reminder', describeError(error).message);
     },
   });
 
   const create = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: (input: CreateReminderInput) =>
       api.post<{ reminder: WireReminder }>('/reminders', input),
 
-    onSuccess: ({ reminder }) => {
-      void syncReminder(reminder).catch(() => undefined);
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: REMINDERS_KEY });
       setComposing(false);
+      // The moment someone sets a reminder is the moment to ask if it may reach them.
+      unblock('ask');
     },
   });
 
@@ -270,7 +173,7 @@ export default function Reminders() {
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"
@@ -315,11 +218,8 @@ export default function Reminders() {
           {back}
           {header}
           <ErrorState
-            message={
-              query.error instanceof Error
-                ? query.error.message
-                : 'We could not load your reminders.'
-            }
+            error={query.error}
+            message="We could not load your reminders."
             onRetry={() => void query.refetch()}
           />
         </View>
@@ -328,6 +228,8 @@ export default function Reminders() {
   }
 
   const reminders = query.data?.items ?? [];
+  // Only worth saying once there is a reminder that would have arrived.
+  const blocked = access && reminders.some((r) => r.enabled) ? accessCopy(access) : null;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -345,11 +247,26 @@ export default function Reminders() {
         {back}
         {header}
 
+        {blocked ? (
+          <Card style={styles.blocked} accessibilityLiveRegion="polite">
+            <Text variant="cardTitle">{blocked.title}</Text>
+            <Text variant="body" color={t.textMuted}>
+              {blocked.body}
+            </Text>
+            <Button
+              label={blocked.actionLabel}
+              variant="secondary"
+              onPress={() => unblock(blocked.action)}
+              style={styles.blockedAction}
+            />
+          </Card>
+        ) : null}
+
         {reminders.length === 0 ? (
           <EmptyState
             icon={<Bell size={30} color={t.onAccent} strokeWidth={1.5} />}
             title="No reminders yet"
-            body="A gentle nudge at the right moment does more than a streak ever will. They fire on this device, even offline."
+            body="Pick a time, and Synítheia reminds you with how your day is going: water so far, habits still to do. They arrive even when you're offline."
             actionLabel="+ Add a reminder"
             onAction={() => setComposing(true)}
           />
@@ -386,6 +303,10 @@ export default function Reminders() {
                 </Touchable>
               </Card>
             ))}
+
+            <Text variant="caption" color={t.textFaint} style={styles.footnote}>
+              Planned two weeks ahead, and refreshed whenever you open Synítheia.
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -393,11 +314,7 @@ export default function Reminders() {
       <ComposeSheet
         visible={composing}
         saving={create.isPending}
-        error={
-          create.error instanceof ApiError || create.error instanceof Error
-            ? create.error.message
-            : null
-        }
+        error={create.error ? errorLine(create.error, 'Couldn’t save this reminder') : null}
         onClose={() => setComposing(false)}
         onSubmit={(input) => create.mutate(input)}
       />
@@ -625,6 +542,9 @@ const makeStyles = (t: Theme) =>
       backgroundColor: t.accent,
     },
     list: { gap: spacing.md },
+    blocked: { gap: spacing.sm, marginBottom: spacing.base },
+    blockedAction: { marginTop: spacing.sm, alignSelf: 'flex-start' },
+    footnote: { marginTop: spacing.sm, textAlign: 'center' },
     reminder: {
       flexDirection: 'row',
       alignItems: 'center',

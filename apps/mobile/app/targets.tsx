@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react-native';
 import {
@@ -20,7 +21,8 @@ import {
   Touchable,
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
-import { ApiError, api } from '../src/api/client.js';
+import { api } from '../src/api/client.js';
+import { errorLine } from '../src/api/errorCopy.js';
 import { spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -55,6 +57,7 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
   const [error, setError] = useState<string | null>(null);
 
   const save = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () => {
       const body: UpdateTargetsInput = {};
       if (tracks('water')) body.waterTargetMl = Number(water) || initial.waterTargetMl;
@@ -70,21 +73,17 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
       // Today reads these numbers for the ring and the budget line; refresh both, then leave.
       void queryClient.invalidateQueries({ queryKey: ['targets'] });
       void queryClient.invalidateQueries({ queryKey: ['today'] });
-      router.back();
+      goBackOrHome(router);
     },
     onError: (err: unknown) => {
-      setError(
-        err instanceof ApiError || err instanceof Error
-          ? err.message
-          : 'Could not save your targets.',
-      );
+      setError(errorLine(err, 'Couldn’t save your targets'));
     },
   });
 
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Touchable
-        onPress={() => router.back()}
+        onPress={() => goBackOrHome(router)}
         style={styles.back}
         haptic={false}
         accessibilityRole="button"
@@ -164,7 +163,7 @@ export default function Targets() {
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
           <Touchable
-            onPress={() => router.back()}
+            onPress={() => goBackOrHome(router)}
             style={styles.back}
             haptic={false}
             accessibilityRole="button"
@@ -173,11 +172,8 @@ export default function Targets() {
             <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
           </Touchable>
           <ErrorState
-            message={
-              query.error instanceof ApiError
-                ? query.error.message
-                : 'Could not load your targets.'
-            }
+            error={query.error}
+            message="Could not load your targets."
             onRetry={() => void query.refetch()}
           />
         </View>

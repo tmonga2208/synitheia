@@ -3,6 +3,7 @@ import {
   addLocalDays,
   diffLocalDays,
   formatMoney,
+  formatVolume,
   percentChange,
   type ConnectableSource,
   type LocalDate,
@@ -89,9 +90,8 @@ function display(value: number, unit: SupportingMetric['unit'], currency: string
     case 'ratio':
       return `${Math.round(value * 100)}%`;
     case 'ml':
-      return value >= 1000
-        ? `${(value / 1000).toFixed(1)} L`
-        : `${Math.round(value)} ml`;
+      // The app's own formatter, so an insight and the water screen write it alike.
+      return formatVolume(value);
     case 'kcal':
       return `${Math.round(value)} kcal`;
     case 'minutes':

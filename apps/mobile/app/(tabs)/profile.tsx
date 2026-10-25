@@ -24,6 +24,8 @@ import {
 } from 'lucide-react-native';
 import { Card, Chip, Text, Touchable } from '../../src/components/primitives.js';
 import { SkeletonList } from '../../src/components/Skeleton.js';
+import { signOutMessage } from '../../src/offline/copy.js';
+import { useOutbox } from '../../src/offline/outbox.js';
 import { useAuth } from '../../src/store/auth.js';
 import { MIN_TAP_TARGET, motion, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles, useThemePreference } from '../../src/theme/ThemeProvider.js';
@@ -105,7 +107,9 @@ export default function Profile() {
   }
 
   function confirmSignOut() {
-    Alert.alert('Sign out?', 'You will need to sign in again on this device.', [
+    // Changes made offline that have not synced go with the session; say so first.
+    const waiting = useOutbox.getState().items.length;
+    Alert.alert('Sign out?', signOutMessage(waiting), [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
     ]);

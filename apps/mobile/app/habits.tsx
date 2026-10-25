@@ -2,9 +2,10 @@ import { useCallback, useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Leaf, Plus } from 'lucide-react-native';
-import { HABIT_MEASURES, measureOf, type TodayResponse } from '@synitheia/shared';
+import type { TodayResponse } from '@synitheia/shared';
 import {
   EmptyState,
   ErrorState,
@@ -15,6 +16,7 @@ import { SkeletonList } from '../src/components/Skeleton.js';
 import { HabitCard, type TodayHabit } from '../src/components/HabitCard.js';
 import { api } from '../src/api/client.js';
 import type { ListResponse, WireHabit } from '../src/api/types.js';
+import { useHabitLog } from '../src/habits/useHabitLog.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -49,7 +51,6 @@ function merge(habits: WireHabit[], today: TodayResponse | undefined): TodayHabi
 export default function Habits() {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const queryClient = useQueryClient();
 
   const habitsQuery = useQuery({
     queryKey: HABITS_KEY,
@@ -61,45 +62,8 @@ export default function Habits() {
     queryFn: () => api.get<TodayResponse>('/today'),
   });
 
-  /** The same optimistic contract as Today: the checkbox never waits on a round trip. */
-  const logHabit = useMutation({
-    mutationFn: (habit: TodayHabit) =>
-      // One tap adds one STEP of this habit's measure, not one unit. A step goal that
-      // moved 1 at a time would need 8,000 taps.
-      api.post<unknown>(`/habits/${habit.id}/log`, {
-        increment: HABIT_MEASURES[measureOf(habit)].step,
-      }),
-
-    onMutate: async (habit: TodayHabit) => {
-      await queryClient.cancelQueries({ queryKey: TODAY_KEY });
-      const previous = queryClient.getQueryData<TodayResponse>(TODAY_KEY);
-
-      queryClient.setQueryData<TodayResponse>(TODAY_KEY, (current) =>
-        current
-          ? {
-              ...current,
-              habits: current.habits.map((h) => {
-                if (h.id !== habit.id) return h;
-                const todayCount = h.todayCount + HABIT_MEASURES[measureOf(h)].step;
-                return { ...h, todayCount, todayComplete: todayCount >= h.targetCount };
-              }),
-            }
-          : current,
-      );
-
-      return { previous };
-    },
-
-    onError: (_error, _habit, context) => {
-      if (context?.previous) queryClient.setQueryData(TODAY_KEY, context.previous);
-    },
-
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: TODAY_KEY });
-      // The log recomputes the streak, which the list renders.
-      void queryClient.invalidateQueries({ queryKey: HABITS_KEY });
-    },
-  });
+  // The same ticking as Today: optimistic, with Undo, and a tap on a ticked habit steps back.
+  const habitLog = useHabitLog();
 
   const openHabit = useCallback((habit: TodayHabit) => {
     router.push(`/habit/${habit.id}`);
@@ -112,7 +76,7 @@ export default function Habits() {
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"
@@ -126,7 +90,7 @@ export default function Habits() {
     <View style={styles.header}>
       <View style={styles.headerCopy}>
         <Text variant="overline" color={t.textFaint}>
-          Your rituals
+          Your habits
         </Text>
         <Text variant="title">Habits</Text>
       </View>
@@ -157,11 +121,8 @@ export default function Habits() {
           {back}
           {header}
           <ErrorState
-            message={
-              habitsQuery.error instanceof Error
-                ? habitsQuery.error.message
-                : 'We could not load your habits.'
-            }
+            error={habitsQuery.error}
+            message="We could not load your habits."
             onRetry={() => void habitsQuery.refetch()}
           />
         </View>
@@ -188,9 +149,9 @@ export default function Habits() {
         {habits.length === 0 ? (
           <EmptyState
             icon={<Leaf size={30} color={t.onAccent} strokeWidth={1.5} />}
-            title="No Rituals Yet"
-            body="Your ritual is a blank canvas. Start small to build a life of intention."
-            actionLabel="+ Add A New Habit"
+            title="No habits yet"
+            body="Add one small thing you want to do each day, then tick it off here."
+            actionLabel="+ Add a habit"
             onAction={() => router.push('/habit/new')}
           />
         ) : (
@@ -200,7 +161,8 @@ export default function Habits() {
                 key={habit.id}
                 habit={habit}
                 onPress={openHabit}
-                onLog={(h) => logHabit.mutate(h)}
+                onLog={habitLog.log}
+                onUnlog={habitLog.unlog}
               />
             ))}
           </View>

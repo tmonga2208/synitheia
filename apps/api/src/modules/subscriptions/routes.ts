@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  clientIdSchema,
   createSubscriptionSchema,
   objectIdSchema,
   updateSubscriptionSchema,
@@ -35,7 +36,7 @@ export async function registerSubscriptionRoutes(app: FastifyInstance): Promise<
     '/subscriptions',
     {
       onRequest: [app.requireAuth],
-      schema: { body: createSubscriptionSchema },
+      schema: { body: createSubscriptionSchema.and(clientIdSchema) },
     },
     async (req, reply) => {
       const subscription = await service.createSubscription(req.user, req.body);

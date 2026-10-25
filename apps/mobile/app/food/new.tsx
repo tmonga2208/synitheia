@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Camera, Minus, Plus } from 'lucide-react-native';
 import { scaleMacros, type Macros, type MealType } from '@synitheia/shared';
@@ -13,7 +14,8 @@ import {
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
-import { ApiError, api } from '../../src/api/client.js';
+import { api } from '../../src/api/client.js';
+import { errorLine } from '../../src/api/errorCopy.js';
 import { radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
@@ -68,6 +70,7 @@ export default function NewFood() {
   const valid = name.trim().length > 0 && perServing.calories > 0;
 
   const create = useMutation({
+    meta: { reportsOwnError: true },
     mutationFn: () =>
       api.post<unknown>('/food', {
         name: name.trim(),
@@ -79,11 +82,11 @@ export default function NewFood() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['food'] });
       await queryClient.invalidateQueries({ queryKey: ['today'] });
-      router.back();
+      goBackOrHome(router);
     },
 
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : 'Could not log that meal.');
+      setError(errorLine(err, 'Couldn’t log that meal'));
     },
   });
 
@@ -99,7 +102,7 @@ export default function NewFood() {
           showsVerticalScrollIndicator={false}
         >
           <Touchable
-            onPress={() => router.back()}
+            onPress={() => goBackOrHome(router)}
             style={styles.back}
             haptic={false}
             accessibilityRole="button"

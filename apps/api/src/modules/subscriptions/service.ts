@@ -3,11 +3,13 @@ import {
   monthlyEquivalent,
   nextDueAfter,
   todayLocalDate,
+  type ClientId,
   type CreateSubscriptionInput,
   type LocalDate,
   type UpdateSubscriptionInput,
 } from '@synitheia/shared';
 import { AppError } from '../../core/errors.js';
+import { rethrowTakenId, withClientId } from '../../core/clientId.js';
 import {
   ExpenseCategoryModel,
   InferredContextModel,
@@ -44,7 +46,7 @@ export async function listSubscriptions(
 
 export async function createSubscription(
   user: AuthedUser,
-  input: CreateSubscriptionInput,
+  input: CreateSubscriptionInput & ClientId,
 ): Promise<SubscriptionHydrated> {
   const category = await resolveCategory(user.id, input.categoryId);
   const today = todayLocalDate(user.timezone);
@@ -66,22 +68,24 @@ export async function createSubscription(
       input.anchorMonth ?? null,
     );
 
-  return SubscriptionModel.create({
-    userId: new Types.ObjectId(user.id),
-    name: input.name.trim(),
-    amountMinor: input.amountMinor,
-    currency: user.currency,
-    categoryId: category._id,
-    categoryName: category.name,
-    categoryColor: category.color,
-    cycle: input.cycle,
-    anchorDay: input.anchorDay,
-    anchorMonth: input.anchorMonth ?? null,
-    nextDueDate,
-    lastPostedDate: null,
-    autoPost: input.autoPost,
-    archivedAt: null,
-  });
+  return SubscriptionModel.create(
+    withClientId(input.id, {
+      userId: new Types.ObjectId(user.id),
+      name: input.name.trim(),
+      amountMinor: input.amountMinor,
+      currency: user.currency,
+      categoryId: category._id,
+      categoryName: category.name,
+      categoryColor: category.color,
+      cycle: input.cycle,
+      anchorDay: input.anchorDay,
+      anchorMonth: input.anchorMonth ?? null,
+      nextDueDate,
+      lastPostedDate: null,
+      autoPost: input.autoPost,
+      archivedAt: null,
+    }),
+  ).catch(rethrowTakenId);
 }
 
 function addDay(date: LocalDate, days: number): LocalDate {

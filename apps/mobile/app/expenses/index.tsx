@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, ArrowLeft, Plus, Wallet } from 'lucide-react-native';
 import {
@@ -102,7 +103,7 @@ export default function Expenses() {
         accessibilityRole="button"
         accessibilityLabel="Go back"
         haptic={false}
-        onPress={() => router.back()}
+        onPress={() => goBackOrHome(router)}
       >
         <ArrowLeft size={22} color={t.textPrimary} />
       </Touchable>
@@ -132,11 +133,8 @@ export default function Expenses() {
         <View style={styles.content}>
           {header}
           <ErrorState
-            message={
-              query.error instanceof Error
-                ? query.error.message
-                : 'We could not load your expenses.'
-            }
+            error={query.error}
+            message="We could not load your expenses."
             onRetry={() => void query.refetch()}
           />
         </View>
@@ -204,7 +202,7 @@ export default function Expenses() {
             <EmptyState
               icon={<Wallet size={30} color={t.onAccent} strokeWidth={1.5} />}
               title={`Nothing logged in ${formatMonthLabel(month)}`}
-              body="Add an expense by hand, or share a payment screenshot and let Synítheia read it for you."
+              body="Add an expense by hand, or pick a payment screenshot and let Synítheia read it for you."
               actionLabel="+ Add an expense"
               onAction={() => router.push('/expenses/new')}
             />
