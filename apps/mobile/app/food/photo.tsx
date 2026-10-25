@@ -92,7 +92,7 @@ export default function FoodPhotoScreen() {
   });
 
   const confirm = useMutation({
-    meta: { failed: 'Couldn’t log that meal' },
+    meta: { reportsOwnError: true },
     mutationFn: async () => {
       if (!ingestion) return;
       await api.post(`/food/photo/${ingestion._id}/confirm`, {
@@ -398,6 +398,19 @@ export default function FoodPhotoScreen() {
                 {totals.proteinG}g protein · {totals.carbsG}g carbs · {totals.fatG}g fat
               </Text>
             </Card>
+
+            {/* Inline, not a toast: this screen is a modal, which sits above the toast layer
+                on iOS, so a toast here would go unseen. */}
+            {confirm.error ? (
+              <Text
+                variant="caption"
+                color={t.danger}
+                style={{ marginTop: spacing.lg }}
+                accessibilityLiveRegion="polite"
+              >
+                {errorLine(confirm.error, 'Couldn’t log that meal')}
+              </Text>
+            ) : null}
 
             <Button
               label={anyIncluded ? 'Log this meal' : 'Nothing selected'}
