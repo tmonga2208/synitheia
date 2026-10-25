@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  clientIdSchema,
   confirmFoodPhotoSchema,
   createFoodEntrySchema,
   localDateSchema,
@@ -37,7 +38,7 @@ export async function registerNutritionRoutes(app: FastifyInstance): Promise<voi
     '/food',
     {
       onRequest: [app.requireAuth],
-      schema: { body: createFoodEntrySchema },
+      schema: { body: createFoodEntrySchema.and(clientIdSchema) },
     },
     async (req, reply) => {
       const { entry, daily } = await createFoodEntry(req.user, req.body);

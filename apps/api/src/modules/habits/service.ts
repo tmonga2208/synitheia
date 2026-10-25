@@ -10,12 +10,14 @@ import {
   startOfLocalWeek,
   toLocalDate,
   todayLocalDate,
+  type ClientId,
   type CreateHabitInput,
   type LocalDate,
   type LogHabitInput,
   type UpdateHabitInput,
 } from '@synitheia/shared';
 import { AppError } from '../../core/errors.js';
+import { rethrowTakenId, withClientId } from '../../core/clientId.js';
 import {
   HabitLogModel,
   HabitModel,
@@ -41,17 +43,20 @@ export async function listHabits(userId: string, includeArchived = false) {
   return HabitModel.find(query).sort({ createdAt: 1 }).lean<HabitLean[]>();
 }
 
-export async function createHabit(user: AuthedUser, input: CreateHabitInput) {
-  const habit = await HabitModel.create({
-    userId: new Types.ObjectId(user.id),
-    ...input,
-    category: input.category ?? null,
-    unit: input.unit ?? null,
-    reminderTime: input.reminderTime ?? null,
-    currentStreak: 0,
-    longestStreak: 0,
-    archivedAt: null,
-  });
+export async function createHabit(user: AuthedUser, input: CreateHabitInput & ClientId) {
+  const { id, ...fields } = input;
+  const habit = await HabitModel.create(
+    withClientId(id, {
+      userId: new Types.ObjectId(user.id),
+      ...fields,
+      category: fields.category ?? null,
+      unit: fields.unit ?? null,
+      reminderTime: fields.reminderTime ?? null,
+      currentStreak: 0,
+      longestStreak: 0,
+      archivedAt: null,
+    }),
+  ).catch(rethrowTakenId);
 
   /**
    * A new habit is scheduled from today, which moves `habits.scheduled` and therefore
