@@ -89,3 +89,37 @@ describe('expense categories in the AI context', () => {
     expect(metric!.label).toBe('Unnamed category spending');
   });
 });
+
+describe('water in the AI context', () => {
+  it('is written the way the app writes it', async () => {
+    const userId = new Types.ObjectId();
+    await UserPreferenceModel.create({ userId, aiEnabled: true });
+    await DailySummaryModel.collection.insertMany(
+      WEEK.map((localDate, i) => ({
+        userId,
+        localDate,
+        expenses: { totalMinor: 0, count: 0, byCategory: {} },
+        habits: { completedIds: [], missedIds: [] },
+        nutrition: { entryCount: 0, totals: { calories: 0 }, calorieTarget: 2000 },
+        water: { entryCount: 3, totalMl: 1250, targetMl: 2500 },
+        activity: { steps: null, workoutMinutes: 0 },
+        context: { weekday: i, calendarEventCount: 0, lastCalendarEventEndMin: null },
+        eventCount: 3,
+        generatedAt: new Date(),
+      })),
+    );
+
+    const context = await buildContext(
+      userId.toString(),
+      'Asia/Kolkata',
+      'INR',
+      asLocalDate(WEEK[0]!),
+      asLocalDate(WEEK[4]!),
+    );
+
+    expect(context.metrics.find((metric) => metric.key === 'water_avg_ml')).toMatchObject({
+      displayValue: '1.25 L',
+      comparisonDisplayValue: '2.5 L',
+    });
+  });
+});

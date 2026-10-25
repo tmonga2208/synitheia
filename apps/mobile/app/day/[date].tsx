@@ -11,6 +11,7 @@ import {
   isLocalDate,
   type LocalDate,
   type TodayResponse,
+  formatVolume,
 } from '@synitheia/shared';
 import {
   Card,
@@ -67,7 +68,7 @@ export default function Day() {
     if (!data) return null;
     return [
       formatMoney(asMinor(data.expenses.totalMinor), user?.currency ?? 'INR'),
-      `${data.water.totalMl} ml`,
+      formatVolume(data.water.totalMl),
       `${Math.round(data.nutrition.totals.calories)} kcal`,
     ].join('  ·  ');
   }, [data, user?.currency]);

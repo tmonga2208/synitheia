@@ -10,6 +10,7 @@ import {
   type InsightFeedback,
   type InsightSeverity,
   type SupportingMetric,
+  formatVolume,
 } from '@synitheia/shared';
 import {
   Button,
@@ -55,7 +56,7 @@ function formatMetric(metric: SupportingMetric, currency: string): string {
     case 'minor_currency':
       return formatMoney(asMinor(Math.round(metric.value)), currency);
     case 'ml':
-      return `${Math.round(metric.value)} ml`;
+      return formatVolume(metric.value);
     case 'kcal':
       return `${Math.round(metric.value)} kcal`;
     case 'percent':

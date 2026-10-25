@@ -149,7 +149,7 @@ export default function Expenses() {
             <EmptyState
               icon={<Wallet size={30} color={t.onAccent} strokeWidth={1.5} />}
               title="Nothing logged yet"
-              body="Add an expense by hand, or share a payment screenshot and let Synítheia read it for you."
+              body="Add an expense by hand, or pick a payment screenshot and let Synítheia read it for you."
               actionLabel="+ Add an expense"
               onAction={() => router.push('/expenses/new')}
             />

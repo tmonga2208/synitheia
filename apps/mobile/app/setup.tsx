@@ -39,7 +39,7 @@ import { accentFor, type Theme } from '../src/theme/theme.js';
  */
 
 const DOMAINS: { key: TrackedDomain; label: string; blurb: string }[] = [
-  { key: 'habits', label: 'Habits', blurb: 'Daily rituals and streaks' },
+  { key: 'habits', label: 'Habits', blurb: 'Daily habits and streaks' },
   { key: 'expenses', label: 'Money', blurb: 'Spending, bills, splits' },
   { key: 'nutrition', label: 'Food', blurb: 'Meals and calories' },
   { key: 'water', label: 'Water', blurb: 'Daily hydration' },

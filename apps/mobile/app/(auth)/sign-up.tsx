@@ -76,7 +76,7 @@ export default function SignUp() {
         >
           <Text variant="title">Begin gently</Text>
           <Text variant="body" color={t.textMuted} style={styles.subtitle}>
-            A few small rituals, kept quietly, every day.
+            A few small habits, kept quietly, every day.
           </Text>
 
           <View style={styles.fields}>

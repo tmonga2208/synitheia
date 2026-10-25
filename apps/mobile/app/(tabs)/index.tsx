@@ -18,6 +18,7 @@ import {
   formatMoney,
   type SupportingMetric,
   type TodayResponse,
+  formatVolume,
 } from '@synitheia/shared';
 import {
   Button,
@@ -51,7 +52,7 @@ function formatMetric(metric: SupportingMetric, currency: string): string {
     case 'minor_currency':
       return formatMoney(asMinor(Math.round(metric.value)), currency);
     case 'ml':
-      return `${Math.round(metric.value)} ml`;
+      return formatVolume(metric.value);
     case 'kcal':
       return `${Math.round(metric.value)} kcal`;
     case 'percent':
@@ -269,9 +270,9 @@ export default function Today() {
           {data.habits.length === 0 ? (
             <EmptyState
               icon={<Leaf size={30} color={t.onAccent} strokeWidth={1.5} />}
-              title="No Rituals Yet"
-              body="Your ritual is a blank canvas. Start small to build a life of intention."
-              actionLabel="+ Add A New Habit"
+              title="No habits yet"
+              body="Add one small thing you want to do each day, then tick it off here."
+              actionLabel="+ Add a habit"
               onAction={() => router.push('/habit/new')}
             />
           ) : (

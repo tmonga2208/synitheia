@@ -9,6 +9,7 @@ import {
   asMinor,
   formatMoney,
   type TodayResponse,
+  formatVolume,
 } from '@synitheia/shared';
 import {
   Chip,
@@ -164,8 +165,8 @@ export default function Trackers() {
               label="Water"
               icon={<Droplets size={20} color={ACCENTS.water.text} strokeWidth={1.7} />}
               accent={ACCENTS.water}
-              value={`${data.water.totalMl} ml`}
-              caption={`of ${data.water.targetMl.toLocaleString()} ml`}
+              value={formatVolume(data.water.totalMl)}
+              caption={`of ${formatVolume(data.water.targetMl)}`}
               progress={data.water.totalMl / data.water.targetMl}
               onPress={() => router.push('/water')}
             />

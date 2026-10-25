@@ -186,9 +186,9 @@ export default function WaterScreen() {
 
         <View style={styles.ring}>
           <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={18}>
-            <Text variant="title">{data.totalMl}</Text>
+            <Text variant="title">{formatVolume(data.totalMl)}</Text>
             <Text variant="caption" color={t.textMuted}>
-              of {data.targetMl.toLocaleString()} ml
+              of {formatVolume(data.targetMl)}
             </Text>
           </ProgressRing>
         </View>
@@ -226,7 +226,7 @@ export default function WaterScreen() {
               <View style={styles.entryRow}>
                 <View style={[styles.dot, { backgroundColor: ACCENT.base }]} />
                 <Text variant="cardTitle" style={{ flex: 1 }}>
-                  {entry.amountMl} ml
+                  {formatVolume(entry.amountMl)}
                 </Text>
                 <Text variant="caption" color={t.textMuted}>
                   {time.format(new Date(entry.loggedAt))}

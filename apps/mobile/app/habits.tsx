@@ -89,7 +89,7 @@ export default function Habits() {
     <View style={styles.header}>
       <View style={styles.headerCopy}>
         <Text variant="overline" color={t.textFaint}>
-          Your rituals
+          Your habits
         </Text>
         <Text variant="title">Habits</Text>
       </View>
@@ -148,9 +148,9 @@ export default function Habits() {
         {habits.length === 0 ? (
           <EmptyState
             icon={<Leaf size={30} color={t.onAccent} strokeWidth={1.5} />}
-            title="No Rituals Yet"
-            body="Your ritual is a blank canvas. Start small to build a life of intention."
-            actionLabel="+ Add A New Habit"
+            title="No habits yet"
+            body="Add one small thing you want to do each day, then tick it off here."
+            actionLabel="+ Add a habit"
             onAction={() => router.push('/habit/new')}
           />
         ) : (

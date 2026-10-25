@@ -79,7 +79,7 @@ export default function SignIn() {
 
           <Text variant="title">Welcome back</Text>
           <Text variant="body" color={t.textMuted} style={styles.subtitle}>
-            Pick your rituals back up where you left them.
+            Pick your habits back up where you left them.
           </Text>
 
           <View style={styles.fields}>
