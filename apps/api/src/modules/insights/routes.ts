@@ -13,6 +13,7 @@ import {
 import { AIInsightModel, UserPreferenceModel } from '../../db/models.js';
 import { AppError } from '../../core/errors.js';
 import { generateInsights, getActiveInsights } from '../../ai/synitheia.js';
+import { aiAllowedSources } from '../../ai/context-builder.js';
 import { isAiConfigured, type Env } from '../../config/env.js';
 
 export async function registerInsightRoutes(
@@ -150,14 +151,15 @@ export async function registerInsightRoutes(
 
   /** Whether the feature is even available, so the client can hide it cleanly. */
   api.get('/insights/availability', { onRequest: [app.requireAuth] }, async (req) => {
-    const prefs = await UserPreferenceModel.findOne({
-      userId: new Types.ObjectId(req.user.id),
-    }).lean();
+    const [prefs, allowed] = await Promise.all([
+      UserPreferenceModel.findOne({ userId: new Types.ObjectId(req.user.id) }).lean(),
+      aiAllowedSources(req.user.id),
+    ]);
 
     return {
       configured: isAiConfigured(env),
       enabled: prefs?.aiEnabled ?? false,
-      allowedSources: prefs?.aiAllowedSources ?? [],
+      allowedSources: [...allowed],
     };
   });
 }

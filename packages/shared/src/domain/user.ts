@@ -64,9 +64,11 @@ export const userPreferenceSchema = z.object({
    */
   aiEnabled: z.boolean(),
   /**
-   * Per-source AI consent. A user may be happy for Synítheia to reason about their
-   * habits but not their location. Absent from this list means the source's data is
-   * excluded from AI context entirely, even though the app still shows it.
+   * Per-source AI consent, as a copy. A user may be happy for Synítheia to reason about
+   * their habits but not their location. The record that decides is each source's
+   * connection row (`aiAllowed`, the switch on Connected Context); this list is rebuilt
+   * from those rows after every change so the export can show it, and nothing reads it
+   * to decide what the model gets.
    */
   aiAllowedSources: z.array(connectableSourceSchema),
   /** Free-text notes on expenses/food can contain anything. Off by default. */

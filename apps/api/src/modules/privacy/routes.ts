@@ -28,6 +28,7 @@ import {
   XpAwardModel,
 } from '../../db/models.js';
 import { AppError } from '../../core/errors.js';
+import { aiAllowedSources } from '../../ai/context-builder.js';
 import { purgeAllReceipts } from '../expenses/receipts.js';
 import { loadEnv } from '../../config/env.js';
 
@@ -150,6 +151,23 @@ const USER_DATA: UserCollection[] = [
   userCollection('refreshTokens', RefreshTokenModel, false),
 ];
 
+/**
+ * Rewrite the preferences' copy of the per-source AI choices from the connection rows.
+ *
+ * The rows are what the switches show and what the context builder obeys. The copy is kept
+ * for the export, where it answers "what did I let the AI use?". It is rebuilt after every
+ * change rather than patched, because patching is how it drifted: switching a source's AI
+ * off left the source on the list.
+ */
+async function mirrorAiChoices(userId: string): Promise<void> {
+  const allowed = await aiAllowedSources(userId);
+
+  await UserPreferenceModel.updateOne(
+    { userId: new Types.ObjectId(userId) },
+    { $set: { aiAllowedSources: [...allowed] } },
+  );
+}
+
 export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void> {
   const api = app.withTypeProvider<ZodTypeProvider>();
   const env = loadEnv();
@@ -208,37 +226,25 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
         );
       }
 
+      // Disabling a source withdraws it from the AI too. Leaving aiAllowed set on a
+      // disconnected source would mean a user who turned Location off still had their
+      // historical location data reasoned about — which is not what "off" means.
+      const aiAllowed = req.body.status === 'connected' ? req.body.aiAllowed : false;
+
       const connection = await DataSourceConnectionModel.findOneAndUpdate(
         { userId: new Types.ObjectId(req.user.id), source },
         {
           $set: {
             status: req.body.status,
             grantedScopes: req.body.grantedScopes,
-            ...(req.body.aiAllowed !== undefined ? { aiAllowed: req.body.aiAllowed } : {}),
+            ...(aiAllowed !== undefined ? { aiAllowed } : {}),
             ...(req.body.status === 'connected' ? { connectedAt: new Date() } : {}),
           },
         },
         { upsert: true, new: true },
       ).lean();
 
-      // Disabling a source withdraws it from the AI too. Leaving aiAllowed set on a
-      // disconnected source would mean a user who turned Location off still had their
-      // historical location data reasoned about — which is not what "off" means.
-      if (req.body.status !== 'connected') {
-        await DataSourceConnectionModel.updateOne(
-          { userId: new Types.ObjectId(req.user.id), source },
-          { $set: { aiAllowed: false } },
-        );
-        await UserPreferenceModel.updateOne(
-          { userId: new Types.ObjectId(req.user.id) },
-          { $pull: { aiAllowedSources: source } },
-        );
-      } else if (req.body.aiAllowed) {
-        await UserPreferenceModel.updateOne(
-          { userId: new Types.ObjectId(req.user.id) },
-          { $addToSet: { aiAllowedSources: source } },
-        );
-      }
+      await mirrorAiChoices(req.user.id);
 
       return { connection };
     },
@@ -278,7 +284,8 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
       schema: {
         body: z.object({
           aiEnabled: z.boolean(),
-          aiAllowedSources: z.array(connectableSourceSchema).optional(),
+          // Not `aiAllowedSources`: which sources the AI may use is set one source at a
+          // time, through the switches PUT /data-sources/:source records.
           aiIncludeNotes: z.boolean().optional(),
         }),
       },
@@ -317,6 +324,7 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
         { userId: uid, source: req.params.source },
         { $set: { status: 'disabled', aiAllowed: false, eventCount: 0, lastSyncedAt: null } },
       );
+      await mirrorAiChoices(req.user.id);
 
       // Health also keeps one record per day (steps, sleep, heart rate, workouts) outside the
       // timeline. Forgetting the events and keeping those would be forgetting the summary

@@ -9,7 +9,7 @@ import {
   type Minor,
   type SupportingMetric,
 } from '@synitheia/shared';
-import { HabitModel, UserPreferenceModel } from '../db/models.js';
+import { DataSourceConnectionModel, HabitModel, UserPreferenceModel } from '../db/models.js';
 import { getSummariesBetween } from '../context/aggregator.js';
 import { AppError } from '../core/errors.js';
 
@@ -126,6 +126,24 @@ function mean(values: readonly number[]): number {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
+/**
+ * The sources the user has let Synítheia AI use.
+ *
+ * Read from the connection rows, because each row's `aiAllowed` is what the source's switch
+ * on Connected Context shows. This used to come from a list on the preferences that the
+ * routes kept in step by hand, and it fell out of step: turning a source's AI switch off
+ * left the source on that list, so the switch read "off" while the model still got the
+ * source's numbers. Reading the record the user sees means the two cannot disagree.
+ */
+export async function aiAllowedSources(userId: string): Promise<Set<ConnectableSource>> {
+  const rows = await DataSourceConnectionModel.find(
+    { userId: new Types.ObjectId(userId), status: 'connected', aiAllowed: true },
+    { source: 1 },
+  ).lean();
+
+  return new Set(rows.map((row) => row.source as ConnectableSource));
+}
+
 const WEEKDAY_NAMES = [
   'Monday',
   'Tuesday',
@@ -152,7 +170,7 @@ export async function buildContext(
     throw AppError.aiDisabled();
   }
 
-  const allowed = new Set((prefs.aiAllowedSources ?? []) as ConnectableSource[]);
+  const allowed = await aiAllowedSources(userId);
 
   const summaries = await getSummariesBetween(userId, from, to);
   const days = diffLocalDays(from, to) + 1;
