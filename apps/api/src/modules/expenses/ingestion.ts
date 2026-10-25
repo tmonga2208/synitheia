@@ -576,9 +576,15 @@ export async function rejectIngestion(userId: string, id: string) {
   if (result.matchedCount === 0) throw AppError.notFound('Ingestion');
 }
 
-export async function markIngestionConfirmed(userId: string, id: string) {
-  await ExpenseIngestionModel.updateOne(
-    { _id: new Types.ObjectId(id), userId: new Types.ObjectId(userId) },
+/**
+ * Moves an import from review to confirmed, once: false when it was not waiting for review,
+ * because it is already filed or a request still running is filing it. Claimed before
+ * anything is filed — a slow confirm and a second tap once filed a whole statement twice.
+ */
+export async function claimIngestionForConfirm(userId: string, id: string): Promise<boolean> {
+  const result = await ExpenseIngestionModel.updateOne(
+    { _id: new Types.ObjectId(id), userId: new Types.ObjectId(userId), status: 'needs_review' },
     { $set: { status: 'confirmed' } },
   );
+  return result.modifiedCount === 1;
 }

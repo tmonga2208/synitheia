@@ -100,6 +100,35 @@ describe('POST /expenses/ingestions/:id/confirm', () => {
     expect(await ExpenseModel.countDocuments({ userId })).toBe(3);
   });
 
+  it('files an import once, even when it is confirmed twice at the same time', async () => {
+    const { app, userId, categoryId, ingestionId } = await setup([100, 200]);
+    const confirm = () =>
+      app.inject({
+        method: 'POST',
+        url: `/expenses/ingestions/${ingestionId}/confirm`,
+        payload: { confirmations: [0, 1].map((draftIndex) => ({ draftIndex, categoryId })) },
+      });
+
+    const statuses = (await Promise.all([confirm(), confirm()])).map((r) => r.statusCode).sort();
+
+    expect(statuses).toEqual([201, 409]);
+    expect(await ExpenseModel.countDocuments({ userId })).toBe(2);
+  });
+
+  it('refuses to confirm an import that has already been filed', async () => {
+    const { app, userId, categoryId, ingestionId } = await setup([100]);
+    const confirm = () =>
+      app.inject({
+        method: 'POST',
+        url: `/expenses/ingestions/${ingestionId}/confirm`,
+        payload: { confirmations: [{ draftIndex: 0, categoryId }] },
+      });
+
+    expect((await confirm()).statusCode).toBe(201);
+    expect((await confirm()).statusCode).toBe(409);
+    expect(await ExpenseModel.countDocuments({ userId })).toBe(1);
+  });
+
   it('files nothing when one confirmation names a draft that is not there', async () => {
     const { app, userId, categoryId, ingestionId } = await setup([100, 200]);
 

@@ -288,6 +288,11 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
         throw AppError.badRequest(`No draft at index ${missing.draftIndex}`);
       }
 
+      // Claimed before anything is filed, so a second tap or a retry files nothing twice.
+      if (!(await ingestion.claimIngestionForConfirm(req.user.id, req.params.id))) {
+        throw AppError.conflict('These have already been added to your expenses.');
+      }
+
       // Each expense is a few database round trips. One at a time, a statement's worth
       // took over a minute, well past the 20 seconds the app waits. They are independent,
       // so they are filed several at once, and answered in the order they were confirmed.
@@ -304,7 +309,6 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
         });
       });
 
-      await ingestion.markIngestionConfirmed(req.user.id, req.params.id);
       return reply.status(201).send({ expenses: created });
     },
   );
