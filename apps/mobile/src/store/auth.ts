@@ -140,6 +140,8 @@ interface AuthState {
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** Finish a forgotten-password reset with the emailed code; signs straight in. */
+  resetPassword: (input: { email: string; code: string; password: string }) => Promise<void>;
 }
 
 /**
@@ -300,6 +302,15 @@ export const useAuth = create<AuthState>((set, get) => {
         // Keep what we have. A genuinely dead session is handled by the client's
         // refresh flow and the onSessionExpired callback wired up in init().
       }
+    },
+
+    async resetPassword({ email, code, password }) {
+      const session = await api.post<SessionResponse>('/auth/password-reset/confirm', {
+        email: email.trim(),
+        code: code.trim(),
+        password,
+      });
+      await adopt(session);
     },
 
     async signIn(email, password) {

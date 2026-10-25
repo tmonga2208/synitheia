@@ -8,8 +8,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { Lock, Mail } from 'lucide-react-native';
 import { Button, Input, Text, Touchable } from '../../src/components/primitives.js';
+import { api } from '../../src/api/client.js';
 import { errorLine } from '../../src/api/errorCopy.js';
 import { useAuth } from '../../src/store/auth.js';
 import { radius, spacing } from '../../src/theme/theme.js';
@@ -27,6 +29,13 @@ export default function SignIn() {
   const signInWithApple = useAuth((s) => s.signInWithApple);
   const signInWithGoogle = useAuth((s) => s.signInWithGoogle);
   const expired = useAuth((s) => s.signedOutReason === 'expired');
+
+  // What this server offers before sign-in; a failure simply hides the reset link.
+  const options = useQuery({
+    queryKey: ['auth-options'],
+    queryFn: () => api.get<{ passwordReset: boolean }>('/auth/options'),
+    staleTime: 10 * 60_000,
+  });
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -107,6 +116,23 @@ export default function SignIn() {
               textContentType="password"
               leading={<Lock size={18} color={t.textFaint} />}
             />
+
+            {/* Only where the server can send the code; elsewhere it would be a dead end. */}
+            {options.data?.passwordReset ? (
+              <Touchable
+                onPress={() =>
+                  router.push({ pathname: '/(auth)/reset-password', params: { email: email.trim() } })
+                }
+                haptic={false}
+                accessibilityRole="link"
+                accessibilityLabel="Forgot password? Reset it with a code by email"
+                style={styles.forgot}
+              >
+                <Text variant="bodyMedium" color={t.accent}>
+                  Forgot password?
+                </Text>
+              </Touchable>
+            ) : null}
           </View>
 
           {formError ? (
@@ -210,6 +236,7 @@ const makeStyles = (t: Theme) =>
       borderColor: t.border,
     },
     cta: { marginTop: spacing.xl },
+    forgot: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center' },
     divider: {
       flexDirection: 'row',
       alignItems: 'center',

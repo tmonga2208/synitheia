@@ -132,6 +132,27 @@ describe('a session that expires', () => {
   });
 });
 
+describe('resetting a forgotten password', () => {
+  it('signs in with the session the reset returns', async () => {
+    useAuth.setState({ user: null, status: 'anon', signedOutReason: 'expired' });
+    mocks.post.mockResolvedValue({ user: USER, accessToken: 'access', refreshToken: 'refresh' });
+
+    await useAuth.getState().resetPassword({
+      email: ' reader@example.com ',
+      code: ' 042719 ',
+      password: 'new-password-456',
+    });
+
+    expect(mocks.post).toHaveBeenCalledWith('/auth/password-reset/confirm', {
+      email: 'reader@example.com',
+      code: '042719',
+      password: 'new-password-456',
+    });
+    expect(mocks.setTokens).toHaveBeenCalledWith('access', 'refresh');
+    expect(useAuth.getState()).toMatchObject({ status: 'authed', user: USER, signedOutReason: null });
+  });
+});
+
 describe('opening the app', () => {
   it('remembers who opened it, for a launch without a connection', async () => {
     mocks.hasSession.mockResolvedValue(true);
