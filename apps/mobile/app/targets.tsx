@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react-native';
 import {
@@ -72,7 +73,7 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
       // Today reads these numbers for the ring and the budget line; refresh both, then leave.
       void queryClient.invalidateQueries({ queryKey: ['targets'] });
       void queryClient.invalidateQueries({ queryKey: ['today'] });
-      router.back();
+      goBackOrHome(router);
     },
     onError: (err: unknown) => {
       setError(errorLine(err, 'Couldn’t save your targets'));
@@ -82,7 +83,7 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Touchable
-        onPress={() => router.back()}
+        onPress={() => goBackOrHome(router)}
         style={styles.back}
         haptic={false}
         accessibilityRole="button"
@@ -162,7 +163,7 @@ export default function Targets() {
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
           <Touchable
-            onPress={() => router.back()}
+            onPress={() => goBackOrHome(router)}
             style={styles.back}
             haptic={false}
             accessibilityRole="button"

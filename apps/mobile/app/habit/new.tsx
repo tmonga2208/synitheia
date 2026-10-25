@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Minus, Plus } from 'lucide-react-native';
 import {
@@ -178,7 +179,7 @@ export default function NewHabit() {
       await queryClient.invalidateQueries({ queryKey: ['habits'] });
       await queryClient.invalidateQueries({ queryKey: ['today'] });
 
-      router.back();
+      goBackOrHome(router);
     } catch (error) {
       setFormError(errorLine(error, 'Couldn’t create this habit'));
     } finally {
@@ -203,7 +204,7 @@ export default function NewHabit() {
               accessibilityRole="button"
               accessibilityLabel="Go back"
               haptic={false}
-              onPress={() => router.back()}
+              onPress={() => goBackOrHome(router)}
             >
               <ArrowLeft size={22} color={t.textPrimary} />
             </Touchable>

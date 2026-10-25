@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Camera, Minus, Plus } from 'lucide-react-native';
 import { scaleMacros, type Macros, type MealType } from '@synitheia/shared';
@@ -81,7 +82,7 @@ export default function NewFood() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['food'] });
       await queryClient.invalidateQueries({ queryKey: ['today'] });
-      router.back();
+      goBackOrHome(router);
     },
 
     onError: (err) => {
@@ -101,7 +102,7 @@ export default function NewFood() {
           showsVerticalScrollIndicator={false}
         >
           <Touchable
-            onPress={() => router.back()}
+            onPress={() => goBackOrHome(router)}
             style={styles.back}
             haptic={false}
             accessibilityRole="button"

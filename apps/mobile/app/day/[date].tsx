@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft } from 'lucide-react-native';
 import {
@@ -80,7 +81,7 @@ export default function Day() {
           accessibilityRole="button"
           accessibilityLabel="Back"
           haptic={false}
-          onPress={() => router.back()}
+          onPress={() => goBackOrHome(router)}
           style={styles.back}
         >
           <ChevronLeft size={24} color={t.textPrimary} strokeWidth={1.8} />
@@ -91,7 +92,7 @@ export default function Day() {
       </View>
 
       {!valid ? (
-        <ErrorState message="That isn't a real date." onRetry={() => router.back()} />
+        <ErrorState message="That isn't a real date." onRetry={() => goBackOrHome(router)} />
       ) : query.isPending ? (
         // SkeletonList, not SkeletonScreen: this screen already has its own
         // SafeAreaView above, and SkeletonScreen wraps another one around its

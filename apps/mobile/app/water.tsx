@@ -1,6 +1,7 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import { ArrowLeft, Droplets, Trash2 } from 'lucide-react-native';
@@ -135,7 +136,7 @@ export default function WaterScreen() {
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"

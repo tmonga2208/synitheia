@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Bell, Minus, Plus, Trash2 } from 'lucide-react-native';
 import type { CreateReminderInput, ReminderKind } from '@synitheia/shared';
@@ -163,7 +164,7 @@ export default function Reminders() {
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"

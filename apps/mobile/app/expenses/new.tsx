@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -253,7 +254,7 @@ export default function NewExpense() {
 
     onSuccess: () => {
       invalidate();
-      router.back();
+      goBackOrHome(router);
     },
 
     onError: (err: unknown) => {
@@ -412,7 +413,7 @@ export default function NewExpense() {
 
     onSuccess: () => {
       invalidate();
-      router.back();
+      goBackOrHome(router);
     },
 
     onError: (err: unknown) => {
@@ -432,7 +433,7 @@ export default function NewExpense() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
       haptic={false}
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
     >
       <ArrowLeft size={22} color={t.textPrimary} />
     </Touchable>

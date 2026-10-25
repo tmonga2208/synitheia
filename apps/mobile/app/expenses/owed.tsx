@@ -1,6 +1,7 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Check, HandCoins } from 'lucide-react-native';
 import { asMinor, formatMoney } from '@synitheia/shared';
@@ -101,7 +102,7 @@ export default function OwedScreen() {
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"

@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Leaf, Plus } from 'lucide-react-native';
 import type { TodayResponse } from '@synitheia/shared';
@@ -75,7 +76,7 @@ export default function Habits() {
 
   const back = (
     <Touchable
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
       style={styles.back}
       haptic={false}
       accessibilityRole="button"

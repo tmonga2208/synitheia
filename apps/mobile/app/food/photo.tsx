@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { ArrowLeft, Info, Minus, PenLine, Plus } from 'lucide-react-native';
@@ -108,7 +109,7 @@ export default function FoodPhotoScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['today'] });
       await queryClient.invalidateQueries({ queryKey: ['food'] });
-      router.back();
+      goBackOrHome(router);
     },
   });
 
@@ -166,7 +167,7 @@ export default function FoodPhotoScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Touchable
-          onPress={() => router.back()}
+          onPress={() => goBackOrHome(router)}
           accessibilityRole="button"
           accessibilityLabel="Go back"
           style={styles.back}

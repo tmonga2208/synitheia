@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, ArrowLeft, Plus, Wallet } from 'lucide-react-native';
 import { asMinor, formatMoney, sumMoney, type Minor } from '@synitheia/shared';
@@ -80,7 +81,7 @@ export default function Expenses() {
         accessibilityRole="button"
         accessibilityLabel="Go back"
         haptic={false}
-        onPress={() => router.back()}
+        onPress={() => goBackOrHome(router)}
       >
         <ArrowLeft size={22} color={t.textPrimary} />
       </Touchable>

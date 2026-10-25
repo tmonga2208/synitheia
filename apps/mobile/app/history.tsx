@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import {
@@ -90,7 +91,7 @@ export default function History() {
           accessibilityRole="button"
           accessibilityLabel="Back"
           haptic={false}
-          onPress={() => router.back()}
+          onPress={() => goBackOrHome(router)}
           style={styles.iconButton}
         >
           <ChevronLeft size={24} color={t.textPrimary} strokeWidth={1.8} />

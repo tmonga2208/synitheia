@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArrowLeft, Flame, Trophy, Zap } from 'lucide-react-native';
 import {
@@ -73,7 +74,7 @@ export default function HabitDetail() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: HABITS_KEY });
       void queryClient.invalidateQueries({ queryKey: TODAY_KEY });
-      router.back();
+      goBackOrHome(router);
     },
     onError: (error: unknown) => {
       Alert.alert('Couldn’t archive this habit', describeError(error).message);
@@ -99,7 +100,7 @@ export default function HabitDetail() {
       accessibilityRole="button"
       accessibilityLabel="Go back"
       haptic={false}
-      onPress={() => router.back()}
+      onPress={() => goBackOrHome(router)}
     >
       <ArrowLeft size={22} color={t.textPrimary} />
     </Touchable>
