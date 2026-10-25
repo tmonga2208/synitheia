@@ -46,8 +46,12 @@ export async function registerReminderRoutes(app: FastifyInstance): Promise<void
         kind: req.body.kind,
         refId: req.body.refId ? new Types.ObjectId(req.body.refId) : null,
         label: req.body.label,
-        time: req.body.time,
+        repeat: req.body.repeat,
+        time: req.body.time ?? null,
         weekdays: req.body.weekdays,
+        intervalMinutes: req.body.intervalMinutes ?? null,
+        windowStart: req.body.windowStart ?? null,
+        windowEnd: req.body.windowEnd ?? null,
         enabled: req.body.enabled,
       });
 
@@ -77,8 +81,14 @@ export async function registerReminderRoutes(app: FastifyInstance): Promise<void
         reminder.refId = req.body.refId ? new Types.ObjectId(req.body.refId) : null;
       }
       if (req.body.label !== undefined) reminder.label = req.body.label;
+      if (req.body.repeat !== undefined) reminder.repeat = req.body.repeat;
       if (req.body.time !== undefined) reminder.time = req.body.time;
       if (req.body.weekdays !== undefined) reminder.weekdays = req.body.weekdays;
+      if (req.body.intervalMinutes !== undefined) {
+        reminder.intervalMinutes = req.body.intervalMinutes;
+      }
+      if (req.body.windowStart !== undefined) reminder.windowStart = req.body.windowStart;
+      if (req.body.windowEnd !== undefined) reminder.windowEnd = req.body.windowEnd;
       if (req.body.enabled !== undefined) reminder.enabled = req.body.enabled;
 
       await reminder.save();

@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import {
   SUGGEST_THRESHOLD,
+  addLocalDays,
   localMinutesOfDay,
   todayLocalDate,
   type Evidence,
@@ -217,8 +218,7 @@ export async function runDetectors(
     PersonalEventModel.find({ userId: uid, localDate }).lean<EventLean[]>(),
     PersonalEventModel.find({
       userId: uid,
-      localDate: { $lt: localDate },
-      timestamp: { $gte: new Date(Date.now() - 21 * 86_400_000) },
+      localDate: { $gte: addLocalDays(localDate, -21), $lt: localDate },
     }).lean<EventLean[]>(),
     UserPreferenceModel.findOne({ userId: uid }).lean(),
   ]);
