@@ -1,10 +1,22 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, ArrowLeft, Plus, Wallet } from 'lucide-react-native';
-import { asMinor, formatMoney, sumMoney, type Minor } from '@synitheia/shared';
+import { ChevronLeft, ChevronRight, ArrowLeft, Plus, Wallet } from 'lucide-react-native';
+import {
+  addMonths,
+  asMinor,
+  firstOfMonth,
+  formatMonthLabel,
+  lastOfMonth,
+  monthKeyOf,
+  formatMoney,
+  sumMoney,
+  todayLocalDate,
+  type Minor,
+  type MonthKey,
+} from '@synitheia/shared';
 import {
   Card,
   EmptyState,
@@ -21,7 +33,16 @@ import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 import { BillsRow, OwedBanner } from '../../src/components/OwedBanner.js';
 
-const EXPENSES_KEY = ['expenses'] as const;
+function expenseQuery(month: MonthKey) {
+  const from = firstOfMonth(month);
+  const to = lastOfMonth(month);
+
+  return {
+    queryKey: ['expenses', month] as const,
+    queryFn: () =>
+      api.get<ListResponse<WireExpense>>(`/expenses?from=${from}&to=${to}&limit=200`),
+  };
+}
 
 interface Day {
   localDate: string;
@@ -65,11 +86,12 @@ export default function Expenses() {
   const styles = useThemedStyles(makeStyles);
   const user = useAuth((s) => s.user);
   const currency = user?.currency ?? 'INR';
+  const timezone = user?.timezone ?? 'UTC';
+  const today = todayLocalDate(timezone);
+  const [month, setMonth] = useState<MonthKey>(() => monthKeyOf(today));
+  const atLatest = month >= monthKeyOf(today);
 
-  const query = useQuery({
-    queryKey: EXPENSES_KEY,
-    queryFn: () => api.get<ListResponse<WireExpense>>('/expenses'),
-  });
+  const query = useQuery(expenseQuery(month));
 
   const days = useMemo(() => groupByDay(query.data?.items ?? []), [query.data]);
 
@@ -144,6 +166,36 @@ export default function Expenses() {
           Expenses
         </Text>
 
+        <View style={styles.monthBar}>
+          <Touchable
+            accessibilityRole="button"
+            accessibilityLabel="Previous month"
+            haptic={false}
+            onPress={() => setMonth(addMonths(month, -1))}
+            style={styles.iconButton}
+          >
+            <ChevronLeft size={20} color={t.textMuted} strokeWidth={1.8} />
+          </Touchable>
+
+          <Text variant="section">{formatMonthLabel(month)}</Text>
+
+          <Touchable
+            accessibilityRole="button"
+            accessibilityLabel="Next month"
+            accessibilityState={{ disabled: atLatest }}
+            disabled={atLatest}
+            haptic={false}
+            onPress={() => setMonth(addMonths(month, 1))}
+            style={styles.iconButton}
+          >
+            <ChevronRight
+              size={20}
+              color={atLatest ? t.textFaint : t.textMuted}
+              strokeWidth={1.8}
+            />
+          </Touchable>
+        </View>
+
         <OwedBanner />
         <BillsRow />
 
@@ -151,7 +203,7 @@ export default function Expenses() {
           <View style={styles.empty}>
             <EmptyState
               icon={<Wallet size={30} color={t.onAccent} strokeWidth={1.5} />}
-              title="Nothing logged yet"
+              title={`Nothing logged in ${formatMonthLabel(month)}`}
               body="Add an expense by hand, or share a payment screenshot and let Synítheia read it for you."
               actionLabel="+ Add an expense"
               onAction={() => router.push('/expenses/new')}
@@ -249,6 +301,12 @@ const makeStyles = (t: Theme) =>
       backgroundColor: t.accent,
     },
     heading: { marginTop: spacing.xs },
+    monthBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.md,
+    },
     empty: { marginTop: spacing.xl },
     day: { marginTop: spacing.xl },
     dayHeader: {
