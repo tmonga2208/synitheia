@@ -17,6 +17,7 @@ import {
   HabitModel,
   HealthDayModel,
   InferredContextModel,
+  PasswordResetModel,
   PersonalEventModel,
   ReceiptModel,
   RefreshTokenModel,
@@ -151,6 +152,8 @@ const USER_DATA: UserCollection[] = [
   userCollection('connections', DataSourceConnectionModel),
   userCollection('xpAwards', XpAwardModel),
   userCollection('refreshTokens', RefreshTokenModel, false),
+  // A reset code is a credential too: deleted with the account, never exported.
+  userCollection('passwordResets', PasswordResetModel, false),
 ];
 
 /**

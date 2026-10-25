@@ -12,6 +12,8 @@ import { HabitModel, UserModel, UserPreferenceModel } from '../../db/models.js';
 import { AppError } from '../../core/errors.js';
 import * as service from './service.js';
 import { issueTokens, revokeAllForUser, revokeToken, rotateRefreshToken } from './tokens.js';
+import { confirmPasswordReset, requestPasswordReset } from './password-reset.js';
+import { mailerFor } from '../../mail/resend.js';
 import type { Env } from '../../config/env.js';
 
 /**
@@ -100,6 +102,60 @@ export async function registerAuthRoutes(app: FastifyInstance, env: Env): Promis
     },
     async (req) => {
       const user = await service.loginWithPassword(req.body.email, req.body.password);
+      const tokens = await issueTokens(env, user._id.toString(), user.timezone, {
+        userAgent: req.headers['user-agent'] ?? null,
+      });
+
+      return { user: publicUser(user), ...tokens };
+    },
+  );
+
+  // ─── Forgot password (password-reset.ts) ──────────────────────────────────
+
+  const sendMail = mailerFor(env);
+
+  /** What this server can do before anyone signs in, so the app shows only what works. */
+  api.get('/auth/options', async () => ({ passwordReset: sendMail !== null }));
+
+  api.post(
+    '/auth/password-reset/request',
+    {
+      // Each request sends an email; this is the cheapest way to stop it being a spam cannon.
+      config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+      schema: { body: z.object({ email: z.string().email() }) },
+    },
+    async (req, reply) => {
+      if (!sendMail) {
+        throw AppError.mailUnavailable('Password reset is not set up on this server.');
+      }
+
+      try {
+        await requestPasswordReset(sendMail, req.body.email);
+      } catch (error) {
+        req.log.warn({ err: error }, 'password reset email failed');
+        throw AppError.mailUnavailable('We could not send the email just now. Try again in a minute.');
+      }
+
+      // The same answer whether or not the address has an account.
+      return reply.status(202).send({ sent: true });
+    },
+  );
+
+  api.post(
+    '/auth/password-reset/confirm',
+    {
+      config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+      schema: {
+        body: z.object({
+          email: z.string().email(),
+          code: z.string().regex(/^\d{6}$/, 'The code is six digits'),
+          password: passwordSchema,
+        }),
+      },
+    },
+    async (req) => {
+      const user = await confirmPasswordReset(req.body.email, req.body.code, req.body.password);
+      // Signed straight in: they just proved they hold the account's email.
       const tokens = await issueTokens(env, user._id.toString(), user.timezone, {
         userAgent: req.headers['user-agent'] ?? null,
       });

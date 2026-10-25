@@ -74,6 +74,14 @@ const envSchema = z
      */
     INBOUND_DOMAIN: z.string().optional(),
     INBOUND_WEBHOOK_SECRET: z.string().min(16).optional(),
+
+    /**
+     * Outgoing email through Resend, for password-reset codes. Optional: without both,
+     * GET /auth/options reports no password reset and the app hides "Forgot password?".
+     * MAIL_FROM must be on a domain verified in Resend, e.g. "Synítheia <hello@example.com>".
+     */
+    RESEND_API_KEY: z.string().optional(),
+    MAIL_FROM: z.string().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;

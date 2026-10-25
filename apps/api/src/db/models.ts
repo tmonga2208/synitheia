@@ -127,6 +127,28 @@ export const RefreshTokenModel = model(
   refreshTokenSchema,
 );
 
+// ─── Password resets ────────────────────────────────────────────────────────
+
+/**
+ * A password reset in progress: one per user, the emailed six-digit code stored only as a
+ * hash, a count of wrong tries, and gone fifteen minutes after it was asked for.
+ */
+const passwordResetSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    codeHash: { type: String, required: true },
+    attempts: { type: Number, required: true, default: 0 },
+    expiresAt: { type: Date, required: true },
+  },
+  opts,
+);
+
+// Asking again replaces the code rather than adding a second live one.
+passwordResetSchema.index({ userId: 1 }, { unique: true });
+passwordResetSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const PasswordResetModel = model('PasswordReset', passwordResetSchema);
+
 // ─── Preferences ────────────────────────────────────────────────────────────
 
 const userPreferenceSchema = new Schema(
