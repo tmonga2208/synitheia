@@ -10,11 +10,15 @@ import {
   type LocalDate,
 } from '@synitheia/shared';
 import { AppError } from '../../core/errors.js';
+import { mapLimit } from '../../core/mapLimit.js';
 import { loadEnv } from '../../config/env.js';
 import * as service from './service.js';
 import * as ingestion from './ingestion.js';
 import * as receipts from './receipts.js';
 import * as inbox_service from './inbox.js';
+
+/** Expenses filed at once when confirming drafts: well inside the database connection pool. */
+const CONFIRM_CONCURRENCY = 8;
 
 export async function registerExpenseRoutes(app: FastifyInstance): Promise<void> {
   const api = app.withTypeProvider<ZodTypeProvider>();
@@ -278,25 +282,27 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
         occurredAt: Date | null;
       }[];
 
-      const created = [];
-      for (const c of req.body.confirmations) {
-        const draft = drafts[c.draftIndex];
-        if (!draft) {
-          throw AppError.badRequest(`No draft at index ${c.draftIndex}`);
-        }
-
-        created.push(
-          await service.createExpense(req.user, {
-            amountMinor: c.amountMinor ?? draft.amountMinor,
-            categoryId: c.categoryId,
-            merchant: c.merchant !== undefined ? c.merchant : draft.merchant,
-            note: null,
-            // A statement with no date is filed as of now, not as of the epoch.
-            occurredAt: c.occurredAt ?? draft.occurredAt ?? new Date(),
-            ingestionId: req.params.id,
-          }),
-        );
+      // Every index is checked before anything is filed, so a bad one files nothing.
+      const missing = req.body.confirmations.find((c) => !drafts[c.draftIndex]);
+      if (missing) {
+        throw AppError.badRequest(`No draft at index ${missing.draftIndex}`);
       }
+
+      // Each expense is a few database round trips. One at a time, a statement's worth
+      // took over a minute, well past the 20 seconds the app waits. They are independent,
+      // so they are filed several at once, and answered in the order they were confirmed.
+      const created = await mapLimit(req.body.confirmations, CONFIRM_CONCURRENCY, (c) => {
+        const draft = drafts[c.draftIndex]!;
+        return service.createExpense(req.user, {
+          amountMinor: c.amountMinor ?? draft.amountMinor,
+          categoryId: c.categoryId,
+          merchant: c.merchant !== undefined ? c.merchant : draft.merchant,
+          note: null,
+          // A statement with no date is filed as of now, not as of the epoch.
+          occurredAt: c.occurredAt ?? draft.occurredAt ?? new Date(),
+          ingestionId: req.params.id,
+        });
+      });
 
       await ingestion.markIngestionConfirmed(req.user.id, req.params.id);
       return reply.status(201).send({ expenses: created });
