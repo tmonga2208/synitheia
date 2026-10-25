@@ -12,7 +12,12 @@ import {
 import { AppError } from '../../core/errors.js';
 import { ExpenseIngestionModel, ExpenseModel } from '../../db/models.js';
 import { callStructured, type AiContent } from '../../ai/client.js';
-import { normalizeUpiLensTransaction, parseStatementWithUpiLens } from './upi-lens.js';
+import {
+  parseStatementTextWithUpiLens,
+  parseStatementWithUpiLens,
+  upiLensDrafts,
+  type UpiLensLayout,
+} from './upi-lens.js';
 import type { Env } from '../../config/env.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 
@@ -37,6 +42,9 @@ import type { AuthedUser } from '../../core/auth-guard.js';
  */
 
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** PDF layouts upi-lens reads exactly. Its generic line reader guesses; the model does better. */
+const BANK_LAYOUTS: readonly UpiLensLayout[] = ['SBI', 'HDFC', 'AXIS'];
 
 export interface IngestMeta {
   channel?: IngestionChannel;
@@ -322,34 +330,14 @@ export async function ingestPdf(
     );
   }
 
-  // 1. Try deterministic statement parsing via UPI Lens API (https://upi-lens-api.onrender.com).
-  // This extracts Indian bank/UPI transactions without consuming LLM token quota or hallucinating.
-  try {
-    const upiTxs = await parseStatementWithUpiLens(env, {
-      buffer,
-      filename: 'statement.pdf',
-      mimeType: 'application/pdf',
-    });
-
-    if (upiTxs && upiTxs.length > 0) {
-      const drafts = upiTxs
-        .map((tx) => normalizeUpiLensTransaction(tx, user.currency))
-        .filter((d): d is DraftTransaction => d !== null);
-
-      if (drafts.length > 0) {
-        return persist(
-          user,
-          meta?.channel ?? 'pdf',
-          await markDuplicates(user.id, drafts),
-          meta,
-        );
-      }
-    }
-  } catch {
-    // Service failure or timeout: fall through to the LLM structured extractor
+  // 1. Deterministic parsing via upi-lens, for bank layouts it knows. It gets the text
+  // opened here — most statements are locked, and the password never leaves this server.
+  const drafts = upiLensDrafts(await parseStatementTextWithUpiLens(env, text), user, BANK_LAYOUTS);
+  if (drafts) {
+    return persist(user, meta?.channel ?? 'pdf', await markDuplicates(user.id, drafts), meta);
   }
 
-  // 2. Fallback: LLM structured extractor
+  // 2. Anything else — an unknown layout, or upi-lens unreachable — goes to the model.
   return runIngestion(env, user, meta?.channel ?? 'pdf', [
     {
       type: 'text',
@@ -368,23 +356,15 @@ export async function ingestSpreadsheet(
   filename: string,
   mimeType: string,
 ) {
-  const upiTxs = await parseStatementWithUpiLens(env, {
-    buffer,
-    filename,
-    mimeType,
-  });
-
-  if (!upiTxs || upiTxs.length === 0) {
+  const result = await parseStatementWithUpiLens(env, { buffer, filename, mimeType });
+  if (!result || result.transactions.length === 0) {
     throw AppError.ingestionFailed(
       'Could not extract transactions from that spreadsheet. Try a CSV export instead.',
     );
   }
 
-  const drafts = upiTxs
-    .map((tx) => normalizeUpiLensTransaction(tx, user.currency))
-    .filter((d): d is DraftTransaction => d !== null);
-
-  if (drafts.length === 0) {
+  const drafts = upiLensDrafts(result, user, ['TABLE']);
+  if (!drafts) {
     throw AppError.ingestionFailed('No debit transactions were found in that spreadsheet.');
   }
 

@@ -68,10 +68,14 @@ const envSchema = z
 
     /**
      * UPI Lens API — external statement parser service.
-     * Parses bank statements (PDF, CSV, XLS, XLSX) into structured transactions
+     * Parses bank statements (PDF text, CSV, XLS, XLSX) into structured transactions
      * with Indian UPI recognition, merchants, and categories.
+     *
+     * The Vercel deployment, not Render's: Render's free tier sleeps when idle and takes
+     * about a minute to wake, longer than an upload waits, so the first statement after a
+     * quiet spell always fell through to the model.
      */
-    UPI_LENS_API_URL: z.string().url().default('https://upi-lens-api.onrender.com'),
+    UPI_LENS_API_URL: z.string().url().default('https://upi-lens-api.vercel.app'),
 
     /**
      * Statement Inbox — inbound email ingestion. Optional: absent, the inbox endpoints

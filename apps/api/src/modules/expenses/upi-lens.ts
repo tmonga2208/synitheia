@@ -1,15 +1,30 @@
-import { asMinor, currencyMeta, type DraftTransaction, type Minor } from '@synitheia/shared';
-import type { Env } from '../../config/env.js';
+import {
+  asMinor,
+  currencyMeta,
+  isLocalDate,
+  startOfLocalDay,
+  type DraftTransaction,
+  type Minor,
+} from '@synitheia/shared';
+import { isUpiLensConfigured, type Env } from '../../config/env.js';
 
 /**
  * UPI Lens API Client.
  *
- * Connects to the standalone upi-lens-api service (https://upi-lens-api.onrender.com)
- * for high-speed, deterministic parsing of bank account statements (PDF, CSV, XLS, XLSX).
+ * Connects to the standalone upi-lens-api service (UPI_LENS_API_URL) for deterministic
+ * parsing of bank account statements (PDF text, CSV, XLS, XLSX).
  *
  * Extracts dates, debit amounts, merchant names, UPI references (UTR/RRN), and categorizes
  * transactions without consuming LLM token budgets or suffering from LLM hallucination.
  */
+
+/** Which reader upi-lens used: a known bank's PDF layout, a table, or its generic line reader. */
+export type UpiLensLayout = 'SBI' | 'HDFC' | 'AXIS' | 'GENERIC' | 'TABLE';
+
+export interface UpiLensResult {
+  layout: UpiLensLayout;
+  transactions: UpiLensTransaction[];
+}
 
 export interface UpiLensTransaction {
   date: string | null;
@@ -28,6 +43,7 @@ export interface UpiLensTransaction {
 
 export interface UpiLensResponse {
   success: boolean;
+  layout?: UpiLensLayout;
   file?: { name: string; type: string; sizeBytes?: number };
   summary?: {
     transactionCount: number;
@@ -137,8 +153,16 @@ function toMinor(amount: number, currency: string): Minor {
   return asMinor(Math.round(amount * 10 ** decimals));
 }
 
-function parseDate(rawDate: string | null): Date | null {
+const NOON_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * A statement gives a bare day ("2026-10-24"), not a moment. Read as UTC midnight it is
+ * the previous evening anywhere west of Greenwich, so it is placed at noon in the user's
+ * own timezone, which is that day everywhere.
+ */
+function parseDate(rawDate: string | null, timezone: string): Date | null {
   if (!rawDate) return null;
+  if (isLocalDate(rawDate)) return new Date(startOfLocalDay(rawDate, timezone).getTime() + NOON_MS);
   const d = new Date(rawDate);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -164,6 +188,7 @@ function formatEvidence(tx: UpiLensTransaction): string {
 export function normalizeUpiLensTransaction(
   tx: UpiLensTransaction,
   fallbackCurrency: string,
+  timezone: string,
 ): DraftTransaction | null {
   // Only debits are expenses. Income or salary credits must never become expenses.
   if (tx.type !== 'DEBIT' || typeof tx.amount !== 'number' || tx.amount <= 0) {
@@ -171,7 +196,7 @@ export function normalizeUpiLensTransaction(
   }
 
   const currency = tx.currency || fallbackCurrency;
-  const occurredAt = parseDate(tx.date);
+  const occurredAt = parseDate(tx.date, timezone);
 
   return {
     amountMinor: toMinor(tx.amount, currency),
@@ -185,45 +210,83 @@ export function normalizeUpiLensTransaction(
   };
 }
 
-/**
- * Sends a bank statement buffer to upi-lens-api for tabular/regex statement parsing.
- * Returns null if the service is unreachable or parsing encounters an error.
- */
-export async function parseStatementWithUpiLens(
-  env: Env,
-  file: { buffer: Buffer; filename: string; mimeType: string },
-): Promise<UpiLensTransaction[] | null> {
-  const baseUrl = env?.UPI_LENS_API_URL || 'https://upi-lens-api.onrender.com';
-  const url = new URL('/v1/statements/parse', baseUrl);
+/** The most drafts one statement may produce — the same ceiling the CSV reader keeps. */
+const MAX_DRAFTS = 500;
 
-  const formData = new FormData();
-  const blob = new Blob([new Uint8Array(file.buffer)], { type: file.mimeType });
-  formData.append('file', blob, file.filename);
+/**
+ * The drafts to file from a upi-lens parse, or null to let the model read the statement.
+ *
+ * Only `trusted` layouts are accepted: for a PDF that is a bank layout upi-lens knows,
+ * because its generic line reader guesses at columns in a way the model does better.
+ * A parse with no debits in it is also declined rather than reported as "nothing found".
+ */
+export function upiLensDrafts(
+  result: UpiLensResult | null,
+  user: { currency: string; timezone: string },
+  trusted: readonly UpiLensLayout[],
+): DraftTransaction[] | null {
+  if (!result || !trusted.includes(result.layout)) return null;
+
+  const drafts = result.transactions
+    .map((tx) => normalizeUpiLensTransaction(tx, user.currency, user.timezone))
+    .filter((d): d is DraftTransaction => d !== null)
+    .slice(0, MAX_DRAFTS);
+
+  return drafts.length > 0 ? drafts : null;
+}
+
+/** A parse should answer in about a second; a request that hangs must not hold up the upload. */
+const TIMEOUT_MS = 10_000;
+
+async function requestUpiLens(
+  env: Env,
+  path: string,
+  body: string | FormData,
+  headers?: Record<string, string>,
+): Promise<UpiLensResult | null> {
+  if (!isUpiLensConfigured(env)) return null;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20_000); // 20s timeout for cold start
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const response = await fetch(url.toString(), {
+    const response = await fetch(new URL(path, env.UPI_LENS_API_URL).toString(), {
       method: 'POST',
-      body: formData,
+      body,
+      headers,
       signal: controller.signal,
     });
-
-    if (!response.ok) {
-      return null;
-    }
+    if (!response.ok) return null;
 
     const data = (await response.json()) as UpiLensResponse;
-    if (!data || !data.success || !Array.isArray(data.transactions)) {
-      return null;
-    }
+    if (!data || !data.success || !Array.isArray(data.transactions)) return null;
 
-    return data.transactions;
+    // A deployment from before `layout` existed cannot say which reader it used.
+    return { layout: data.layout ?? 'GENERIC', transactions: data.transactions };
   } catch {
-    // If the network request fails, timeout fires, or payload is invalid, return null to fall back
+    // Unreachable, timed out, or not JSON: the caller falls back to the model.
     return null;
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/** Sends a spreadsheet or unlocked file to upi-lens-api. Null when it cannot help. */
+export async function parseStatementWithUpiLens(
+  env: Env,
+  file: { buffer: Buffer; filename: string; mimeType: string },
+): Promise<UpiLensResult | null> {
+  const formData = new FormData();
+  formData.append('file', new Blob([new Uint8Array(file.buffer)], { type: file.mimeType }), file.filename);
+  return requestUpiLens(env, '/v1/statements/parse', formData);
+}
+
+/**
+ * Sends a PDF statement's text, already opened here, to upi-lens-api. Bank statements are
+ * usually locked, and the password stays on this server: only the opened text leaves it.
+ */
+export async function parseStatementTextWithUpiLens(env: Env, text: string): Promise<UpiLensResult | null> {
+  return requestUpiLens(env, '/v1/statements/parse-text', JSON.stringify({ text }), {
+    'content-type': 'application/json',
+  });
 }

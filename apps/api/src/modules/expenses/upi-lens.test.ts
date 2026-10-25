@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { toLocalDate } from '@synitheia/shared';
 import type { Env } from '../../config/env.js';
 import {
   mapUpiLensCategory,
   mapUpiLensConfidence,
   normalizeUpiLensTransaction,
+  parseStatementTextWithUpiLens,
   parseStatementWithUpiLens,
+  upiLensDrafts,
   type UpiLensTransaction,
 } from './upi-lens.js';
 
@@ -80,7 +83,7 @@ describe('normalizeUpiLensTransaction', () => {
   };
 
   it('converts a valid debit transaction into a DraftTransaction', () => {
-    const draft = normalizeUpiLensTransaction(sampleTx, 'INR');
+    const draft = normalizeUpiLensTransaction(sampleTx, 'INR', 'Asia/Kolkata');
     expect(draft).not.toBeNull();
     expect(draft!.amountMinor).toBe(32050); // 320.50 INR in paise
     expect(draft!.currency).toBe('INR');
@@ -93,6 +96,14 @@ describe('normalizeUpiLensTransaction', () => {
     expect(draft!.duplicateOfExpenseId).toBeNull();
   });
 
+  it('files a statement date on that day wherever the user lives', () => {
+    // A bare date read as UTC midnight is the previous evening west of Greenwich.
+    for (const timezone of ['Asia/Kolkata', 'America/Los_Angeles', 'Pacific/Auckland']) {
+      const draft = normalizeUpiLensTransaction(sampleTx, 'INR', timezone);
+      expect(toLocalDate(draft!.occurredAt!, timezone)).toBe('2026-10-24');
+    }
+  });
+
   it('discards CREDIT transactions so income is not treated as an expense', () => {
     const creditTx: UpiLensTransaction = {
       ...sampleTx,
@@ -100,14 +111,14 @@ describe('normalizeUpiLensTransaction', () => {
       amount: 45000,
       description: 'SALARY ACME CORP',
     };
-    expect(normalizeUpiLensTransaction(creditTx, 'INR')).toBeNull();
+    expect(normalizeUpiLensTransaction(creditTx, 'INR', 'Asia/Kolkata')).toBeNull();
   });
 
   it('discards zero or negative amounts', () => {
     const zeroTx: UpiLensTransaction = { ...sampleTx, amount: 0 };
     const negTx: UpiLensTransaction = { ...sampleTx, amount: -100 };
-    expect(normalizeUpiLensTransaction(zeroTx, 'INR')).toBeNull();
-    expect(normalizeUpiLensTransaction(negTx, 'INR')).toBeNull();
+    expect(normalizeUpiLensTransaction(zeroTx, 'INR', 'Asia/Kolkata')).toBeNull();
+    expect(normalizeUpiLensTransaction(negTx, 'INR', 'Asia/Kolkata')).toBeNull();
   });
 
   it('handles fallback paymentMethod when merchant is absent', () => {
@@ -116,8 +127,76 @@ describe('normalizeUpiLensTransaction', () => {
       merchant: null,
       paymentMethod: 'UPI',
     };
-    const draft = normalizeUpiLensTransaction(unnamedUpi, 'INR');
+    const draft = normalizeUpiLensTransaction(unnamedUpi, 'INR', 'Asia/Kolkata');
     expect(draft!.merchant).toBe('UPI Payment');
+  });
+});
+
+describe('upiLensDrafts', () => {
+  const user = { currency: 'INR', timezone: 'Asia/Kolkata' };
+  const debit: UpiLensTransaction = {
+    date: '2026-10-25',
+    description: 'UPI/DR/111122223333/Ravi veg/YESB/Q123456789/NO R',
+    amount: 75,
+    type: 'DEBIT',
+    currency: 'INR',
+    paymentMethod: 'UPI',
+    merchant: 'Ravi Veg',
+    category: 'Groceries',
+    confidence: 'high',
+  };
+  const credit: UpiLensTransaction = { ...debit, type: 'CREDIT', amount: 5000 };
+
+  it('turns a recognised bank layout into drafts of its debits', () => {
+    const drafts = upiLensDrafts({ layout: 'SBI', transactions: [debit, credit] }, user, ['SBI']);
+    expect(drafts).toHaveLength(1);
+    expect(drafts![0]).toMatchObject({ amountMinor: 7500, merchant: 'Ravi Veg', suggestedCategoryName: 'Groceries' });
+  });
+
+  it('declines the generic line reader, so the model reads layouts the parser does not know', () => {
+    expect(upiLensDrafts({ layout: 'GENERIC', transactions: [debit] }, user, ['SBI'])).toBeNull();
+  });
+
+  it('declines a statement with no debits in it', () => {
+    expect(upiLensDrafts({ layout: 'SBI', transactions: [credit] }, user, ['SBI'])).toBeNull();
+  });
+
+  it('declines when the parser could not be reached', () => {
+    expect(upiLensDrafts(null, user, ['SBI'])).toBeNull();
+  });
+});
+
+describe('parseStatementTextWithUpiLens', () => {
+  const env = { UPI_LENS_API_URL: 'https://lens.example' } as Env;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('sends the opened statement text as JSON to the parse-text endpoint', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, layout: 'SBI', transactions: [] }), { status: 200 }),
+    );
+
+    const result = await parseStatementTextWithUpiLens(env, 'statement text');
+
+    expect(result).toEqual({ layout: 'SBI', transactions: [] });
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(String(url)).toBe('https://lens.example/v1/statements/parse-text');
+    expect(init).toMatchObject({ method: 'POST', body: JSON.stringify({ text: 'statement text' }) });
+  });
+
+  it('makes no request when no parser is configured', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    expect(await parseStatementTextWithUpiLens({} as Env, 'statement text')).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns null when the service refuses', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('{}', { status: 422 }));
+
+    expect(await parseStatementTextWithUpiLens(env, 'statement text')).toBeNull();
   });
 });
 
@@ -140,6 +219,7 @@ describe('parseStatementWithUpiLens', () => {
   it('returns parsed transactions on successful 200 response', async () => {
     const mockResponseData = {
       success: true,
+      layout: 'TABLE',
       transactions: [
         {
           date: '2026-10-24',
@@ -160,9 +240,10 @@ describe('parseStatementWithUpiLens', () => {
       json: async () => mockResponseData,
     } as unknown as Response);
 
-    const txs = await parseStatementWithUpiLens(env, mockFile);
-    expect(txs).toHaveLength(1);
-    expect(txs![0].merchant).toBe('Uber');
+    const result = await parseStatementWithUpiLens(env, mockFile);
+    expect(result!.layout).toBe('TABLE');
+    expect(result!.transactions).toHaveLength(1);
+    expect(result!.transactions[0]!.merchant).toBe('Uber');
   });
 
   it('returns null when the API responds with non-200 error', async () => {
