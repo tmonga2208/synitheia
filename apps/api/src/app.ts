@@ -12,6 +12,7 @@ import {
 import { ZodError } from 'zod';
 import { AppError, type ErrorResponseBody } from './core/errors.js';
 import { authGuard } from './core/auth-guard.js';
+import { registerIdempotency } from './core/idempotency.js';
 import { registerAuthRoutes } from './modules/auth/routes.js';
 import { registerExpenseRoutes } from './modules/expenses/routes.js';
 import { registerHabitRoutes } from './modules/habits/routes.js';
@@ -151,6 +152,9 @@ export async function buildApp(env: Env): Promise<FastifyInstance> {
 
   await app.register(
     async (api) => {
+      // Before the routes, so every write in /v1 gets it. See core/idempotency.ts.
+      registerIdempotency(api);
+
       await registerAuthRoutes(api, env);
       await registerExpenseRoutes(api);
       await registerHabitRoutes(api);

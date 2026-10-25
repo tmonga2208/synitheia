@@ -167,8 +167,8 @@ describe('GET /privacy/export', () => {
     const missing = userCollections()
       .map((model) => model.modelName)
       // Sign-in tokens and reset codes are credentials. An export is a file a person may
-      // hand to someone else.
-      .filter((name) => name !== 'RefreshToken' && name !== 'PasswordReset')
+      // hand to someone else. Idempotency records are stored answers to resent changes.
+      .filter((name) => !['RefreshToken', 'PasswordReset', 'IdempotencyRecord'].includes(name))
       .filter((name) => !response.body.includes(`"mine:${name}"`));
     expect(missing).toEqual([]);
 
