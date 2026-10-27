@@ -229,33 +229,46 @@ export async function logHabit(
     throw AppError.badRequest('Cannot log a habit for a future date');
   }
 
-  const existing = await HabitLogModel.findOne({
+  // One atomic update against the (userId, habitId, localDate) unique index. Quick taps
+  // arrive together: reading the count here and writing count + step back let two of them
+  // read the same count, and one tap was lost. The database adds instead, and the row as it
+  // was before tells whether this change crossed the target.
+  const before = await HabitLogModel.findOneAndUpdate(
+    { userId: new Types.ObjectId(user.id), habitId: habit._id, localDate },
+    [
+      {
+        $set: {
+          count:
+            input.count !== undefined
+              ? input.count
+              : { $max: [0, { $add: [{ $ifNull: ['$count', 0] }, input.increment ?? 1] }] },
+          targetCount: habit.targetCount,
+          source,
+        },
+      },
+      {
+        $set: {
+          completedAt: {
+            $cond: [
+              { $gte: ['$count', habit.targetCount] },
+              { $ifNull: ['$completedAt', '$$NOW'] },
+              null,
+            ],
+          },
+        },
+      },
+    ],
+    { upsert: true, new: false, updatePipeline: true },
+  ).lean();
+
+  const existing = before;
+  const log = (await HabitLogModel.findOne({
     userId: new Types.ObjectId(user.id),
     habitId: habit._id,
     localDate,
-  });
-
-  const nextCount =
-    input.count !== undefined
-      ? input.count
-      : Math.max(0, (existing?.count ?? 0) + (input.increment ?? 1));
-
+  }))!;
+  const nextCount = log.count;
   const complete = nextCount >= habit.targetCount;
-
-  // Upsert against the (userId, habitId, localDate) unique index — the double-tap
-  // and the offline-replay both land here and collapse onto one row.
-  const log = await HabitLogModel.findOneAndUpdate(
-    { userId: new Types.ObjectId(user.id), habitId: habit._id, localDate },
-    {
-      $set: {
-        count: nextCount,
-        targetCount: habit.targetCount,
-        completedAt: complete ? (existing?.completedAt ?? new Date()) : null,
-        source,
-      },
-    },
-    { upsert: true, new: true },
-  );
 
   const updated = await recomputeStreak(user.id, habitId, user.timezone);
 
