@@ -1,55 +1,62 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, ArrowLeft, Plus, Wallet } from 'lucide-react-native';
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Wallet } from 'lucide-react-native';
 import {
   addMonths,
-  asMinor,
   firstOfMonth,
   formatMonthLabel,
   lastOfMonth,
   monthKeyOf,
-  formatMoney,
-  sumMoney,
   todayLocalDate,
-  type Minor,
+  type LocalDate,
   type MonthKey,
 } from '@synitheia/shared';
-import {
-  Card,
-  EmptyState,
-  ErrorState,
-  Text,
-  Touchable,
-} from '../../src/components/primitives.js';
+import { EmptyState, ErrorState, Text, Touchable } from '../../src/components/primitives.js';
 import { SkeletonList } from '../../src/components/Skeleton.js';
+import { CountUp } from '../../src/components/CountUp.js';
+import { BillsRow, OwedBanner } from '../../src/components/OwedBanner.js';
 import { api } from '../../src/api/client.js';
 import type { ListResponse, WireExpense } from '../../src/api/types.js';
+import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useAuth } from '../../src/store/auth.js';
+import { MonthCalendar } from '../../src/expenses/MonthCalendar.js';
+import { PayeeStrip } from '../../src/expenses/PayeeStrip.js';
+import { PaymentRow } from '../../src/expenses/PaymentRow.js';
+import type { WireExpenseTotals } from '../../src/expenses/monthTotal.js';
+import {
+  calendarCells,
+  comparisonLine,
+  formatAmount,
+  formatWhole,
+  normalizeTotals,
+  previousComparable,
+} from '../../src/expenses/monthView.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
-import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
-import { BillsRow, OwedBanner } from '../../src/components/OwedBanner.js';
-import { monthSpentLine, type WireExpenseTotals } from '../../src/expenses/monthTotal.js';
+import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+
+/** The list endpoint's ceiling; the month's total, calendar and payees come from totals. */
+const LIST_LIMIT = 200;
+/** "Mostly to" and the first payments rise in once the calendar's wave has mostly passed. */
+const AFTER_CALENDAR_MS = 450;
+const ROW_STAGGER_MS = 70;
+const EASED_ROWS = 8;
+const HIGHLIGHT_MS = 1400;
 
 function expenseQuery(month: MonthKey) {
-  const from = firstOfMonth(month);
-  const to = lastOfMonth(month);
-
   return {
     queryKey: ['expenses', month] as const,
     queryFn: () =>
-      api.get<ListResponse<WireExpense>>(`/expenses?from=${from}&to=${to}&limit=200`),
+      api.get<ListResponse<WireExpense>>(
+        `/expenses?from=${firstOfMonth(month)}&to=${lastOfMonth(month)}&limit=${LIST_LIMIT}`,
+      ),
   };
 }
 
-/**
- * The month's total comes from the server, not from adding up the list: the list stops at
- * 200 expenses, and a total quietly short by the rest would be worse than none.
- */
 function monthTotalQuery(month: MonthKey) {
   return {
     queryKey: ['expenses', 'totals', month] as const,
@@ -61,57 +68,95 @@ function monthTotalQuery(month: MonthKey) {
 }
 
 interface Day {
-  localDate: string;
-  totalMinor: Minor;
+  localDate: LocalDate;
+  /** What the rows under it add up to, so the header always matches what is shown. */
+  totalMinor: number;
   items: WireExpense[];
 }
 
-/**
- * A LocalDate carries no timezone. Anchoring it at UTC midnight and formatting it in UTC
- * is the only way to render it without some zone quietly shifting it a day — the exact
- * class of bug local-date.ts exists to prevent.
- */
-function formatDay(localDate: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${localDate}T00:00:00Z`));
+/** "Sat 19". The date is anchored at UTC so no zone can shift it a day. */
+function dayLabel(localDate: string): string {
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(
+    new Date(`${localDate}T00:00:00Z`),
+  );
 }
 
-/** The list arrives sorted by occurredAt desc, so insertion order preserves the day order. */
+/** The list arrives newest first, so insertion order keeps the days in order. */
 function groupByDay(items: WireExpense[]): Day[] {
   const days = new Map<string, WireExpense[]>();
-
   for (const expense of items) {
     const bucket = days.get(expense.localDate);
     if (bucket) bucket.push(expense);
     else days.set(expense.localDate, [expense]);
   }
-
   return [...days.entries()].map(([localDate, dayItems]) => ({
-    localDate,
-    totalMinor: sumMoney(dayItems.map((e) => asMinor(e.amountMinor))),
+    localDate: localDate as LocalDate,
+    totalMinor: dayItems.reduce((sum, e) => sum + e.amountMinor, 0),
     items: dayItems,
   }));
 }
 
+/**
+ * Expenses opens on the month rather than on every payment: its total settling into place,
+ * the month as a calendar, who the money mostly went to, and only then each payment.
+ */
 export default function Expenses() {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
   const user = useAuth((s) => s.user);
   const currency = user?.currency ?? 'INR';
-  const timezone = user?.timezone ?? 'UTC';
-  const today = todayLocalDate(timezone);
-  const [month, setMonth] = useState<MonthKey>(() => monthKeyOf(today));
-  const atLatest = month >= monthKeyOf(today);
+  const today = todayLocalDate(user?.timezone ?? 'UTC');
+  const currentMonth = monthKeyOf(today);
+  const [month, setMonth] = useState<MonthKey>(currentMonth);
+  const previous = addMonths(month, -1);
+  const atLatest = month >= currentMonth;
 
   const query = useQuery(expenseQuery(month));
-  const totals = useQuery(monthTotalQuery(month));
-  const spent = monthSpentLine(totals.data, currency);
+  const totalsQuery = useQuery(monthTotalQuery(month));
+  const previousQuery = useQuery(monthTotalQuery(previous));
+  const totals = totalsQuery.data ? normalizeTotals(totalsQuery.data) : null;
 
   const days = useMemo(() => groupByDay(query.data?.items ?? []), [query.data]);
+  const cells = useMemo(() => calendarCells(month, totals?.byDay ?? {}, today), [month, totals, today]);
+
+  const comparison = useMemo(() => {
+    if (!totals || totals.count === 0 || !previousQuery.data) return null;
+    const prev = previousComparable({
+      previousByDay: normalizeTotals(previousQuery.data).byDay,
+      previousMonth: previous,
+      ongoingDay: month === currentMonth ? Number(today.slice(8, 10)) : null,
+    });
+    return comparisonLine({ thisMinor: totals.totalMinor, previousMinor: prev.minor, previousLabel: prev.label });
+  }, [totals, previousQuery.data, previous, month, currentMonth, today]);
+
+  // Where each day's payments start, so tapping a day can bring them into view.
+  const scrollRef = useRef<ScrollView>(null);
+  const bodyY = useRef(0);
+  const listY = useRef(0);
+  const dayY = useRef(new Map<string, number>());
+  const [selected, setSelected] = useState<LocalDate | null>(null);
+  const [highlighted, setHighlighted] = useState<LocalDate | null>(null);
+
+  useEffect(() => {
+    if (!highlighted) return;
+    const id = setTimeout(() => setHighlighted(null), HIGHLIGHT_MS);
+    return () => clearTimeout(id);
+  }, [highlighted]);
+
+  const changeMonth = (delta: number) => {
+    setSelected(null);
+    setHighlighted(null);
+    dayY.current.clear();
+    setMonth(addMonths(month, delta));
+  };
+
+  const goToDay = (date: LocalDate) => {
+    setSelected(date);
+    const y = dayY.current.get(date);
+    if (y === undefined) return;
+    scrollRef.current?.scrollTo({ y: bodyY.current + listY.current + y - spacing.sm, animated: true });
+    setHighlighted(date);
+  };
 
   const header = (
     <View style={styles.header}>
@@ -159,9 +204,14 @@ export default function Expenses() {
     );
   }
 
+  const empty = days.length === 0;
+  const listed = query.data?.items.length ?? 0;
+  let row = 0;
+
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -169,7 +219,8 @@ export default function Expenses() {
             refreshing={query.isRefetching}
             onRefresh={() => {
               void query.refetch();
-              void totals.refetch();
+              void totalsQuery.refetch();
+              void previousQuery.refetch();
             }}
             tintColor={t.accent}
           />
@@ -177,37 +228,18 @@ export default function Expenses() {
       >
         {header}
 
-        <Text variant="overline" color={t.textFaint}>
-          Your spending
-        </Text>
-        <Text variant="title" style={styles.heading}>
-          Expenses
-        </Text>
-
         <View style={styles.monthBar}>
           <Touchable
             accessibilityRole="button"
             accessibilityLabel="Previous month"
             haptic={false}
-            onPress={() => setMonth(addMonths(month, -1))}
+            onPress={() => changeMonth(-1)}
             style={styles.iconButton}
           >
             <ChevronLeft size={20} color={t.textMuted} strokeWidth={1.8} />
           </Touchable>
 
-          <View
-            style={styles.monthTitle}
-            accessible
-            accessibilityLabel={
-              spent ? `${formatMonthLabel(month)}, ${spent}` : formatMonthLabel(month)
-            }
-          >
-            <Text variant="section">{formatMonthLabel(month)}</Text>
-            {/* Always laid out, so the bar does not jump when the total arrives. */}
-            <Text variant="bodyMedium" color={t.textMuted}>
-              {spent ?? ' '}
-            </Text>
-          </View>
+          <Text variant="bodyMedium">{formatMonthLabel(month)}</Text>
 
           <Touchable
             accessibilityRole="button"
@@ -215,87 +247,112 @@ export default function Expenses() {
             accessibilityState={{ disabled: atLatest }}
             disabled={atLatest}
             haptic={false}
-            onPress={() => setMonth(addMonths(month, 1))}
+            onPress={() => changeMonth(1)}
             style={styles.iconButton}
           >
-            <ChevronRight
-              size={20}
-              color={atLatest ? t.textFaint : t.textMuted}
-              strokeWidth={1.8}
-            />
+            <ChevronRight size={20} color={atLatest ? t.textFaint : t.textMuted} strokeWidth={1.8} />
           </Touchable>
         </View>
 
-        <OwedBanner />
-        <BillsRow />
-
-        {days.length === 0 ? (
-          <View style={styles.empty}>
-            <EmptyState
-              icon={<Wallet size={30} color={t.onAccent} strokeWidth={1.5} />}
-              title={`Nothing logged in ${formatMonthLabel(month)}`}
-              body="Add an expense by hand, or pick a payment screenshot and let Synítheia read it for you."
-              actionLabel="+ Add an expense"
-              onAction={() => router.push('/expenses/new')}
-            />
+        {/* Keyed by month: everything below eases in again only when the month changes. */}
+        <View key={month} onLayout={(e) => (bodyY.current = e.nativeEvent.layout.y)}>
+          <View style={styles.hero}>
+            {totals ? (
+              <CountUp
+                to={totals.totalMinor}
+                format={(n) => formatWhole(n, currency)}
+                animate
+                variant="display"
+                center
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              />
+            ) : (
+              <Text variant="display" center color={t.textFaint}>
+                {' '}
+              </Text>
+            )}
+            <Text variant="body" color={t.textMuted} center>
+              {comparison ?? ' '}
+            </Text>
           </View>
-        ) : (
-          days.map((day) => (
-            <View key={day.localDate} style={styles.day}>
-              <View style={styles.dayHeader}>
-                <Text variant="label" color={t.textMuted}>
-                  {formatDay(day.localDate)}
-                </Text>
-                <Text variant="label" color={t.textPrimary}>
-                  {formatMoney(day.totalMinor, currency)}
-                </Text>
+
+          <MonthCalendar cells={cells} selected={selected} onSelect={goToDay} currency={currency} />
+
+          {empty ? (
+            <View style={styles.empty}>
+              <EmptyState
+                icon={<Wallet size={30} color={t.onAccent} strokeWidth={1.5} />}
+                title={`Nothing logged in ${formatMonthLabel(month)}`}
+                body="Add an expense by hand, or pick a payment screenshot and let Synítheia read it for you."
+                actionLabel="+ Add an expense"
+                onAction={() => router.push('/expenses/new')}
+              />
+            </View>
+          ) : (
+            <>
+              {totals && totals.topPayees.length > 0 ? (
+                <Animated.View entering={FadeInDown.delay(AFTER_CALENDAR_MS).duration(420)}>
+                  <Text variant="overline" color={t.textFaint} style={styles.label}>
+                    Mostly to
+                  </Text>
+                  <PayeeStrip payees={totals.topPayees} currency={currency} />
+                </Animated.View>
+              ) : null}
+
+              <View style={styles.rows}>
+                <OwedBanner />
+                <BillsRow />
               </View>
 
-              <Card padded={false} style={styles.dayCard}>
-                {day.items.map((expense, index) => (
-                  <View key={expense._id}>
-                    {index > 0 ? <View style={styles.divider} /> : null}
+              <View onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}>
+                <Text variant="overline" color={t.textFaint} style={styles.label}>
+                  Every payment
+                </Text>
 
-                    <Touchable
-                      style={styles.expense}
-                      onPress={() => router.push(`/expenses/${expense._id}`)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${
-                        expense.merchant ?? expense.categoryName
-                      }, ${formatMoney(asMinor(expense.amountMinor), expense.currency)}. Open details.`}
-                    >
-                      <View
-                        style={[styles.dot, { backgroundColor: expense.categoryColor }]}
-                      />
+                {days.map((day) => (
+                  <View
+                    key={day.localDate}
+                    onLayout={(e) => dayY.current.set(day.localDate, e.nativeEvent.layout.y)}
+                    style={[styles.day, highlighted === day.localDate && styles.highlight]}
+                  >
+                    <View style={styles.dayHeader}>
+                      <Text variant="label" color={t.textMuted}>
+                        {dayLabel(day.localDate)}
+                      </Text>
+                      <Text variant="label" color={t.textMuted}>
+                        {formatAmount(day.totalMinor, currency)}
+                      </Text>
+                    </View>
 
-                      <View style={styles.expenseCopy}>
-                        <Text variant="bodyMedium" numberOfLines={1}>
-                          {expense.merchant ?? expense.categoryName}
-                        </Text>
-                        <Text variant="caption" color={t.textFaint} numberOfLines={1}>
-                          {expense.note
-                            ? `${expense.categoryName} · ${expense.note}`
-                            : expense.categoryName}
-                        </Text>
-                      </View>
-
-                      <View style={styles.expenseRight}>
-                        <Text variant="bodyMedium">
-                          {formatMoney(asMinor(expense.amountMinor), expense.currency)}
-                        </Text>
-                        <ChevronRight
-                          size={16}
-                          color={t.textFaint}
-                          strokeWidth={1.8}
-                        />
-                      </View>
-                    </Touchable>
+                    {day.items.map((expense) => {
+                      const index = row++;
+                      const payment = (
+                        <PaymentRow expense={expense} onPress={() => router.push(`/expenses/${expense._id}`)} />
+                      );
+                      return index < EASED_ROWS ? (
+                        <Animated.View
+                          key={expense._id}
+                          entering={FadeInDown.delay(AFTER_CALENDAR_MS + 150 + index * ROW_STAGGER_MS).duration(420)}
+                        >
+                          {payment}
+                        </Animated.View>
+                      ) : (
+                        <View key={expense._id}>{payment}</View>
+                      );
+                    })}
                   </View>
                 ))}
-              </Card>
-            </View>
-          ))
-        )}
+
+                {totals && totals.count > listed ? (
+                  <Text variant="caption" color={t.textMuted} center style={styles.more}>
+                    Showing the latest {LIST_LIMIT}
+                  </Text>
+                ) : null}
+              </View>
+            </>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -304,16 +361,12 @@ export default function Expenses() {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
-    content: {
-      paddingHorizontal: spacing.xl,
-      paddingBottom: spacing['4xl'],
-    },
+    content: { paddingHorizontal: spacing.xl, paddingBottom: spacing['4xl'] },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingVertical: spacing.sm,
-      marginBottom: spacing.base,
     },
     iconButton: {
       width: MIN_TAP_TARGET,
@@ -330,41 +383,13 @@ const makeStyles = (t: Theme) =>
       justifyContent: 'center',
       backgroundColor: t.accent,
     },
-    heading: { marginTop: spacing.xs },
-    monthBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: spacing.md,
-    },
-    monthTitle: { alignItems: 'center', gap: spacing.xs },
+    monthBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
+    hero: { alignItems: 'center', marginTop: spacing.md, gap: spacing.xs },
+    label: { marginTop: spacing['2xl'], marginBottom: spacing.md },
+    rows: { gap: spacing.sm, marginTop: spacing.xl },
     empty: { marginTop: spacing.xl },
-    day: { marginTop: spacing.xl },
-    dayHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.sm,
-    },
-    dayCard: { overflow: 'hidden' },
-    expense: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.base,
-      minHeight: MIN_TAP_TARGET,
-    },
-    expenseRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    expenseCopy: { flex: 1, gap: spacing.xs },
-    dot: {
-      width: 10,
-      height: 10,
-      borderRadius: radius.full,
-    },
-    divider: {
-      height: 1,
-      marginLeft: spacing.lg,
-      backgroundColor: t.border,
-    },
+    day: { marginTop: spacing.base, borderRadius: radius.md, paddingHorizontal: spacing.xs },
+    highlight: { backgroundColor: t.accentWash },
+    dayHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.xs, paddingBottom: spacing.xs },
+    more: { marginTop: spacing.xl },
   });
