@@ -16,14 +16,27 @@ export interface AmountScale {
 }
 
 /**
- * The slider's range: half again past the target, and past whatever is already logged, so a
- * day that went over the goal can still be shown and nudged.
+ * The slider's range: half again past the target, and a quarter past whatever is already
+ * logged. The sheet resizes it after every change, so dragging to the end and letting go
+ * leaves more room each time: a long day is never out of reach.
  */
 export function amountScale(habit: TodayHabit): AmountScale {
   const measure = measureOf(habit);
   const step = measure === 'steps' ? 100 : 1;
-  const reach = Math.max(habit.targetCount * 1.5, habit.todayCount + HABIT_MEASURES[measure].step * 4);
+  const reach = Math.max(habit.targetCount * 1.5, habit.todayCount * 1.25 + HABIT_MEASURES[measure].step * 4);
   return { step, max: Math.ceil(reach / step) * step };
+}
+
+/** A chip or a step added to the amount: never below zero, and no upper limit. */
+export function addAmount(value: number, amount: number): number {
+  return Math.max(0, value + amount);
+}
+
+/** A typed amount: digits only, grouping commas allowed. Anything else is not an amount. */
+export function parseAmount(text: string): number | null {
+  const digits = text.replace(/[,\s]/g, '');
+  if (!/^\d+$/.test(digits)) return null;
+  return Number(digits);
 }
 
 export function snapAmount(value: number, scale: AmountScale): number {

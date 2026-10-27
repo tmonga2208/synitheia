@@ -1,18 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, PanResponder, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  PanResponder,
+  Platform,
+  StyleSheet,
+  TextInput,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
   formatHabitProgress,
+  formatHabitTarget,
   HABIT_MEASURES,
   measureOf,
   type TodayResponse,
 } from '@synitheia/shared';
 import { Button, Chip, Text, Touchable } from '../components/primitives.js';
-import { accentFor, radius, spacing } from '../theme/theme.js';
+import { accentFor, radius, spacing, type } from '../theme/theme.js';
 import type { Theme } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
-import { amountScale, quickAmounts, snapAmount } from './logAmount.js';
+import { addAmount, amountScale, parseAmount, quickAmounts, snapAmount } from './logAmount.js';
 
 type TodayHabit = TodayResponse['habits'][number];
 
@@ -25,13 +35,18 @@ interface Props {
 const THUMB = 28;
 
 /**
- * Logging a measured habit by its real amount: drag to today's total, or add a usual amount
- * with one tap, then save it once. Replaces a "+" that only ever added 5 minutes or 500 steps.
+ * Logging a measured habit by its real amount: drag to today's total, add a usual amount with
+ * one tap, or type it, then save it once. Replaces a "+" that only ever added 5 minutes or 500
+ * steps. There is no ceiling: the slider's range grows with the amount after each change.
  */
 export function LogAmountSheet({ habit, onClose, onSave }: Props) {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [value, setValue] = useState(0);
+  // The amount the slider's range is sized around. It moves only between gestures, so the
+  // rail never rescales under a finger mid-drag.
+  const [rangeFor, setRangeFor] = useState(0);
+  const [draft, setDraft] = useState<string | null>(null);
   const width = useRef(0);
   const origin = useRef(0);
   const lastSnap = useRef(0);
@@ -39,11 +54,16 @@ export function LogAmountSheet({ habit, onClose, onSave }: Props) {
   useEffect(() => {
     if (habit) {
       setValue(habit.todayCount);
+      setRangeFor(habit.todayCount);
+      setDraft(null);
       lastSnap.current = habit.todayCount;
     }
   }, [habit]);
 
-  const scale = useMemo(() => (habit ? amountScale(habit) : { step: 1, max: 1 }), [habit]);
+  const scale = useMemo(
+    () => (habit ? amountScale({ ...habit, todayCount: Math.max(habit.todayCount, rangeFor) }) : { step: 1, max: 1 }),
+    [habit, rangeFor],
+  );
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
 
@@ -70,6 +90,8 @@ export function LogAmountSheet({ habit, onClose, onSave }: Props) {
           setFromX(e.nativeEvent.locationX);
         },
         onPanResponderMove: (_e, g) => setFromX(g.moveX - origin.current),
+        onPanResponderRelease: () => setRangeFor(lastSnap.current),
+        onPanResponderTerminate: () => setRangeFor(lastSnap.current),
       }),
     [],
   );
@@ -80,6 +102,20 @@ export function LogAmountSheet({ habit, onClose, onSave }: Props) {
   const unit = habit.unit ?? HABIT_MEASURES[measure].unit ?? '';
   const accent = accentFor(habit.color, t);
   const fraction = Math.min(1, value / scale.max);
+
+  const setExactly = (next: number) => {
+    lastSnap.current = next;
+    setValue(next);
+    setRangeFor(next);
+  };
+
+  const commitDraft = () => {
+    if (draft !== null) {
+      const typed = parseAmount(draft);
+      if (typed !== null) setExactly(typed);
+    }
+    setDraft(null);
+  };
   const targetFraction = Math.min(1, habit.targetCount / scale.max);
 
   return (
@@ -93,6 +129,7 @@ export function LogAmountSheet({ habit, onClose, onSave }: Props) {
           onPress={onClose}
         />
 
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <SafeAreaView style={styles.sheet} edges={['bottom']}>
           <View style={styles.handle} />
           <Text variant="cardTitle" style={styles.title}>
@@ -102,9 +139,26 @@ export function LogAmountSheet({ habit, onClose, onSave }: Props) {
             Today
           </Text>
 
-          <Text variant="title" center style={styles.value}>
-            {formatHabitProgress(habit, value)}
-          </Text>
+          {/* The count is a field: any amount can be typed, not only what the slider reaches. */}
+          <View style={styles.valueRow}>
+            <TextInput
+              value={draft ?? value.toLocaleString()}
+              onFocus={() => setDraft(String(value))}
+              onChangeText={setDraft}
+              onBlur={commitDraft}
+              onSubmitEditing={commitDraft}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              selectTextOnFocus
+              selectionColor={accent.base}
+              maxLength={7}
+              accessibilityLabel={`${habit.name} today, in ${unit || 'count'}`}
+              style={[styles.valueInput, { color: t.textPrimary, borderBottomColor: accent.base }]}
+            />
+            <Text variant="title" color={t.textMuted}>
+              {` / ${formatHabitTarget(habit)}`}
+            </Text>
+          </View>
 
           <View
             style={styles.track}
@@ -115,11 +169,8 @@ export function LogAmountSheet({ habit, onClose, onSave }: Props) {
             accessibilityValue={{ text: formatHabitProgress(habit, value) }}
             accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
             onAccessibilityAction={(e) =>
-              setValue((v) =>
-                snapAmount(
-                  v + (e.nativeEvent.actionName === 'increment' ? 1 : -1) * HABIT_MEASURES[measure].step,
-                  scale,
-                ),
+              setExactly(
+                addAmount(value, (e.nativeEvent.actionName === 'increment' ? 1 : -1) * HABIT_MEASURES[measure].step),
               )
             }
             {...pan.panHandlers}
@@ -139,22 +190,25 @@ export function LogAmountSheet({ habit, onClose, onSave }: Props) {
               <Chip
                 key={amount}
                 label={`+${amount.toLocaleString()} ${unit}`.trim()}
-                onPress={() => setValue((v) => snapAmount(v + amount, { ...scale, max: Math.max(scale.max, v + amount) }))}
+                onPress={() => setExactly(addAmount(value, amount))}
               />
             ))}
-            <Chip label="Clear" onPress={() => setValue(0)} />
+            <Chip label="Clear" onPress={() => setExactly(0)} />
           </View>
 
           <Button
             label="Save"
             style={styles.save}
-            disabled={value === habit.todayCount}
+            disabled={value === habit.todayCount && draft === null}
             onPress={() => {
-              onSave(habit, value);
+              const typed = draft === null ? null : parseAmount(draft);
+              const count = typed ?? value;
+              if (count !== habit.todayCount) onSave(habit, count);
               onClose();
             }}
           />
         </SafeAreaView>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -174,7 +228,14 @@ const makeStyles = (t: Theme) =>
     },
     handle: { alignSelf: 'center', width: 96, height: 6, borderRadius: radius.full, backgroundColor: t.border },
     title: { marginTop: spacing.lg },
-    value: { marginTop: spacing.xl },
+    valueRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'center',
+      marginTop: spacing.xl,
+    },
+    // Underlined so it reads as something to tap and type into, not a label.
+    valueInput: { ...type.title, minWidth: 48, textAlign: 'center', borderBottomWidth: 2, paddingVertical: 0 },
     // Tall enough to grab anywhere along it, not only on the thumb.
     track: { height: 56, justifyContent: 'center', marginTop: spacing.lg, marginHorizontal: THUMB / 2 },
     rail: { height: 8, borderRadius: radius.full, backgroundColor: t.surfaceRaised, overflow: 'hidden' },
