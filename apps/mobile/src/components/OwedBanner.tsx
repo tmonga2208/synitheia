@@ -38,13 +38,13 @@ export function BillsRow() {
 
   return (
     <Touchable
-      style={[styles.banner, { borderColor: accent.base, backgroundColor: accent.wash }]}
+      style={styles.banner}
       onPress={() => router.push('/subscriptions')}
       accessibilityRole="button"
       accessibilityLabel="Recurring bills and subscriptions"
     >
-      <View style={[styles.icon, { backgroundColor: t.surface }]}>
-        <Repeat size={18} color={accent.text} strokeWidth={1.8} />
+      <View style={[styles.icon, { backgroundColor: accent.wash }]}>
+        <Repeat size={16} color={accent.text} strokeWidth={1.8} />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -84,7 +84,7 @@ export function OwedBanner() {
       accessibilityLabel={`${formatMoney(asMinor(data.totalMinor), currency)} owed to you across ${people} splits. Open settle up.`}
     >
       <View style={[styles.icon, { backgroundColor: accent.wash }]}>
-        <HandCoins size={18} color={accent.text} strokeWidth={1.8} />
+        <HandCoins size={16} color={accent.text} strokeWidth={1.8} />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -101,27 +101,27 @@ export function OwedBanner() {
   );
 }
 
-const makeStyles = (t: Theme) => {
-  const accent = accentFor(OWED_ACCENT_COLOR, t);
-
-  return StyleSheet.create({
+/**
+ * Quiet rows rather than bordered cards: on Expenses they sit below the month's picture
+ * and must not compete with it.
+ */
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
     banner: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
-      padding: spacing.base,
-      marginBottom: spacing.lg,
+      minHeight: 44,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
       borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: accent.base,
-      backgroundColor: accent.wash,
+      backgroundColor: t.surface,
     },
     icon: {
-      width: 36,
-      height: 36,
-      borderRadius: radius.md,
+      width: 30,
+      height: 30,
+      borderRadius: radius.sm,
       alignItems: 'center',
       justifyContent: 'center',
     },
   });
-};

@@ -263,7 +263,20 @@ export interface ExpenseTotals {
   largestMinor: Minor | null;
   /** Still owed to you. Reported, never subtracted. */
   owedMinor: Minor;
+  /** NET per local date, for the days that had any spending. */
+  byDay: Record<string, number>;
+  /** The biggest payees by NET, at most six: the merchant, or the category when there is none. */
+  topPayees: TopPayee[];
 }
+
+export interface TopPayee {
+  name: string;
+  totalMinor: number;
+  count: number;
+  categoryName: string;
+}
+
+const TOP_PAYEES = 6;
 
 /**
  * Totals are computed here, in code, and never by the LLM.
@@ -283,10 +296,12 @@ export async function totalsFor(
       userId: new Types.ObjectId(user.id),
       localDate: { $gte: from, $lte: to },
     },
-    { amountMinor: 1, categoryName: 1, participants: 1 },
+    { amountMinor: 1, categoryName: 1, participants: 1, localDate: 1, merchant: 1 },
   ).lean();
 
   const byCategory: Record<string, number> = {};
+  const byDay: Record<string, number> = {};
+  const payees = new Map<string, TopPayee>();
   let largest = 0;
   let owed = 0;
 
@@ -306,6 +321,14 @@ export async function totalsFor(
     });
 
     byCategory[e.categoryName] = (byCategory[e.categoryName] ?? 0) + net;
+    byDay[e.localDate] = (byDay[e.localDate] ?? 0) + net;
+
+    const name = e.merchant ?? e.categoryName;
+    const payee = payees.get(name) ?? { name, totalMinor: 0, count: 0, categoryName: e.categoryName };
+    payee.totalMinor += net;
+    payee.count += 1;
+    payees.set(name, payee);
+
     if (net > largest) largest = net;
     owed += owedMinor(participantsOf(e));
   }
@@ -320,6 +343,8 @@ export async function totalsFor(
     byCategory,
     largestMinor: expenses.length > 0 ? (largest as Minor) : null,
     owedMinor: owed as Minor,
+    byDay,
+    topPayees: [...payees.values()].sort((a, b) => b.totalMinor - a.totalMinor).slice(0, TOP_PAYEES),
   };
 }
 
