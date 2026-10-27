@@ -5,10 +5,23 @@ import {
   comparisonLine,
   formatAmount,
   formatWhole,
+  initialOf,
   normalizeTotals,
   previousComparable,
   type CalendarCell,
 } from './monthView.js';
+
+describe('initialOf', () => {
+  it("takes a payee's first letter, in capitals", () => {
+    expect(initialOf('ankush m')).toBe('A');
+    expect(initialOf('  zepto')).toBe('Z');
+    expect(initialOf('10311434')).toBe('1');
+  });
+
+  it('falls back to a dot for an empty name', () => {
+    expect(initialOf('   ')).toBe('•');
+  });
+});
 
 const line = (thisMinor: number, previousMinor: number) =>
   comparisonLine({ thisMinor, previousMinor, previousLabel: 'August' });

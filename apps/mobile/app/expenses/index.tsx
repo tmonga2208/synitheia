@@ -289,22 +289,23 @@ export default function Expenses() {
                 onAction={() => router.push('/expenses/new')}
               />
             </View>
-          ) : (
+          ) : totals && totals.topPayees.length > 0 ? (
+            <Animated.View entering={FadeInDown.delay(AFTER_CALENDAR_MS).duration(420)}>
+              <Text variant="overline" color={t.textFaint} style={styles.label}>
+                Mostly to
+              </Text>
+              <PayeeStrip payees={totals.topPayees} currency={currency} />
+            </Animated.View>
+          ) : null}
+
+          {/* Always here, so bills stay one tap away even in a month with nothing logged. */}
+          <View style={styles.rows}>
+            <OwedBanner />
+            <BillsRow />
+          </View>
+
+          {empty ? null : (
             <>
-              {totals && totals.topPayees.length > 0 ? (
-                <Animated.View entering={FadeInDown.delay(AFTER_CALENDAR_MS).duration(420)}>
-                  <Text variant="overline" color={t.textFaint} style={styles.label}>
-                    Mostly to
-                  </Text>
-                  <PayeeStrip payees={totals.topPayees} currency={currency} />
-                </Animated.View>
-              ) : null}
-
-              <View style={styles.rows}>
-                <OwedBanner />
-                <BillsRow />
-              </View>
-
               <View onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}>
                 <Text variant="overline" color={t.textFaint} style={styles.label}>
                   Every payment

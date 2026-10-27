@@ -106,6 +106,14 @@ function format(minor: number, currency: string, digits: number): string {
   }).format((digits === 0 ? Math.round(minor / 10 ** decimals) : minor / 10 ** decimals));
 }
 
+/**
+ * A payee's avatar letter. Plain string handling on purpose: a Unicode-property regex
+ * (`\p{L}`) is not something Hermes is known to run here.
+ */
+export function initialOf(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || '•';
+}
+
 /** The month's total: "₹85,786". */
 export function formatWhole(minor: number, currency: string): string {
   return format(minor, currency, 0);
