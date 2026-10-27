@@ -36,6 +36,11 @@ interface HabitCardProps {
    */
   onUnlog?: (habit: TodayHabit) => void;
   /**
+   * For a habit measured in minutes, steps or a count: opens the log sheet, where the day's
+   * real amount is set. Without it, "+" adds one step as before.
+   */
+  onAdjust?: (habit: TodayHabit) => void;
+  /**
    * A past day. The affordance becomes a status glyph rather than a control —
    * history is a record, and a tappable checkbox on a finished day would be an
    * invitation to rewrite it.
@@ -83,7 +88,7 @@ function metadataFor(habit: TodayHabit, readOnly: boolean): string {
  * completion affordance. It is the most distinctive thing in the design language:
  * a list of habits should read as a list of individual rituals, not as rows in a table.
  */
-export function HabitCard({ habit, onPress, onLog, onUnlog, readOnly = false }: HabitCardProps) {
+export function HabitCard({ habit, onPress, onLog, onUnlog, onAdjust, readOnly = false }: HabitCardProps) {
   const t = useTheme();
   const accent = accentFor(habit.color, t);
   const { Icon } = iconFor(habit.icon);
@@ -146,7 +151,9 @@ export function HabitCard({ habit, onPress, onLog, onUnlog, readOnly = false }: 
             accessibilityLabel={
               readOnly
                 ? `${habit.name} ${habit.todayComplete ? 'was completed' : 'was not completed'}`
-                : habit.todayComplete
+                : isCounter && onAdjust
+                  ? `Log ${habit.name}, ${formatHabitProgress(habit, habit.todayCount)}`
+                  : habit.todayComplete
                   ? `${habit.name} is complete for today`
                   : isCounter
                     ? `Add ${HABIT_MEASURES[measure].step} to ${habit.name}, ${formatHabitProgress(habit, habit.todayCount)}`
@@ -163,7 +170,8 @@ export function HabitCard({ habit, onPress, onLog, onUnlog, readOnly = false }: 
             // completed habit's check should read as an achievement, not a greyed-out control.
             onPress={() => {
               if (readOnly) return;
-              if (!habit.todayComplete) onLog(habit);
+              if (isCounter && onAdjust) onAdjust(habit);
+              else if (!habit.todayComplete) onLog(habit);
               else onUnlog?.(habit);
             }}
             style={styles.affordanceTarget}

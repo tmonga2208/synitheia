@@ -9,19 +9,19 @@ import {
 import { api, isQueued } from '../api/client.js';
 import { showToast } from '../feedback/toast.js';
 import { useAuth } from '../store/auth.js';
+import { withHabitCount } from './logAmount.js';
 import { tickMessage } from './tickCopy.js';
 
 type TodayHabit = TodayResponse['habits'][number];
 
 const TODAY_KEY = ['today'] as const;
+const LOG_KEY = ['habit-log'] as const;
 
-interface Step {
-  habit: TodayHabit;
+type Change =
   /** +1 adds one step of the habit's measure; -1 takes one back. */
-  direction: 1 | -1;
-  /** The day the tap was made on, so a tick sent after midnight still counts for it. */
-  localDate: LocalDate;
-}
+  | { habit: TodayHabit; kind: 'step'; direction: 1 | -1; localDate: LocalDate }
+  /** An exact total for the day, from the log sheet. */
+  | { habit: TodayHabit; kind: 'set'; count: number; localDate: LocalDate };
 
 /** Today on the user's calendar, the way the server counts their days. */
 function userToday(): LocalDate {
@@ -30,73 +30,77 @@ function userToday(): LocalDate {
   return todayLocalDate(zone);
 }
 
+function stepOf(habit: TodayHabit): number {
+  return HABIT_MEASURES[measureOf(habit)].step;
+}
+
 /**
- * Ticking a habit, and taking a tick back, the same way on every screen that lists habits.
+ * Ticking a habit, taking a tick back, and setting a day's exact amount, the same way on
+ * every screen that lists habits.
  *
- * Optimistic, because a checkbox that waits on a round trip feels broken: the card moves
- * at once and rolls back if the server refuses (the failure is reported by the mutation
- * cache in app/_layout.tsx). A tick is saved straight away, since the streak and XP hang on
- * it, and its toast offers Undo, which sends one step back. Tapping a ticked habit does
- * the same.
+ * Optimistic, because a checkbox that waits on a round trip feels broken. Quick taps overlap,
+ * so each change undoes only its own effect if refused, and Today is reloaded once the last
+ * change in a burst has landed: reloading after every tap showed the screen jumping back
+ * while later taps were still on their way.
  */
-export function useHabitLog(): { log: (habit: TodayHabit) => void; unlog: (habit: TodayHabit) => void } {
+export function useHabitLog(): {
+  log: (habit: TodayHabit) => void;
+  unlog: (habit: TodayHabit) => void;
+  setCount: (habit: TodayHabit, count: number) => void;
+} {
   const queryClient = useQueryClient();
 
-  const step = useMutation({
+  const change = useMutation({
+    mutationKey: LOG_KEY,
     meta: { failed: 'Couldn’t log that habit' },
-    mutationFn: ({ habit, direction, localDate }: Step) =>
-      // One tap moves one STEP of the habit's measure, not one unit: a step goal that moved
-      // 1 at a time would need 8,000 taps. Offline, it waits on the phone (src/offline).
+    mutationFn: (c: Change) =>
       api.offline.post<unknown>(
-        `/habits/${habit.id}/log`,
-        { localDate, increment: direction * HABIT_MEASURES[measureOf(habit)].step },
-        habit.name,
+        `/habits/${c.habit.id}/log`,
+        c.kind === 'set'
+          ? { localDate: c.localDate, count: c.count }
+          : { localDate: c.localDate, increment: c.direction * stepOf(c.habit) },
+        c.habit.name,
       ),
 
-    onMutate: async ({ habit, direction }: Step) => {
+    onMutate: async (c: Change) => {
       await queryClient.cancelQueries({ queryKey: TODAY_KEY });
-      const previous = queryClient.getQueryData<TodayResponse>(TODAY_KEY);
-
-      queryClient.setQueryData<TodayResponse>(TODAY_KEY, (current) =>
-        current
-          ? {
-              ...current,
-              habits: current.habits.map((h) => {
-                if (h.id !== habit.id) return h;
-                const todayCount = Math.max(
-                  0,
-                  h.todayCount + direction * HABIT_MEASURES[measureOf(h)].step,
-                );
-                return { ...h, todayCount, todayComplete: todayCount >= h.targetCount };
-              }),
-            }
-          : current,
-      );
-
-      return { previous };
+      const current = queryClient.getQueryData<TodayResponse>(TODAY_KEY);
+      const before = current?.habits.find((h) => h.id === c.habit.id)?.todayCount ?? c.habit.todayCount;
+      const after = c.kind === 'set' ? c.count : Math.max(0, before + c.direction * stepOf(c.habit));
+      if (current) queryClient.setQueryData(TODAY_KEY, withHabitCount(current, c.habit.id, () => after));
+      return { delta: after - before, after };
     },
 
-    onSuccess: (_result, { habit, direction, localDate }) => {
-      if (direction === -1) return;
-      const count = habit.todayCount + HABIT_MEASURES[measureOf(habit)].step;
+    onSuccess: (_result, c, context) => {
+      if (c.kind === 'step' && c.direction === -1) return;
+      const count = context?.after ?? c.habit.todayCount;
       showToast({
-        message: tickMessage(habit, count),
+        message: tickMessage(c.habit, count),
         action: {
           label: 'Undo',
-          // The habit as it now is, so the step back lands where the tick left it.
           onPress: () =>
-            step.mutate({ habit: { ...habit, todayCount: count }, direction: -1, localDate }),
+            change.mutate(
+              c.kind === 'set'
+                ? { habit: c.habit, kind: 'set', count: c.habit.todayCount, localDate: c.localDate }
+                : { habit: { ...c.habit, todayCount: count }, kind: 'step', direction: -1, localDate: c.localDate },
+            ),
         },
       });
     },
 
-    onError: (_error, _step, context) => {
-      if (context?.previous) queryClient.setQueryData(TODAY_KEY, context.previous);
+    // Only this change's own effect comes off; other taps still in flight keep theirs.
+    onError: (_error, c, context) => {
+      const current = queryClient.getQueryData<TodayResponse>(TODAY_KEY);
+      if (current && context) {
+        queryClient.setQueryData(TODAY_KEY, withHabitCount(current, c.habit.id, (n) => n - context.delta));
+      }
     },
 
     // Still on the phone: the card already shows it, and the sync refetches when it lands.
     onSettled: (result) => {
       if (isQueued(result)) return;
+      // This change still counts as running here; reload only when it is the last.
+      if (queryClient.isMutating({ mutationKey: LOG_KEY }) > 1) return;
       void queryClient.invalidateQueries({ queryKey: TODAY_KEY });
       // A log recomputes the streak, which the habit lists and history render.
       void queryClient.invalidateQueries({ queryKey: ['habits'] });
@@ -105,7 +109,8 @@ export function useHabitLog(): { log: (habit: TodayHabit) => void; unlog: (habit
   });
 
   return {
-    log: (habit) => step.mutate({ habit, direction: 1, localDate: userToday() }),
-    unlog: (habit) => step.mutate({ habit, direction: -1, localDate: userToday() }),
+    log: (habit) => change.mutate({ habit, kind: 'step', direction: 1, localDate: userToday() }),
+    unlog: (habit) => change.mutate({ habit, kind: 'step', direction: -1, localDate: userToday() }),
+    setCount: (habit, count) => change.mutate({ habit, kind: 'set', count, localDate: userToday() }),
   };
 }
