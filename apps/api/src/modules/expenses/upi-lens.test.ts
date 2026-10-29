@@ -186,6 +186,21 @@ describe('parseStatementTextWithUpiLens', () => {
     expect(init).toMatchObject({ method: 'POST', body: JSON.stringify({ text: 'statement text' }) });
   });
 
+  it('sends the shared key when one is configured, and none otherwise', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () =>
+        new Response(JSON.stringify({ success: true, layout: 'SBI', transactions: [] }), { status: 200 }),
+      );
+
+    await parseStatementTextWithUpiLens({ ...env, UPI_LENS_API_KEY: 'k3y' } as Env, 'statement text');
+    await parseStatementTextWithUpiLens(env, 'statement text');
+
+    const headersOf = (call: number) => new Headers(fetchSpy.mock.calls[call]![1]!.headers);
+    expect(headersOf(0).get('x-api-key')).toBe('k3y');
+    expect(headersOf(1).has('x-api-key')).toBe(false);
+  });
+
   it('makes no request when no parser is configured', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 

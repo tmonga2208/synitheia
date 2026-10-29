@@ -76,6 +76,11 @@ const envSchema = z
      * quiet spell always fell through to the model.
      */
     UPI_LENS_API_URL: z.string().url().default('https://upi-lens-api.vercel.app'),
+    /**
+     * The key upi-lens checks once its own UPI_LENS_API_KEY is set. Statements are bank
+     * history; without the key the service would parse them for anyone who asked.
+     */
+    UPI_LENS_API_KEY: z.string().optional(),
 
     /**
      * Statement Inbox — inbound email ingestion. Optional: absent, the inbox endpoints
