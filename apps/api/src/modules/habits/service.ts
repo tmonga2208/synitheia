@@ -403,12 +403,18 @@ export async function scheduledOn(
   userId: string,
   localDate: LocalDate,
 ): Promise<HabitLean[]> {
-  const habits = await listHabits(userId, true);
+  const [habits, logged] = await Promise.all([
+    listHabits(userId, true),
+    // A habit logged on the day counts on it, even if it was created afterwards: someone
+    // filling in last week from the history calendar did do those habits then.
+    HabitLogModel.distinct('habitId', { userId: new Types.ObjectId(userId), localDate }),
+  ]);
+  const loggedIds = new Set(logged.map(String));
   const dayEnd = new Date(`${addLocalDays(localDate, 1)}T00:00:00Z`);
 
   return habits.filter((h) => {
     const createdAt = h.createdAt;
-    if (createdAt && createdAt.getTime() >= dayEnd.getTime()) return false;
+    if (createdAt && createdAt.getTime() >= dayEnd.getTime()) return loggedIds.has(String(h._id));
     if (h.archivedAt && h.archivedAt.getTime() < dayEnd.getTime() - 86_400_000) {
       return false;
     }

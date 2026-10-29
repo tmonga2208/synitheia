@@ -10,7 +10,7 @@ import {
   XpAwardModel,
 } from '../../db/models.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
-import { logHabit } from './service.js';
+import { logHabit, scheduledOn } from './service.js';
 
 let mongo: MongoMemoryReplSet;
 
@@ -133,5 +133,30 @@ describe('completing a habit for an earlier day', () => {
     const [event] = await completions(user.id);
     expect(event!.localDate).toBe(todayLocalDate(IST));
     expect(new Date(event!.timestamp).getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+});
+
+/**
+ * A day's ring counts the habits that existed on it. A habit created today and ticked for
+ * three days ago did exist, as far as that day's record goes: leaving it out showed the day
+ * at 0% under a fully ticked list.
+ */
+describe('which habits count on an earlier day', () => {
+  it('counts a habit created later when it was logged on that day', async () => {
+    const user = await seedUser();
+    const habit = await seedHabit(user.id);
+    const threeDaysAgo = addLocalDays(todayLocalDate(IST), -3);
+
+    await logHabit(user, habit._id.toString(), { localDate: threeDaysAgo, count: 1 });
+
+    const ids = (await scheduledOn(user.id, threeDaysAgo)).map((h) => h._id.toString());
+    expect(ids).toEqual([habit._id.toString()]);
+  });
+
+  it('still leaves out a habit that did not exist and was not logged that day', async () => {
+    const user = await seedUser();
+    await seedHabit(user.id);
+
+    expect(await scheduledOn(user.id, addLocalDays(todayLocalDate(IST), -3))).toEqual([]);
   });
 });
