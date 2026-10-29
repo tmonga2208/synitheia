@@ -285,6 +285,22 @@ function isPasswordException(err: unknown): err is { name: string; code: number 
 }
 
 /**
+ * pdf-parse 1.1 bundles pdf.js 1.10, which keeps state between documents in one process and
+ * now and then throws "bad XRef entry" or "Invalid PDF structure" on a valid file, usually
+ * right after it was handed a broken one. The same buffer opens on the next attempt, so a
+ * structural failure is tried once more before the user is told the PDF is unreadable. A
+ * password failure is final and goes straight back.
+ */
+async function parseWithRetry<S, R>(parse: (source: S) => Promise<R>, source: S): Promise<R> {
+  try {
+    return await parse(source);
+  } catch (err) {
+    if (isPasswordException(err)) throw err;
+    return parse(source);
+  }
+}
+
+/**
  * @param password The statement's open password, when the user has supplied one. Bank
  *   e-statements in India are almost always locked with one (a PAN, a date of birth, a
  *   customer id). It is used to open the document and is never logged or stored — it is
@@ -306,7 +322,7 @@ export async function ingestPdf(
     // pdf-parse hands its first argument straight to pdf.js's getDocument, which accepts
     // either a buffer or a {data, password} source. Passing the object is the only way to
     // open a locked document; there is no password option on pdf-parse itself.
-    const parsed = await pdfParse(password ? { data: buffer, password } : buffer);
+    const parsed = await parseWithRetry(pdfParse, password ? { data: buffer, password } : buffer);
     text = parsed.text;
   } catch (err) {
     if (isPasswordException(err)) {
