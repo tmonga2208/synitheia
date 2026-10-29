@@ -44,7 +44,7 @@ import { LogAmountSheet } from '../../src/habits/LogAmountSheet.js';
 import { useSourcePrefsMirror } from '../../src/sync/useSourcePrefsMirror.js';
 import { useHealthSync } from '../../src/health/useHealthSync.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
+import { MIN_TAP_TARGET, TAB_BAR_CLEARANCE, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 
@@ -493,8 +493,7 @@ const makeStyles = (t: Theme) =>
     screen: { flex: 1, backgroundColor: t.bg },
     content: {
       paddingHorizontal: spacing.xl,
-      // Clears the floating tab bar, so the last habit can be scrolled fully into view.
-      paddingBottom: 120,
+      paddingBottom: TAB_BAR_CLEARANCE,
     },
     header: {
       flexDirection: 'row',

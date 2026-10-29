@@ -22,7 +22,7 @@ import { TrackerTile } from '../../src/components/TrackerTile.js';
 import { api } from '../../src/api/client.js';
 import { useAddWater } from '../../src/water/useAddWater.js';
 import { useAuth } from '../../src/store/auth.js';
-import { radius, spacing } from '../../src/theme/theme.js';
+import { TAB_BAR_CLEARANCE, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 
@@ -232,7 +232,7 @@ export default function Trackers() {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg, paddingBottom: spacing.xl },
+    content: { padding: spacing.lg, paddingBottom: TAB_BAR_CLEARANCE },
     title: { marginTop: spacing.xs, marginBottom: spacing.xl },
 
     grid: { gap: spacing.md, marginBottom: spacing['2xl'] },

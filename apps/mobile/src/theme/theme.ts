@@ -184,6 +184,12 @@ export const motion = {
 /** Below this, a touch target fails accessibility guidance on both platforms. */
 export const MIN_TAP_TARGET = 44;
 
+/**
+ * Space to leave under the last thing on a tab screen. The tab bar floats over the content,
+ * so without it the last habit on Today and Sign out on You sat underneath it.
+ */
+export const TAB_BAR_CLEARANCE = 120;
+
 /* ──────────────────────────────── habit accents ──────────────────────────────── */
 
 /**

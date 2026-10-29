@@ -27,7 +27,7 @@ import { SkeletonList } from '../../src/components/Skeleton.js';
 import { signOutMessage } from '../../src/offline/copy.js';
 import { useOutbox } from '../../src/offline/outbox.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, motion, radius, spacing } from '../../src/theme/theme.js';
+import { MIN_TAP_TARGET, TAB_BAR_CLEARANCE, motion, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles, useThemePreference } from '../../src/theme/ThemeProvider.js';
 import type { ThemePreference } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
@@ -446,7 +446,7 @@ const makeStyles = (t: Theme) =>
     screen: { flex: 1, backgroundColor: t.bg },
     content: {
       paddingHorizontal: spacing.xl,
-      paddingBottom: spacing.xl,
+      paddingBottom: TAB_BAR_CLEARANCE,
     },
     header: {
       alignItems: 'center',
