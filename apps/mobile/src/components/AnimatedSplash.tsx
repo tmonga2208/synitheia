@@ -22,7 +22,8 @@ const EXIT_MS = 260;
  *
  * The phone's own splash can only show a still image, so this draws an identical copy on
  * top of it, hides the native one underneath (nothing visibly changes), and once the app is
- * ready spins each arc a full turn, inner first, before easing out to reveal the app.
+ * ready turns each arc once, inner first and alternating direction, before easing out to
+ * reveal the app.
  *
  * It follows the SYSTEM light/dark setting, not the app's theme override, because that is
  * what the native splash it replaces follows. The scheme is read once, on mount: that is
@@ -74,9 +75,10 @@ export function AnimatedSplash({ ready, onDone }: { ready: boolean; onDone: () =
 
   const containerStyle = useAnimatedStyle(() => ({ opacity: 1 - exit.value }));
   const logoStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + exit.value * 0.08 }] }));
+  // Alternate directions: inner and outer turn clockwise, the middle one against them.
   const spinStyles = [
     useAnimatedStyle(() => ({ transform: [{ rotate: `${spins[0].value * 360}deg` }] })),
-    useAnimatedStyle(() => ({ transform: [{ rotate: `${spins[1].value * 360}deg` }] })),
+    useAnimatedStyle(() => ({ transform: [{ rotate: `${spins[1].value * -360}deg` }] })),
     useAnimatedStyle(() => ({ transform: [{ rotate: `${spins[2].value * 360}deg` }] })),
   ];
 
