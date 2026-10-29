@@ -6,6 +6,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
+import { AnimatedSplash } from '../src/components/AnimatedSplash.js';
 import {
   Manrope_400Regular,
   Manrope_500Medium,
@@ -286,16 +287,22 @@ export default function RootLayout() {
   // one frame before a stored theme override was known. See the doc on `useThemeHydrated`.
   const themeHydrated = useThemeHydrated();
 
-  useEffect(() => {
-    // Hide the splash once EVERYTHING the first paint depends on is ready — fonts (or a
-    // font error, so a 404'd font can't wedge the splash forever) AND the theme
-    // preference. Hiding on fonts alone would reveal a render that might still flip
-    // themes a moment later.
-    if ((fontsLoaded || fontError) && themeHydrated) void SplashScreen.hideAsync();
-  }, [fontsLoaded, fontError, themeHydrated]);
+  // The app renders once EVERYTHING the first paint depends on is ready — fonts (or a
+  // font error, so a 404'd font can't wedge the splash forever) AND the theme preference.
+  // Revealing it on fonts alone could show a render that flips themes a moment later. The
+  // animated splash covers the wait, takes over from the native one, and leaves after.
+  const ready = (fontsLoaded || !!fontError) && themeHydrated;
+  const [splashDone, setSplashDone] = useState(false);
 
-  if ((!fontsLoaded && !fontError) || !themeHydrated) return null;
+  return (
+    <>
+      {ready ? <App /> : null}
+      {splashDone ? null : <AnimatedSplash ready={ready} onDone={() => setSplashDone(true)} />}
+    </>
+  );
+}
 
+function App() {
   return (
     // The OUTER boundary — static light, no `themed` prop. Wraps <ThemeProvider> itself, so
     // it is the only thing that can catch a crash IN the provider, where useTheme() is not
