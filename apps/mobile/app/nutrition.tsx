@@ -22,6 +22,8 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { ProgressRing } from '../src/components/ProgressRing.js';
+import { WeekStrip } from '../src/components/WeekStrip.js';
+import { summarizeWeek, weekOf } from '../src/today/week.js';
 import { api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
 import { radius, spacing } from '../src/theme/theme.js';
@@ -128,6 +130,8 @@ export default function NutritionScreen() {
 
   const totals = data.daily.totals;
   const percent = (totals.calories / target) * 100;
+  const week = weekOf(today.data, (d) => d.calories, totals.calories);
+  const usual = week ? summarizeWeek(week).usual : null;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -150,7 +154,7 @@ export default function NutritionScreen() {
         <Text variant="title">Food</Text>
 
         <View style={styles.ring}>
-          <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={26}>
+          <ProgressRing percent={percent} color={ACCENT.base} size={168} strokeWidth={22}>
             <Text variant="title">{Math.round(totals.calories).toLocaleString()}</Text>
             <Text variant="caption" color={t.textMuted}>
               of {target.toLocaleString()} kcal
@@ -202,6 +206,27 @@ export default function NutritionScreen() {
           </Touchable>
         </View>
 
+        {week ? (
+          <Card style={styles.week}>
+            <View style={styles.weekHeader}>
+              <Text variant="label">Last 7 days</Text>
+              <Text variant="caption" color={t.textMuted}>
+                {usual != null
+                  ? `Usually ${Math.round(usual).toLocaleString()} kcal`
+                  : `Target ${target.toLocaleString()} kcal`}
+              </Text>
+            </View>
+            <WeekStrip
+              days={week}
+              target={target}
+              highlightMet={false}
+              color={ACCENT.base}
+              format={(kcal) => Math.round(kcal).toLocaleString()}
+              describe={(kcal) => `${Math.round(kcal)} kilocalories`}
+            />
+          </Card>
+        ) : null}
+
         {data.items.length === 0 ? (
           <EmptyState
             icon={<UtensilsCrossed size={26} color={t.onAccent} strokeWidth={1.6} />}
@@ -224,18 +249,23 @@ export default function NutritionScreen() {
                   action={`${Math.round(kcal)} kcal`}
                 />
 
-                {entries.map((entry) => (
-                  <Card key={entry._id} style={styles.entry} padded={false}>
-                    <View style={styles.entryRow}>
+                <Card padded={false}>
+                  {entries.map((entry, index) => (
+                    <View
+                      key={entry._id}
+                      style={[styles.entryRow, index > 0 && styles.divider]}
+                    >
                       <View style={{ flex: 1 }}>
                         <View style={styles.entryTitle}>
-                          <Text variant="cardTitle" numberOfLines={1}>
+                          <Text variant="bodyMedium" numberOfLines={1}>
                             {entry.name}
                           </Text>
 
                           {/* Estimated, not measured — and it says so, for good. */}
                           {entry.source === 'inferred' ? (
-                            <View style={[styles.estimated, { backgroundColor: ACCENT.wash }]}>
+                            <View
+                              style={[styles.estimated, { backgroundColor: ACCENT.wash }]}
+                            >
                               <Camera size={11} color={ACCENT.text} strokeWidth={2} />
                               <Text variant="caption" color={ACCENT.text}>
                                 estimated
@@ -247,8 +277,8 @@ export default function NutritionScreen() {
                         <Text variant="caption" color={t.textMuted}>
                           {Math.round(entry.macros.calories)} kcal ·{' '}
                           {Math.round(entry.macros.proteinG)}p ·{' '}
-                          {Math.round(entry.macros.carbsG)}c · {Math.round(entry.macros.fatG)}f
-                          {'  ·  '}
+                          {Math.round(entry.macros.carbsG)}c ·{' '}
+                          {Math.round(entry.macros.fatG)}f{'  ·  '}
                           {time.format(new Date(entry.loggedAt))}
                         </Text>
                       </View>
@@ -262,8 +292,8 @@ export default function NutritionScreen() {
                         <Trash2 size={16} color={t.textFaint} strokeWidth={1.7} />
                       </Touchable>
                     </View>
-                  </Card>
-                ))}
+                  ))}
+                </Card>
               </View>
             );
           })
@@ -294,31 +324,44 @@ const makeStyles = (t: Theme) =>
       justifyContent: 'center',
       marginLeft: -spacing.md,
     },
-    ring: { alignItems: 'center', marginVertical: spacing.xl },
+    ring: { alignItems: 'center', marginVertical: spacing.lg },
+    week: { marginBottom: spacing.xl, gap: spacing.base },
+    weekHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+    },
+    divider: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: t.border,
+    },
     macros: {
       flexDirection: 'row',
       justifyContent: 'space-around',
       marginBottom: spacing.xl,
     },
     macro: { alignItems: 'center' },
-    addActions: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing['2xl'] },
+    addActions: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginBottom: spacing.lg,
+    },
     addAction: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing.sm,
-      minHeight: 88,
+      minHeight: 64,
       borderRadius: radius.md,
       backgroundColor: t.surfaceRaised,
       borderWidth: 1,
       borderColor: t.border,
     },
     mealGroup: { marginBottom: spacing.xl },
-    entry: { marginBottom: spacing.sm },
     entryRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: spacing.base,
+      paddingVertical: spacing.md,
       paddingLeft: spacing.lg,
       paddingRight: spacing.sm,
     },
@@ -326,7 +369,7 @@ const makeStyles = (t: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
-      marginBottom: spacing.xs,
+      marginBottom: 2,
     },
     // Fill comes from ACCENT, a runtime value — applied inline at the call site.
     estimated: {
@@ -337,7 +380,12 @@ const makeStyles = (t: Theme) =>
       paddingVertical: 2,
       borderRadius: radius.full,
     },
-    delete: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    delete: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     footnote: {
       flexDirection: 'row',
       alignItems: 'flex-start',

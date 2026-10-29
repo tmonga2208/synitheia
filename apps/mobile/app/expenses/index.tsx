@@ -14,6 +14,7 @@ import {
   todayLocalDate,
   type LocalDate,
   type MonthKey,
+  type TargetsView,
 } from '@synitheia/shared';
 import {
   Button,
@@ -33,6 +34,7 @@ import { PayeeStrip } from '../../src/expenses/PayeeStrip.js';
 import { PaymentRow } from '../../src/expenses/PaymentRow.js';
 import { MonthSkeleton } from '../../src/expenses/MonthSkeleton.js';
 import type { WireExpenseTotals } from '../../src/expenses/monthTotal.js';
+import { budgetLine } from '../../src/expenses/budgetLine.js';
 import {
   calendarCells,
   comparisonLine,
@@ -43,7 +45,7 @@ import {
   previousComparable,
 } from '../../src/expenses/monthView.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
-import type { Theme } from '../../src/theme/theme.js';
+import { accentFor, type Theme } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 
 /** Payments per page. The month's total, calendar and payees come from totals, not the list. */
@@ -134,9 +136,17 @@ export default function Expenses() {
   const query = useInfiniteQuery(expensePagesQuery(month, chase));
   const totalsQuery = useQuery(monthTotalQuery(month));
   const previousQuery = useQuery(monthTotalQuery(previous));
+  // The same query the Targets screen edits, so a new budget shows here at once.
+  const targetsQuery = useQuery({
+    queryKey: ['targets'],
+    queryFn: () => api.get<TargetsView>('/me/targets'),
+  });
   const totals = totalsQuery.data ? normalizeTotals(totalsQuery.data) : null;
 
-  const items = useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data]);
+  const items = useMemo(
+    () => query.data?.pages.flatMap((p) => p.items) ?? [],
+    [query.data],
+  );
   const days = useMemo(() => groupByDay(items), [items]);
   const cells = useMemo(
     () => calendarCells(month, totals?.byDay ?? {}, today),
@@ -156,6 +166,10 @@ export default function Expenses() {
       previousLabel: prev.label,
     });
   }, [totals, previousQuery.data, previous, month, currentMonth, today]);
+
+  const budget = totals
+    ? budgetLine(totals.totalMinor, targetsQuery.data?.monthlyBudgetMinor, currency)
+    : null;
 
   // Where each day's payments start, so tapping a day can bring them into view.
   const scrollRef = useRef<ScrollView>(null);
@@ -329,6 +343,15 @@ export default function Expenses() {
               <Text variant="body" color={t.textMuted} center>
                 {comparison ?? ' '}
               </Text>
+              {budget ? (
+                <Text
+                  variant="label"
+                  color={budget.over ? accentFor('#C08A7D', t).text : t.textMuted}
+                  center
+                >
+                  {budget.text}
+                </Text>
+              ) : null}
             </View>
 
             <MonthCalendar
@@ -381,7 +404,10 @@ export default function Expenses() {
                           scrollToDay(day.localDate, y);
                         }
                       }}
-                      style={[styles.day, highlighted === day.localDate && styles.highlight]}
+                      style={[
+                        styles.day,
+                        highlighted === day.localDate && styles.highlight,
+                      ]}
                     >
                       <View style={styles.dayHeader}>
                         <Text variant="label" color={t.textMuted}>
@@ -430,7 +456,12 @@ export default function Expenses() {
                     />
                   ) : null}
                   {query.isFetchNextPageError ? (
-                    <Text variant="caption" color={t.textMuted} center style={styles.moreError}>
+                    <Text
+                      variant="caption"
+                      color={t.textMuted}
+                      center
+                      style={styles.moreError}
+                    >
                       Those payments could not be loaded. Try again.
                     </Text>
                   ) : null}
@@ -479,7 +510,11 @@ const makeStyles = (t: Theme) =>
     label: { marginTop: spacing['2xl'], marginBottom: spacing.md },
     rows: { gap: spacing.sm, marginTop: spacing.xl },
     empty: { marginTop: spacing.xl },
-    day: { marginTop: spacing.base, borderRadius: radius.md, paddingHorizontal: spacing.xs },
+    day: {
+      marginTop: spacing.base,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.xs,
+    },
     highlight: { backgroundColor: t.accentWash },
     dayHeader: {
       flexDirection: 'row',

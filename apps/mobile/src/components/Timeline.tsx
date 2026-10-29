@@ -48,58 +48,81 @@ function durationText(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
+/** A timeline line: what happened, and its number, which sits on the right. */
+interface Line {
+  text: string;
+  value?: string;
+}
+
 /**
- * A PersonalEvent as a sentence a human would say.
+ * A PersonalEvent as a short line: the thing on the left, its amount on the right.
+ *
+ * Kept short on purpose. A day reads as a list of names with their numbers lined up,
+ * not as a column of sentences — "Metro card ₹489" scans, "₹489 spent at Metro card ·
+ * Transport" has to be read.
  *
  * Exhaustive over the discriminated union so a new event type is a type error here, not a
  * silent fallback in production; EVENT_TYPE_LABEL only ever covers a genuinely unknown
  * payload.
  */
-function describe(metadata: EventMetadata, numbers: Intl.NumberFormat): string {
+function describe(metadata: EventMetadata, numbers: Intl.NumberFormat): Line {
   switch (metadata.type) {
-    case 'expense.created': {
-      const money = formatMoney(asMinor(metadata.amountMinor), metadata.currency);
-      const where = metadata.merchant ? ` at ${metadata.merchant}` : '';
-      return `${money} spent${where} · ${metadata.categoryName}`;
-    }
-    case 'expense.detected': {
-      const money = formatMoney(asMinor(metadata.amountMinor), metadata.currency);
-      return metadata.merchant ? `${money} at ${metadata.merchant}` : `${money} charged`;
-    }
+    case 'expense.created':
+      return {
+        text: metadata.merchant || metadata.categoryName,
+        value: formatMoney(asMinor(metadata.amountMinor), metadata.currency),
+      };
+    case 'expense.detected':
+      return {
+        text: metadata.merchant || 'A charge',
+        value: formatMoney(asMinor(metadata.amountMinor), metadata.currency),
+      };
     case 'habit.completed':
-      return `${metadata.habitName} completed`;
+      return { text: metadata.habitName, value: 'Done' };
     case 'habit.missed':
-      return `${metadata.habitName} missed`;
+      return { text: metadata.habitName, value: 'Missed' };
     case 'food.logged':
-      return `${metadata.foodName} for ${metadata.mealType} · ${numbers.format(
-        roundedInt(metadata.calories),
-      )} kcal`;
+      return {
+        text: metadata.foodName,
+        value: `${numbers.format(roundedInt(metadata.calories))} kcal`,
+      };
     case 'water.logged':
-      return `${formatVolume(metadata.amountMl)} water`;
+      return { text: 'Water', value: formatVolume(metadata.amountMl) };
     case 'workout.detected':
-      return `${metadata.activity} · ${durationText(metadata.durationMin)}`;
+      return { text: metadata.activity, value: durationText(metadata.durationMin) };
     case 'steps.recorded':
-      return `${numbers.format(metadata.steps)} steps`;
+      return { text: 'Steps', value: numbers.format(metadata.steps) };
     case 'sleep.detected':
-      return `${durationText(metadata.durationMin)} of sleep`;
+      return { text: 'Sleep', value: durationText(metadata.durationMin) };
     case 'location.arrived':
-      return metadata.placeLabel ? `Arrived at ${metadata.placeLabel}` : 'Arrived somewhere new';
+      return {
+        text: metadata.placeLabel
+          ? `Arrived at ${metadata.placeLabel}`
+          : 'Arrived somewhere new',
+      };
     case 'location.departed':
-      return metadata.placeLabel
-        ? `Left ${metadata.placeLabel} after ${durationText(metadata.dwellMin)}`
-        : `Left after ${durationText(metadata.dwellMin)}`;
+      return {
+        text: metadata.placeLabel ? `Left ${metadata.placeLabel}` : 'Left',
+        value: durationText(metadata.dwellMin),
+      };
     case 'calendar.started':
-      return metadata.isAllDay
-        ? `${metadata.title} · all day`
-        : `${metadata.title} · ${durationText(metadata.durationMin)}`;
+      return {
+        text: metadata.title,
+        value: metadata.isAllDay ? 'All day' : durationText(metadata.durationMin),
+      };
     case 'calendar.completed':
-      return `${metadata.title} ended`;
+      return { text: `${metadata.title} ended` };
     case 'reminder.completed':
-      return `${metadata.label} · done`;
-    case 'weather.observed':
-      return `${roundedInt(metadata.tempC)}°C · ${metadata.conditionCode.replace(/[_-]/g, ' ')}`;
+      return { text: metadata.label, value: 'Done' };
+    case 'weather.observed': {
+      const condition = metadata.conditionCode.replace(/[_-]/g, ' ');
+      return {
+        text: condition.charAt(0).toUpperCase() + condition.slice(1),
+        value: `${roundedInt(metadata.tempC)}°C`,
+      };
+    }
     case 'weight.logged':
-      return `Weighed ${metadata.weightKg.toFixed(1)} kg`;
+      return { text: 'Weighed', value: `${metadata.weightKg.toFixed(1)} kg` };
   }
 }
 
@@ -208,7 +231,12 @@ export function Timeline({ events, timezone }: TimelineProps) {
   );
 
   const hourFormat = useMemo(
-    () => new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: timezone }),
+    () =>
+      new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        hour12: false,
+        timeZone: timezone,
+      }),
     [timezone],
   );
 
@@ -230,7 +258,8 @@ export function Timeline({ events, timezone }: TimelineProps) {
     for (const event of events) {
       // The user's hour, not the device's — a trip abroad must not reshuffle their day.
       const hour = Number(hourFormat.format(toInstant(event.timestamp)));
-      const bucket = made.find((b) => hour >= b.part.from && hour < b.part.to) ?? made[2]!;
+      const bucket =
+        made.find((b) => hour >= b.part.from && hour < b.part.to) ?? made[2]!;
 
       bucket.events.push(event);
 
@@ -369,7 +398,10 @@ function PartBlock({
               // Confidence below 1 means no human asserted it. The user must always be able
               // to tell what they entered from what we guessed.
               const inferred = event.confidence < 1;
-              const sentence = describe(event.metadata, numbers) || EVENT_TYPE_LABEL[event.type];
+              const line = describe(event.metadata, numbers) ?? {
+                text: EVENT_TYPE_LABEL[event.type],
+              };
+              const sentence = line.value ? `${line.text}, ${line.value}` : line.text;
               const color = DOMAIN_COLOR[domainOf(event.type)];
 
               return (
@@ -390,9 +422,9 @@ function PartBlock({
                     style={[
                       styles.rowDot,
                       inferred
-                        // Hollow against the Card it sits in (t.surface, not t.bg) — the ring
-                        // reads "empty" by matching its surroundings.
-                        ? { borderColor: color, backgroundColor: t.surface }
+                        ? // Hollow against the Card it sits in (t.surface, not t.bg) — the ring
+                          // reads "empty" by matching its surroundings.
+                          { borderColor: color, backgroundColor: t.surface }
                         : { backgroundColor: color },
                     ]}
                   />
@@ -401,9 +433,15 @@ function PartBlock({
                     variant="body"
                     color={inferred ? t.textMuted : t.textPrimary}
                     style={styles.sentence}
+                    numberOfLines={1}
                   >
-                    {sentence}
+                    {line.text}
                   </Text>
+                  {line.value ? (
+                    <Text variant="label" color={t.textMuted} style={styles.value}>
+                      {line.value}
+                    </Text>
+                  ) : null}
                 </View>
               );
             })}
@@ -415,8 +453,10 @@ function PartBlock({
                 </Text>
                 <View style={[styles.rowDot, { backgroundColor: DOMAIN_COLOR.water }]} />
                 <Text variant="body" color={t.textPrimary} style={styles.sentence}>
-                  {formatVolume(bucket.waterMl)} water · {bucket.waterLogs} glass
-                  {bucket.waterLogs === 1 ? '' : 'es'}
+                  {`Water · ${bucket.waterLogs} glass${bucket.waterLogs === 1 ? '' : 'es'}`}
+                </Text>
+                <Text variant="label" color={t.textMuted} style={styles.value}>
+                  {formatVolume(bucket.waterMl)}
                 </Text>
               </View>
             ) : null}
@@ -445,11 +485,18 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.lg,
     paddingRight: spacing.lg,
     paddingBottom: spacing.lg,
-    gap: spacing.base,
+    gap: spacing.md,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  value: { fontVariant: ['tabular-nums'] },
   time: { width: 62, textAlign: 'right' },
-  rowDot: { width: 8, height: 8, borderRadius: radius.full, borderWidth: 1, borderColor: 'transparent' },
+  rowDot: {
+    width: 8,
+    height: 8,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
   sentence: { flex: 1 },
 
   empty: { alignItems: 'center', paddingVertical: spacing.xl },
