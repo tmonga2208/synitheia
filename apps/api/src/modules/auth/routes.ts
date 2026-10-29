@@ -249,6 +249,40 @@ export async function registerAuthRoutes(app: FastifyInstance, env: Env): Promis
     return { user: publicUser(user), preferences };
   });
 
+  // ─── Sign-in methods ──────────────────────────────────────────────────────
+  //
+  // One account, several ways in: someone who signed up with Google can add a password,
+  // and someone who signed up with email can connect Google or Apple. Both act on the
+  // signed-in account, so there is never a second account to merge.
+
+  api.post(
+    '/me/password',
+    {
+      onRequest: [app.requireAuth],
+      config: { rateLimit: { max: 10, timeWindow: '10 minutes' } },
+      schema: {
+        body: z.object({
+          newPassword: passwordSchema,
+          /** Required when the account already has a password. */
+          currentPassword: z.string().max(200).optional(),
+        }),
+      },
+    },
+    async (req) => ({ user: publicUser(await service.setPassword(req.user.id, req.body)) }),
+  );
+
+  api.post(
+    '/me/link',
+    {
+      onRequest: [app.requireAuth],
+      config: { rateLimit: { max: 20, timeWindow: '10 minutes' } },
+      schema: {
+        body: z.object({ provider: z.enum(['apple', 'google']), idToken: z.string().min(1) }),
+      },
+    },
+    async (req) => ({ user: publicUser(await service.linkSocial(env, req.user.id, req.body)) }),
+  );
+
   // ─── Targets ──────────────────────────────────────────────────────────────
   //
   // Read and write the water/calorie/budget numbers on their own, outside the onboarding

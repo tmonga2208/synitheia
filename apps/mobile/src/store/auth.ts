@@ -142,6 +142,93 @@ interface AuthState {
   signOut: () => Promise<void>;
   /** Finish a forgotten-password reset with the emailed code; signs straight in. */
   resetPassword: (input: { email: string; code: string; password: string }) => Promise<void>;
+  /** Connect Google or Apple to the signed-in account. False when the person cancelled. */
+  connect: (provider: 'google' | 'apple') => Promise<boolean>;
+  /** Add a password to the signed-in account, or change it (then the current one is needed). */
+  setPassword: (input: { newPassword: string; currentPassword?: string }) => Promise<void>;
+}
+
+/**
+ * Apple's identity token and the name it shares only the first time, or null when the
+ * person cancelled. Used both to sign in and to connect Apple to an account.
+ */
+async function appleIdentity(): Promise<{ idToken: string; name: string | null } | null> {
+  try {
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+    if (!credential.identityToken) throw new Error('Apple did not return an identity token.');
+
+    // Apple hands over the name ONLY on the very first authorization for this app.
+    // Every subsequent sign-in — including after a reinstall — returns null, and the
+    // name is not in the identity token either. If we do not capture and forward it
+    // now, it is gone permanently and the account is stuck being called "there".
+    const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+      .filter((part): part is string => Boolean(part))
+      .join(' ')
+      .trim();
+    return { idToken: credential.identityToken, name: fullName.length > 0 ? fullName : null };
+  } catch (error) {
+    if (isUserCancellation(error)) return null;
+    throw error;
+  }
+}
+
+/**
+ * Google's identity token, or null when the person cancelled.
+ *
+ * Authorization code + PKCE, NOT the implicit id_token flow.
+ *
+ * Google does not support `response_type=id_token` for installed apps — that is a Web
+ * client feature, and a web client may only redirect to https, which a native app has
+ * no way to receive. An iOS/Android client must ask for a `code` and exchange it.
+ *
+ * PKCE is what makes that exchange safe without a client secret (and a native app can
+ * never hold a secret — it ships inside the binary). The code that comes back through
+ * the browser is useless to anyone who did not generate the verifier, and the ID token
+ * itself never travels through the redirect at all: it is fetched directly from
+ * Google's token endpoint over TLS.
+ */
+async function googleIdToken(): Promise<string | null> {
+  const clientId = googleClientId();
+  const redirectUri = googleRedirectUri(clientId);
+
+  const request = new AuthSession.AuthRequest({
+    clientId,
+    redirectUri,
+    scopes: ['openid', 'profile', 'email'],
+    responseType: AuthSession.ResponseType.Code,
+    usePKCE: true,
+  });
+
+  const result = await request.promptAsync(GOOGLE_DISCOVERY);
+
+  if (result.type === 'cancel' || result.type === 'dismiss') return null;
+  if (result.type !== 'success') {
+    throw new Error('Google sign-in failed. Please try again.');
+  }
+
+  const code = result.params.code;
+  if (!code) throw new Error('Google did not return an authorization code.');
+
+  const tokens = await AuthSession.exchangeCodeAsync(
+    {
+      clientId,
+      code,
+      redirectUri,
+      extraParams: { code_verifier: request.codeVerifier ?? '' },
+    },
+    GOOGLE_DISCOVERY,
+  );
+
+  // The only thing we want is the identity assertion. The access token would let us
+  // call Google's APIs on the user's behalf, which this app has no reason to do.
+  const idToken = tokens.idToken;
+  if (!idToken) throw new Error('Google did not return an identity token.');
+  return idToken;
 }
 
 /**
@@ -332,98 +419,45 @@ export const useAuth = create<AuthState>((set, get) => {
     },
 
     async signInWithApple() {
-      try {
-        const credential = await AppleAuthentication.signInAsync({
-          requestedScopes: [
-            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-            AppleAuthentication.AppleAuthenticationScope.EMAIL,
-          ],
-        });
+      const identity = await appleIdentity();
+      if (!identity) return;
 
-        if (!credential.identityToken) {
-          throw new Error('Apple did not return an identity token.');
-        }
-
-        // Apple hands over the name ONLY on the very first authorization for this app.
-        // Every subsequent sign-in — including after a reinstall — returns null, and the
-        // name is not in the identity token either. If we do not capture and forward it
-        // now, it is gone permanently and the account is stuck being called "there".
-        const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
-          .filter((part): part is string => Boolean(part))
-          .join(' ')
-          .trim();
-
-        const session = await api.post<SessionResponse>('/auth/social', {
-          provider: 'apple',
-          idToken: credential.identityToken,
-          name: fullName.length > 0 ? fullName : null,
-          timezone: deviceTimeZone(),
-        });
-
-        await adopt(session);
-      } catch (error) {
-        if (isUserCancellation(error)) return;
-        throw error;
-      }
+      const session = await api.post<SessionResponse>('/auth/social', {
+        provider: 'apple',
+        idToken: identity.idToken,
+        name: identity.name,
+        timezone: deviceTimeZone(),
+      });
+      await adopt(session);
     },
 
-    /**
-     * Authorization code + PKCE, NOT the implicit id_token flow.
-     *
-     * Google does not support `response_type=id_token` for installed apps — that is a Web
-     * client feature, and a web client may only redirect to https, which a native app has
-     * no way to receive. An iOS/Android client must ask for a `code` and exchange it.
-     *
-     * PKCE is what makes that exchange safe without a client secret (and a native app can
-     * never hold a secret — it ships inside the binary). The code that comes back through
-     * the browser is useless to anyone who did not generate the verifier, and the ID token
-     * itself never travels through the redirect at all: it is fetched directly from
-     * Google's token endpoint over TLS.
-     */
     async signInWithGoogle() {
-      const clientId = googleClientId();
-      const redirectUri = googleRedirectUri(clientId);
-
-      const request = new AuthSession.AuthRequest({
-        clientId,
-        redirectUri,
-        scopes: ['openid', 'profile', 'email'],
-        responseType: AuthSession.ResponseType.Code,
-        usePKCE: true,
-      });
-
-      const result = await request.promptAsync(GOOGLE_DISCOVERY);
-
-      if (result.type === 'cancel' || result.type === 'dismiss') return;
-      if (result.type !== 'success') {
-        throw new Error('Google sign-in failed. Please try again.');
-      }
-
-      const code = result.params.code;
-      if (!code) throw new Error('Google did not return an authorization code.');
-
-      const tokens = await AuthSession.exchangeCodeAsync(
-        {
-          clientId,
-          code,
-          redirectUri,
-          extraParams: { code_verifier: request.codeVerifier ?? '' },
-        },
-        GOOGLE_DISCOVERY,
-      );
-
-      // The only thing we want is the identity assertion. The access token would let us
-      // call Google's APIs on the user's behalf, which this app has no reason to do.
-      const idToken = tokens.idToken;
-      if (!idToken) throw new Error('Google did not return an identity token.');
+      const idToken = await googleIdToken();
+      if (!idToken) return;
 
       const session = await api.post<SessionResponse>('/auth/social', {
         provider: 'google',
         idToken,
         timezone: deviceTimeZone(),
       });
-
       await adopt(session);
+    },
+
+    async connect(provider) {
+      const idToken =
+        provider === 'google' ? await googleIdToken() : (await appleIdentity())?.idToken;
+      if (!idToken) return false;
+
+      const { user } = await api.post<{ user: User }>('/me/link', { provider, idToken });
+      know(user);
+      set({ user });
+      return true;
+    },
+
+    async setPassword(input) {
+      const { user } = await api.post<{ user: User }>('/me/password', input);
+      know(user);
+      set({ user });
     },
 
     async signOut() {

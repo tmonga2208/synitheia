@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Alert, Image, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Image, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import Animated, {
@@ -27,6 +27,9 @@ import { SkeletonList } from '../../src/components/Skeleton.js';
 import { signOutMessage } from '../../src/offline/copy.js';
 import { useOutbox } from '../../src/offline/outbox.js';
 import { useAuth } from '../../src/store/auth.js';
+import { PasswordSheet } from '../../src/auth/PasswordSheet.js';
+import { describeError } from '../../src/api/errorCopy.js';
+import { showToast } from '../../src/feedback/toast.js';
 import { MIN_TAP_TARGET, TAB_BAR_CLEARANCE, motion, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles, useThemePreference } from '../../src/theme/ThemeProvider.js';
 import type { ThemePreference } from '../../src/theme/ThemeProvider.js';
@@ -44,10 +47,11 @@ import type { Theme } from '../../src/theme/theme.js';
  * it is an assertion by Google rather than a string the client typed. See the note in
  * auth/service.ts — linking on a client-supplied email would be an account-takeover bug.
  */
+// Apple sign-in exists only on Apple's own devices.
 const SIGN_IN_METHODS = [
   { key: 'password', label: 'Email & password' },
   { key: 'google', label: 'Google' },
-  { key: 'apple', label: 'Apple' },
+  ...(Platform.OS === 'ios' ? [{ key: 'apple', label: 'Apple' } as const] : []),
 ] as const;
 
 const APPEARANCE_OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
@@ -92,6 +96,21 @@ export default function Profile() {
   );
 
   const [methodsOpen, setMethodsOpen] = useState(false);
+  const [passwordSheet, setPasswordSheet] = useState(false);
+  const [connecting, setConnecting] = useState<'google' | 'apple' | null>(null);
+  const connect = useAuth((s) => s.connect);
+
+  // Another way into this same account; the signed-in account is the one it joins.
+  const connectProvider = async (provider: 'google' | 'apple', label: string) => {
+    setConnecting(provider);
+    try {
+      if (await connect(provider)) showToast({ message: `${label} connected` });
+    } catch (error) {
+      Alert.alert(`Couldn’t connect ${label}`, describeError(error).message);
+    } finally {
+      setConnecting(null);
+    }
+  };
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const chevron = useSharedValue(0);
 
@@ -248,12 +267,7 @@ export default function Profile() {
                   const connected = user.authProviders.includes(method.key);
 
                   return (
-                    <View
-                      key={method.key}
-                      style={styles.method}
-                      accessibilityRole="text"
-                      accessibilityLabel={`${method.label}. ${connected ? 'Connected' : 'Not connected'}.`}
-                    >
+                    <View key={method.key} style={styles.method}>
                       <View style={[styles.methodIcon, connected && styles.methodIconOn]}>
                         {method.key === 'password' ? (
                           <Mail
@@ -276,16 +290,31 @@ export default function Profile() {
                         <Text
                           variant="caption"
                           color={connected ? t.accent : t.textFaint}
+                          numberOfLines={1}
+                          ellipsizeMode="middle"
                         >
                           {connected ? user.email : 'Not connected'}
                         </Text>
                       </View>
 
-                      {connected ? (
-                        <View style={styles.tick}>
+                      {method.key === 'password' ? (
+                        <Chip
+                          label={connected ? 'Change' : 'Add'}
+                          accessibilityLabel={connected ? 'Change password' : 'Add a password'}
+                          onPress={() => setPasswordSheet(true)}
+                        />
+                      ) : connected ? (
+                        <View style={styles.tick} accessibilityLabel={`${method.label} connected`}>
                           <Check size={12} color={t.onAccent} strokeWidth={3} />
                         </View>
-                      ) : null}
+                      ) : (
+                        <Chip
+                          label={connecting === method.key ? 'Connecting…' : 'Connect'}
+                          accessibilityLabel={`Connect ${method.label}`}
+                          disabled={connecting !== null}
+                          onPress={() => void connectProvider(method.key, method.label)}
+                        />
+                      )}
                     </View>
                   );
                 })}
@@ -313,6 +342,12 @@ export default function Profile() {
           setAppearanceOpen(false);
         }}
         onClose={() => setAppearanceOpen(false)}
+      />
+      <PasswordSheet
+        visible={passwordSheet}
+        hasPassword={user.authProviders.includes('password')}
+        email={user.email}
+        onClose={() => setPasswordSheet(false)}
       />
     </SafeAreaView>
   );

@@ -44,6 +44,22 @@ export async function verifyPassword(hash: string, plain: string): Promise<boole
   }
 }
 
+const PROVIDER_NAME: Record<AuthProvider, string> = {
+  password: 'email',
+  google: 'Google',
+  apple: 'Apple',
+};
+
+/**
+ * "Continue with Google" for an account that has no password. Said instead of "incorrect
+ * password" or "already exists", which left someone who signed up with Google nowhere to go.
+ */
+function useYourProvider(providers: AuthProvider[]): string {
+  const social = providers.filter((p) => p !== 'password').map((p) => PROVIDER_NAME[p]);
+  const which = social.length > 0 ? social.join(' or ') : 'the way you signed up';
+  return `This email signs in with ${which}. Continue with ${which}, then add a password in You → Sign-in methods.`;
+}
+
 /** Seed the things a new account cannot function without. */
 async function provisionUser(userId: Types.ObjectId, session?: ClientSession) {
   await UserPreferenceModel.create(
@@ -71,10 +87,13 @@ export async function signup(input: SignupInput): Promise<UserWithId> {
   }
 
   const email = input.email.toLowerCase().trim();
-  const existing = await UserModel.findOne({ email }).lean();
+  const existing = await UserModel.findOne({ email }).select('+passwordHash').lean();
   if (existing) {
     // Deliberately explicit. Email enumeration is a real but minor leak; a vague
     // "signup failed" here produces support tickets and teaches users nothing.
+    if (!existing.passwordHash) {
+      throw AppError.conflict(useYourProvider(existing.authProviders as AuthProvider[]));
+    }
     throw AppError.conflict('An account with this email already exists');
   }
 
@@ -104,7 +123,10 @@ export async function loginWithPassword(
   const hash = user?.passwordHash ?? '$argon2id$v=19$m=19456,t=2,p=1$notarealsalt$notarealhash';
   const ok = await verifyPassword(hash, password);
 
-  if (!user || !ok || !user.passwordHash) {
+  if (user && !user.passwordHash) {
+    throw AppError.unauthorized(useYourProvider(user.authProviders as AuthProvider[]));
+  }
+  if (!user || !ok) {
     throw AppError.unauthorized('Incorrect email or password');
   }
 
@@ -119,6 +141,8 @@ interface SocialIdentity {
   provider: AuthProvider;
   sub: string;
   email: string | null;
+  /** Whether the provider has confirmed the person owns `email`. Joining on it needs this. */
+  emailVerified: boolean;
   name: string | null;
 }
 
@@ -149,6 +173,8 @@ async function verifyAppleToken(env: Env, idToken: string): Promise<SocialIdenti
       // Apple only returns the email on the FIRST authorization, and only if the
       // user agreed to share it. It may legitimately be absent forever after.
       email: typeof payload.email === 'string' ? payload.email.toLowerCase() : null,
+      // Apple sends this as a boolean or as the string "true".
+      emailVerified: payload.email_verified === true || payload.email_verified === 'true',
       name: null, // Apple never puts the name in the token; the client passes it separately.
     };
   } catch {
@@ -174,6 +200,7 @@ async function verifyGoogleToken(env: Env, idToken: string): Promise<SocialIdent
       provider: 'google',
       sub: payload.sub,
       email: payload.email?.toLowerCase() ?? null,
+      emailVerified: payload.email_verified === true,
       name: payload.name ?? null,
     };
   } catch {
@@ -212,6 +239,14 @@ export async function loginWithSocial(
    * not a string the client typed. Linking on a client-supplied email would be an
    * account takeover primitive.
    */
+  // An email the provider has not confirmed is only a string someone typed into their
+  // Google account. Joining or creating on it would hand that person whoever owns it.
+  if (identity.email && !identity.emailVerified) {
+    throw AppError.unauthorized(
+      `${PROVIDER_NAME[identity.provider]} hasn't verified this email yet. Verify it there, or sign up with email.`,
+    );
+  }
+
   if (identity.email) {
     const byEmail = await UserModel.findOne({ email: identity.email });
     if (byEmail) {
@@ -245,4 +280,62 @@ export async function loginWithSocial(
 
   await provisionUser(user._id);
   return { user: user as UserWithId, isNew: true };
+}
+
+/**
+ * Connect Google or Apple to the account that is signed in, so it opens with either.
+ *
+ * The person is already signed in, and now proves they own the Google or Apple login too,
+ * so the two emails need not match. A login already attached to a different account is
+ * refused rather than moved: moving it would sign someone out of their other account.
+ */
+export async function linkSocial(
+  env: Env,
+  userId: string,
+  input: { provider: 'apple' | 'google'; idToken: string },
+): Promise<UserWithId> {
+  const identity =
+    input.provider === 'apple'
+      ? await verifyAppleToken(env, input.idToken)
+      : await verifyGoogleToken(env, input.idToken);
+  const subField = identity.provider === 'apple' ? 'appleSub' : 'googleSub';
+
+  const owner = await UserModel.findOne({ [subField]: identity.sub }, { _id: 1 }).lean();
+  if (owner && String(owner._id) !== userId) {
+    throw AppError.conflict(
+      `This ${PROVIDER_NAME[identity.provider]} login already signs in to another Synítheia account.`,
+    );
+  }
+
+  const user = await UserModel.findById(userId);
+  if (!user) throw AppError.notFound('User');
+  user.set(subField, identity.sub);
+  if (!user.authProviders.includes(identity.provider)) user.authProviders.push(identity.provider);
+  await user.save();
+  return user as UserWithId;
+}
+
+/**
+ * Add a password to the signed-in account, or change it. Adding needs nothing more than
+ * being signed in; changing one that exists needs the current one, so a phone left
+ * unlocked cannot be used to lock its owner out.
+ */
+export async function setPassword(
+  userId: string,
+  input: { newPassword: string; currentPassword?: string },
+): Promise<UserWithId> {
+  const user = await UserModel.findById(userId).select('+passwordHash');
+  if (!user) throw AppError.notFound('User');
+
+  if (user.passwordHash) {
+    const ok = input.currentPassword
+      ? await verifyPassword(user.passwordHash, input.currentPassword)
+      : false;
+    if (!ok) throw AppError.unauthorized('Your current password is incorrect');
+  }
+
+  user.passwordHash = await hashPassword(input.newPassword);
+  if (!user.authProviders.includes('password')) user.authProviders.push('password');
+  await user.save();
+  return user as UserWithId;
 }
