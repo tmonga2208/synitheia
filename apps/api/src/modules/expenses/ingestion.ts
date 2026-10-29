@@ -287,16 +287,17 @@ function isPasswordException(err: unknown): err is { name: string; code: number 
 /**
  * pdf-parse 1.1 bundles pdf.js 1.10, which keeps state between documents in one process and
  * now and then throws "bad XRef entry" or "Invalid PDF structure" on a valid file, usually
- * right after it was handed a broken one. The same buffer opens on the next attempt, so a
- * structural failure is tried once more before the user is told the PDF is unreadable. A
- * password failure is final and goes straight back.
+ * right after it was handed a broken one. A second attempt on a fresh copy of the bytes
+ * opens it, so a structural failure is tried once more before the user is told the PDF is
+ * unreadable; retrying on the same buffer still failed now and then. A password failure is
+ * final and goes straight back.
  */
-async function parseWithRetry<S, R>(parse: (source: S) => Promise<R>, source: S): Promise<R> {
+async function parseWithRetry<S, R>(parse: (source: S) => Promise<R>, source: () => S): Promise<R> {
   try {
-    return await parse(source);
+    return await parse(source());
   } catch (err) {
     if (isPasswordException(err)) throw err;
-    return parse(source);
+    return parse(source());
   }
 }
 
@@ -322,7 +323,12 @@ export async function ingestPdf(
     // pdf-parse hands its first argument straight to pdf.js's getDocument, which accepts
     // either a buffer or a {data, password} source. Passing the object is the only way to
     // open a locked document; there is no password option on pdf-parse itself.
-    const parsed = await parseWithRetry(pdfParse, password ? { data: buffer, password } : buffer);
+    // A fresh copy for each attempt: pdf.js works on the bytes it is handed, and a retry
+    // given the same, already-used buffer failed the same way.
+    const parsed = await parseWithRetry(pdfParse, () => {
+      const data = Buffer.from(buffer);
+      return password ? { data, password } : data;
+    });
     text = parsed.text;
   } catch (err) {
     if (isPasswordException(err)) {
