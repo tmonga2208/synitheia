@@ -60,35 +60,33 @@ const SOURCE_COPY: Record<
     title: 'Health & Activity',
     why: 'Steps, workouts, and sleep appear on your timeline and let Synítheia notice things like lower activity on days you eat more.',
     platforms: 'Apple Health on iOS · Health Connect on Android',
-    reliability:
-      'Reliable for steps. Sleep and workouts depend on what your phone or watch actually records.',
+    reliability: 'Sleep and workouts show up if your phone or watch records them.',
   },
   calendar: {
     title: 'Calendar',
     why: 'Meetings give your day structure, and make observations like "you skip workouts on days with late meetings" possible.',
     platforms: 'iOS and Android',
-    reliability: 'Reliable. Read-only — we never write to your calendar.',
+    reliability: 'Read only. Synítheia never changes your calendar.',
   },
   location: {
     title: 'Location',
     why: 'Recognising the places you visit regularly lets us suggest an expense or a meal instead of asking you to type it.',
     platforms: 'iOS and Android',
-    reliability:
-      'Best-effort. The operating system limits background location to save battery, so some visits will be missed.',
+    reliability: 'Your phone may skip some visits to save battery.',
   },
   weather: {
     title: 'Weather',
     why: 'Weather is context for your day — it helps explain a low-step Sunday.',
     platforms: 'iOS and Android',
-    reliability: 'Reliable. Uses only your approximate area, never a precise position.',
+    reliability: 'Uses only your rough area, never your exact location.',
   },
   // Android can grant notification access; this used to say store policy forbids it, which
   // was never checked. What is true is that the app chooses not to ask (see README).
   notifications: {
     title: 'Notifications',
-    why: 'Not read. iOS gives apps no way to read your notifications. Android does, if you allow it in Settings, but Synítheia chooses not to ask: it would mean reading every notification you get. Pick a payment screenshot or paste the message instead.',
+    why: 'Not read: it would mean reading every notification you get. Pick a payment screenshot or paste the message instead.',
     platforms: 'Not possible on iOS · not used on Android',
-    reliability: 'Not collected.',
+    reliability: '',
   },
 };
 
