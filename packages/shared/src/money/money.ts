@@ -96,14 +96,42 @@ export function formatMoney(amount: Minor, currency: string): string {
  * Compact display for dense UI — "₹1.2K", "₹4.8L" (Indian lakh/crore in en-IN).
  * Used in stat chips and chart labels where a full amount would wrap.
  */
+/** Indian amounts read in lakhs and crores; everyone else in thousands, millions, billions. */
+const COMPACT_STEPS: Record<'indian' | 'western', readonly [number, string][]> = {
+  indian: [
+    [1e7, 'Cr'],
+    [1e5, 'L'],
+    [1e3, 'K'],
+  ],
+  western: [
+    [1e9, 'B'],
+    [1e6, 'M'],
+    [1e3, 'K'],
+  ],
+};
+
+/**
+ * "₹22K", "₹4.8L", "$1.2M": an amount where only its size matters.
+ *
+ * Built by hand rather than with Intl's `notation: 'compact'`, which Hermes (the engine
+ * the app runs on) ignores: the phone showed "₹22,000.0" while Node, and so the tests,
+ * showed "₹22K".
+ */
 export function formatMoneyCompact(amount: Minor, currency: string): string {
-  const { code, decimals, locale } = currencyMeta(currency);
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: code,
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(amount / 10 ** decimals);
+  const { code, decimals, locale, symbol } = currencyMeta(currency);
+  const major = amount / 10 ** decimals;
+  const sign = major < 0 ? '-' : '';
+  const size = Math.abs(major);
+
+  const steps = COMPACT_STEPS[code === 'INR' ? 'indian' : 'western'];
+  const step = steps.find(([at]) => size >= at);
+  if (!step) {
+    return `${sign}${symbol}${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(size)}`;
+  }
+
+  const [at, suffix] = step;
+  const scaled = Math.round((size / at) * 10) / 10;
+  return `${sign}${symbol}${scaled % 1 === 0 ? scaled.toFixed(0) : scaled.toFixed(1)}${suffix}`;
 }
 
 export function sumMoney(amounts: readonly Minor[]): Minor {
