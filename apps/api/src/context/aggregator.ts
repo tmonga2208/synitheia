@@ -11,6 +11,7 @@ import {
   type LocalDate,
   type Macros,
   type Participant,
+  type WeekDayTotals,
 } from '@synitheia/shared';
 import {
   DailyNutritionModel,
@@ -259,6 +260,17 @@ export function flowInputOf(summary: DailySummaryDoc): FlowSummaryInput {
       calorieTarget: summary.nutrition.calorieTarget,
       entryCount: summary.nutrition.entryCount,
     },
+  };
+}
+
+/** A day's totals as the trackers' week strips draw them. */
+export function weekTotalsOf(summary: DailySummaryDoc): WeekDayTotals {
+  return {
+    waterMl: summary.water.totalMl,
+    calories: summary.nutrition.totals.calories,
+    spentMinor: summary.expenses.totalMinor,
+    habitsDone: summary.habits.completed,
+    habitsScheduled: summary.habits.scheduled,
   };
 }
 

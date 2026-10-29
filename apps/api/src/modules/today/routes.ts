@@ -35,7 +35,7 @@ import {
   WaterEntryModel,
 } from '../../db/models.js';
 import { timelineFor } from '../../context/engine.js';
-import { flowInputOf, getDailySummary } from '../../context/aggregator.js';
+import { flowInputOf, getDailySummary, weekTotalsOf } from '../../context/aggregator.js';
 import { runDetectors } from '../../context/detectors/run.js';
 import type { AuthedUser } from '../../core/auth-guard.js';
 import * as habits from '../habits/service.js';
@@ -341,6 +341,7 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
               localDate: day,
               percent: flowPercentForSummary(flowInputOf(summary), tracked),
               isToday: day === today,
+              totals: weekTotalsOf(summary),
             };
           },
         ),
