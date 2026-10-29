@@ -82,13 +82,18 @@ export function parseMoneyInput(input: string, currency: string): Minor | null {
 }
 
 /** Full display form: "₹1,234.50". */
+/**
+ * "₹606", "₹397.96": paise only when there are some. A column of "₹606.00, ₹359.00" is
+ * noise for whole amounts, which most payments are; a part-rupee amount keeps both digits.
+ */
 export function formatMoney(amount: Minor, currency: string): string {
   const { code, decimals, locale } = currencyMeta(currency);
+  const shown = amount % 10 ** decimals === 0 ? 0 : decimals;
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: code,
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
+    minimumFractionDigits: shown,
+    maximumFractionDigits: shown,
   }).format(amount / 10 ** decimals);
 }
 

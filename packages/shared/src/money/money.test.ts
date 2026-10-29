@@ -81,7 +81,13 @@ describe('parseMoneyInput', () => {
 describe('formatMoney', () => {
   it('formats INR with the Indian grouping system', () => {
     // en-IN groups as 1,23,456 — not 123,456.
-    expect(formatMoney(asMinor(12345600), 'INR')).toBe('₹1,23,456.00');
+    expect(formatMoney(asMinor(12345600), 'INR')).toBe('₹1,23,456');
+  });
+
+  it('shows paise only when there are some', () => {
+    expect(formatMoney(asMinor(60600), 'INR')).toBe('₹606');
+    expect(formatMoney(asMinor(39796), 'INR')).toBe('₹397.96');
+    expect(formatMoney(asMinor(39790), 'INR')).toBe('₹397.90');
   });
 
   it('formats USD', () => {
