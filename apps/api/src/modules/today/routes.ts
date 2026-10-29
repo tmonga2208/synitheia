@@ -19,7 +19,6 @@ import {
   localMinutesOfDay,
   monthKeyOf,
   netMinor,
-  startOfLocalWeek,
   todayLocalDate,
   rankSuggestions,
   type LocalDate,
@@ -321,8 +320,9 @@ export async function registerTodayRoutes(app: FastifyInstance): Promise<void> {
         ),
       );
 
-      // ── Weekly chart (Monday-anchored, matching the M–S columns in the design)
-      const weekStart = startOfLocalWeek(localDate);
+      // ── Weekly chart: the seven days ending on this one. It was Monday to Sunday, which
+      // left a Monday's chart six empty bars; the labels come from each day's date.
+      const weekStart = addLocalDays(localDate, -6);
       const weeklyFlow = await Promise.all(
         Array.from({ length: 7 }, (_, i) => addLocalDays(weekStart, i)).map(
           async (day) => {

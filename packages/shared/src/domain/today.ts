@@ -71,7 +71,7 @@ export const todayResponseSchema = z.object({
   /** At most one insight surfaces on Today. The rest live in the Insights tab. */
   featuredInsight: aiInsightSchema.nullable(),
 
-  /** Monday-anchored, for the Weekly Analysis chart. Index 0 = Monday. */
+  /** The seven days ending on this one, oldest first, for the Weekly Analysis chart. */
   weeklyFlow: z.array(
     z.object({
       localDate: localDateSchema,

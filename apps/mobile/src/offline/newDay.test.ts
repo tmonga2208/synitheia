@@ -63,6 +63,29 @@ describe('startNewDay', () => {
     expect(today().weeklyFlow.map((d) => d.isToday)).toEqual([false, true]);
   });
 
+  it('moves the chart’s week along by a day when the new day is not in it', () => {
+    const week = Array.from({ length: 7 }, (_, i) => ({
+      localDate: `2026-10-${String(19 + i).padStart(2, '0')}`,
+      percent: 50,
+      isToday: i === 6,
+    }));
+    client.setQueryData(['today'], { ...day('2026-10-25'), weeklyFlow: week });
+
+    startNewDay(client, ZONE, NOW);
+
+    expect(today().weeklyFlow.map((d) => d.localDate)).toEqual([
+      '2026-10-20',
+      '2026-10-21',
+      '2026-10-22',
+      '2026-10-23',
+      '2026-10-24',
+      '2026-10-25',
+      '2026-10-26',
+    ]);
+    expect(today().weeklyFlow.at(-1)).toEqual({ localDate: '2026-10-26', percent: 0, isToday: true });
+    expect(today().weeklyFlow.filter((d) => d.isToday)).toHaveLength(1);
+  });
+
   it('leaves today’s numbers alone, and only brings the greeting up to date', () => {
     client.setQueryData(['today'], day('2026-10-26', 'Good evening'));
 

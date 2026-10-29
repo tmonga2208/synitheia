@@ -40,8 +40,22 @@ function freshDay(day: TodayResponse, localDate: LocalDate, greeting: string): T
     water: { ...day.water, totalMl: 0 },
     timeline: [],
     suggestions: [],
-    weeklyFlow: day.weeklyFlow.map((d) => ({ ...d, isToday: d.localDate === localDate })),
+    weeklyFlow: rollWeek(day.weeklyFlow, localDate),
   };
+}
+
+/**
+ * The chart is the seven days ending today, so a new day joins at the end and the oldest
+ * leaves. A cached week that already holds the day only moves its "today" mark.
+ */
+function rollWeek(days: TodayResponse['weeklyFlow'], localDate: LocalDate): TodayResponse['weeklyFlow'] {
+  if (days.some((d) => d.localDate === localDate)) {
+    return days.map((d) => ({ ...d, isToday: d.localDate === localDate }));
+  }
+  return [
+    ...days.slice(-6).map((d) => ({ ...d, isToday: false })),
+    { localDate, percent: 0, isToday: true },
+  ];
 }
 
 /** Empty a list of today's entries that was fetched on an earlier day. */
