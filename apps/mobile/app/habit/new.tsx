@@ -3,7 +3,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Linking,
-  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -13,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Minus, Plus } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react-native';
 import {
   HABIT_COLORS,
   HABIT_MEASURES,
@@ -22,14 +21,7 @@ import {
   type HabitFrequency,
   type HabitMeasure,
 } from '@synitheia/shared';
-import {
-  Button,
-  Card,
-  Chip,
-  Input,
-  Text,
-  Touchable,
-} from '../../src/components/primitives.js';
+import { Button, Card, Chip, Input, Text, Touchable } from '../../src/components/primitives.js';
 import { DEFAULT_ICON, IconPicker, iconFor } from '../../src/components/IconPicker.js';
 import { api } from '../../src/api/client.js';
 import { errorLine } from '../../src/api/errorCopy.js';
@@ -39,6 +31,14 @@ import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 
 const BASE_CATEGORIES = ['Mindfulness', 'Health'] as const;
+
+/** A word under each way of tracking, so the choice explains itself. */
+const MEASURE_HINT: Record<HabitMeasure, string> = {
+  check: 'Tick it off',
+  count: 'Glasses, pages…',
+  duration: 'Minutes',
+  steps: 'From your phone',
+};
 
 interface TimeOfDay {
   /** 1–12, as displayed. */
@@ -82,7 +82,6 @@ export default function NewHabit() {
   const [time, setTime] = useState<TimeOfDay>({ hour: 7, minute: 30, period: 'PM' });
 
   const [iconSheet, setIconSheet] = useState(false);
-  const [colorSheet, setColorSheet] = useState(false);
 
   const [nameError, setNameError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -138,7 +137,7 @@ export default function NewHabit() {
       frequency,
       measure,
       targetCount,
-      unit: measure === 'check' ? null : (unit?.trim() || spec.unit),
+      unit: measure === 'check' ? null : unit?.trim() || spec.unit,
       reminderTime: reminderEnabled ? to24h(time) : null,
     });
 
@@ -189,10 +188,7 @@ export default function NewHabit() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior="padding"
-      >
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
@@ -208,23 +204,14 @@ export default function NewHabit() {
             >
               <ArrowLeft size={22} color={t.textPrimary} />
             </Touchable>
-
-            <Touchable
-              style={styles.iconButton}
-              accessibilityRole="button"
-              accessibilityLabel="Choose habit colour"
-              onPress={() => setColorSheet(true)}
-            >
-              <View style={[styles.swatch, { backgroundColor: accent.base }]} />
-            </Touchable>
           </View>
 
-          <Text variant="title">New Habit</Text>
+          <Text variant="title">New habit</Text>
           <Text variant="body" color={t.textMuted} style={styles.subtitle}>
             Something small you want to do regularly.
           </Text>
 
-          {/* ─── Name ─────────────────────────────────────────────────────── */}
+          {/* ─── Name, icon, colour, category ─────────────────────────────── */}
           <Card style={styles.card}>
             <Text variant="section">Name</Text>
 
@@ -251,6 +238,34 @@ export default function NewHabit() {
               </View>
             </View>
 
+            {/* On the screen, not behind an unlabelled square in the corner. */}
+            <Text variant="label" color={t.textMuted}>
+              Colour
+            </Text>
+            <View style={styles.colours} accessibilityRole="radiogroup">
+              {HABIT_COLORS.map((value) => {
+                const isSelected = value === color;
+                return (
+                  <Touchable
+                    key={value}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Colour ${value}`}
+                    accessibilityState={{ selected: isSelected }}
+                    haptic={false}
+                    onPress={() => setColor(value)}
+                    style={[
+                      styles.colour,
+                      { backgroundColor: value },
+                      isSelected && { borderColor: t.textPrimary },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+
+            <Text variant="label" color={t.textMuted}>
+              Category (optional)
+            </Text>
             <View style={styles.pills}>
               {categories.map((c) => (
                 <Chip
@@ -287,14 +302,14 @@ export default function NewHabit() {
             ) : null}
           </Card>
 
-          {/* ─── Frequency ────────────────────────────────────────────────── */}
+          {/* ─── How often ────────────────────────────────────────────────── */}
           <Card style={styles.card}>
-            <Text variant="section">Frequency</Text>
+            <Text variant="section">How often</Text>
 
             <View style={styles.segments} accessibilityRole="tablist">
               {(['daily', 'weekly'] as const).map((value) => {
                 const active = frequency === value;
-                const label = value === 'daily' ? 'Daily' : 'Weekly';
+                const label = value === 'daily' ? 'Every day' : 'Every week';
 
                 return (
                   <Touchable
@@ -303,41 +318,54 @@ export default function NewHabit() {
                     accessibilityLabel={label}
                     accessibilityState={{ selected: active }}
                     onPress={() => setFrequency(value)}
-                    style={[
-                      styles.segment,
-                      ...(active ? [{ backgroundColor: t.accent }] : []),
-                    ]}
+                    style={[styles.segment, active && { backgroundColor: t.accent }]}
                   >
-                    <Text
-                      variant="heading"
-                      color={active ? t.onAccent : t.textMuted}
-                    >
+                    <Text variant="bodyMedium" color={active ? t.onAccent : t.textMuted}>
                       {label}
                     </Text>
                   </Touchable>
                 );
               })}
             </View>
+          </Card>
 
-            {/* What the habit actually measures — a tick, a count, minutes, or steps. */}
-            <View style={styles.measures}>
-              {(Object.keys(HABIT_MEASURES) as HabitMeasure[]).map((key) => (
-                <Chip
-                  key={key}
-                  label={HABIT_MEASURES[key].label}
-                  selected={measure === key}
-                  onPress={() => pickMeasure(key)}
-                  accessibilityLabel={`Measure by ${HABIT_MEASURES[key].label}`}
-                />
-              ))}
+          {/* ─── How you'll track it ──────────────────────────────────────── */}
+          {/* Separate from how often: they were one box, and "Steps" wrapped onto a line alone. */}
+          <Card style={styles.card}>
+            <Text variant="section">How you’ll track it</Text>
+
+            <View style={styles.measureGrid}>
+              {(Object.keys(HABIT_MEASURES) as HabitMeasure[]).map((key) => {
+                const active = measure === key;
+                return (
+                  <Touchable
+                    key={key}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Track by ${HABIT_MEASURES[key].label}`}
+                    accessibilityState={{ selected: active }}
+                    onPress={() => pickMeasure(key)}
+                    style={[
+                      styles.measure,
+                      active && { borderColor: accent.base, backgroundColor: accent.wash },
+                    ]}
+                  >
+                    <Text variant="bodyMedium" color={active ? accent.text : t.textPrimary}>
+                      {HABIT_MEASURES[key].label}
+                    </Text>
+                    <Text variant="caption" color={t.textMuted}>
+                      {MEASURE_HINT[key]}
+                    </Text>
+                  </Touchable>
+                );
+              })}
             </View>
 
             {/* A tick has no goal to set — 'done' is the only target it can have. */}
             {measure === 'check' ? null : (
               <View style={styles.goalRow}>
-                <Text variant="section" color={t.textMuted}>
-                  Goal:{' '}
-                  <Text variant="section" color={t.textPrimary}>
+                <Text variant="body" color={t.textMuted}>
+                  Goal{'  '}
+                  <Text variant="bodyMedium" color={t.textPrimary}>
                     {`${targetCount.toLocaleString()} ${unit ?? spec.unit ?? ''} ${periodLabel.toLowerCase()}`}
                   </Text>
                 </Text>
@@ -379,50 +407,42 @@ export default function NewHabit() {
             ) : null}
           </Card>
 
-          {/* ─── Gentle Reminder ──────────────────────────────────────────── */}
+          {/* ─── Reminder ─────────────────────────────────────────────────── */}
           <Card style={styles.card}>
-            <Text variant="section">Reminder</Text>
-
-            <View style={styles.clock}>
-              <TimeField
-                value={pad(time.hour)}
-                label="Hour"
-                onStep={(d) =>
-                  setTime((t) => ({ ...t, hour: ((t.hour - 1 + d + 12) % 12) + 1 }))
-                }
-              />
-              <Text variant="heading" color={t.textFaint}>
-                :
-              </Text>
-              <TimeField
-                value={pad(time.minute)}
-                label="Minute"
-                onStep={(d) =>
-                  setTime((t) => ({ ...t, minute: (t.minute + d * 5 + 60) % 60 }))
-                }
-              />
-              <TimeField
-                value={time.period}
-                label="AM or PM"
-                onStep={() =>
-                  setTime((t) => ({ ...t, period: t.period === 'AM' ? 'PM' : 'AM' }))
-                }
-              />
-            </View>
-
             <View style={styles.toggleRow}>
-              <Text variant="label" color={t.textMuted}>
-                Notification Enabled
-              </Text>
+              <Text variant="section">Remind me</Text>
               <Switch
                 value={reminderEnabled}
                 onValueChange={setReminderEnabled}
-                accessibilityLabel="Notification enabled"
+                accessibilityLabel="Remind me"
                 trackColor={{ false: t.border, true: t.accent }}
                 thumbColor={t.onAccent}
                 ios_backgroundColor={t.border}
               />
             </View>
+
+            {reminderEnabled ? (
+              <View style={styles.clock}>
+                <TimeField
+                  value={pad(time.hour)}
+                  label="Hour"
+                  onStep={(d) => setTime((t) => ({ ...t, hour: ((t.hour - 1 + d + 12) % 12) + 1 }))}
+                />
+                <Text variant="heading" color={t.textFaint}>
+                  :
+                </Text>
+                <TimeField
+                  value={pad(time.minute)}
+                  label="Minute"
+                  onStep={(d) => setTime((t) => ({ ...t, minute: (t.minute + d * 5 + 60) % 60 }))}
+                />
+                <TimeField
+                  value={time.period}
+                  label="AM or PM"
+                  onStep={() => setTime((t) => ({ ...t, period: t.period === 'AM' ? 'PM' : 'AM' }))}
+                />
+              </View>
+            ) : null}
           </Card>
 
           {formError ? (
@@ -434,7 +454,7 @@ export default function NewHabit() {
           ) : null}
 
           <Button
-            label="Create Habit"
+            label="Create habit"
             loading={saving}
             style={styles.cta}
             onPress={() => void submit()}
@@ -449,21 +469,14 @@ export default function NewHabit() {
         onSelect={setIcon}
         onClose={() => setIconSheet(false)}
       />
-
-      <ColorPicker
-        visible={colorSheet}
-        selected={color}
-        onSelect={setColor}
-        onClose={() => setColorSheet(false)}
-      />
     </SafeAreaView>
   );
 }
 
 /**
- * Tap steps the field forward; VoiceOver users get proper increment/decrement actions.
- * A wheel picker would be more familiar, but it cannot be styled to the design language
- * on both platforms, and this reads as the flip-clock tiles in the reference.
+ * One part of the reminder time, with an arrow above to step up and one below to step
+ * down. It used to only step forward on a tap, so 7:30 PM to 8:00 AM took dozens of taps.
+ * VoiceOver users get increment and decrement actions on the tile itself.
  */
 function TimeField({
   value,
@@ -478,82 +491,41 @@ function TimeField({
   const styles = useThemedStyles(makeStyles);
 
   return (
-    <Touchable
-      accessibilityRole="adjustable"
-      accessibilityLabel={label}
-      accessibilityValue={{ text: value }}
-      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-      onAccessibilityAction={(event) =>
-        onStep(event.nativeEvent.actionName === 'decrement' ? -1 : 1)
-      }
-      onPress={() => onStep(1)}
-      style={styles.timeTile}
-    >
-      <Text variant="heading" color={t.onAccent}>
-        {value}
-      </Text>
-    </Touchable>
-  );
-}
-
-function ColorPicker({
-  visible,
-  selected,
-  onSelect,
-  onClose,
-}: {
-  visible: boolean;
-  selected: string;
-  onSelect: (color: string) => void;
-  onClose: () => void;
-}) {
-  const t = useTheme();
-  const styles = useThemedStyles(makeStyles);
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <Touchable
-          style={styles.flex}
-          haptic={false}
-          accessibilityRole="button"
-          accessibilityLabel="Close colour picker"
-          onPress={onClose}
-        />
-
-        <SafeAreaView style={styles.sheet} edges={['bottom']}>
-          <View style={styles.handle} />
-
-          <Text variant="heading" style={styles.sheetTitle}>
-            Accent
-          </Text>
-
-          <View style={styles.swatches}>
-            {HABIT_COLORS.map((value) => {
-              const isSelected = value === selected;
-
-              return (
-                <Touchable
-                  key={value}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Accent colour ${value}`}
-                  accessibilityState={{ selected: isSelected }}
-                  onPress={() => {
-                    onSelect(value);
-                    onClose();
-                  }}
-                  style={[
-                    styles.swatchOption,
-                    { backgroundColor: value },
-                    ...(isSelected ? [{ borderColor: t.textPrimary }] : []),
-                  ]}
-                />
-              );
-            })}
-          </View>
-        </SafeAreaView>
+    <View style={styles.timeColumn}>
+      <Touchable
+        accessibilityRole="button"
+        accessibilityLabel={`${label} up`}
+        haptic={false}
+        onPress={() => onStep(1)}
+        style={styles.timeArrow}
+      >
+        <ChevronUp size={20} color={t.textMuted} />
+      </Touchable>
+      <View
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={label}
+        accessibilityValue={{ text: value }}
+        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+        onAccessibilityAction={(event) =>
+          onStep(event.nativeEvent.actionName === 'decrement' ? -1 : 1)
+        }
+        style={styles.timeTile}
+      >
+        <Text variant="heading" color={t.onAccent}>
+          {value}
+        </Text>
       </View>
-    </Modal>
+      <Touchable
+        accessibilityRole="button"
+        accessibilityLabel={`${label} down`}
+        haptic={false}
+        onPress={() => onStep(-1)}
+        style={styles.timeArrow}
+      >
+        <ChevronDown size={20} color={t.textMuted} />
+      </Touchable>
+    </View>
   );
 }
 
@@ -579,11 +551,6 @@ const makeStyles = (t: Theme) =>
       justifyContent: 'center',
       borderRadius: radius.md,
     },
-    swatch: {
-      width: 36,
-      height: 36,
-      borderRadius: radius.sm,
-    },
     subtitle: { marginTop: spacing.xs },
     card: { marginTop: spacing.xl, gap: spacing.base },
     nameRow: {
@@ -604,7 +571,26 @@ const makeStyles = (t: Theme) =>
       gap: spacing.sm,
     },
     newCategory: { marginTop: spacing.xs },
-    measures: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    colours: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    colour: {
+      width: 32,
+      height: 32,
+      borderRadius: radius.full,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    measureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    measure: {
+      flexBasis: '47%',
+      flexGrow: 1,
+      gap: 2,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: t.border,
+      backgroundColor: t.surfaceRaised,
+    },
     segments: {
       flexDirection: 'row',
       padding: spacing.xs,
@@ -642,6 +628,13 @@ const makeStyles = (t: Theme) =>
       alignItems: 'center',
       gap: spacing.sm,
     },
+    timeColumn: { alignItems: 'center' },
+    timeArrow: {
+      width: MIN_TAP_TARGET,
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     timeTile: {
       minWidth: MIN_TAP_TARGET,
       minHeight: MIN_TAP_TARGET,
@@ -655,9 +648,6 @@ const makeStyles = (t: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      borderTopWidth: 1,
-      borderTopColor: t.border,
-      paddingTop: spacing.md,
     },
     formError: {
       marginTop: spacing.lg,
@@ -668,39 +658,4 @@ const makeStyles = (t: Theme) =>
       borderColor: t.danger,
     },
     cta: { marginTop: spacing.xl },
-    backdrop: {
-      flex: 1,
-      justifyContent: 'flex-end',
-      backgroundColor: t.scrim,
-    },
-    // A real bottom sheet: transparent Modal, slides up over the scrim.
-    sheet: {
-      backgroundColor: t.surface,
-      borderTopLeftRadius: radius.xl,
-      borderTopRightRadius: radius.xl,
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.xl,
-    },
-    handle: {
-      alignSelf: 'center',
-      width: 96,
-      height: 6,
-      borderRadius: radius.full,
-      backgroundColor: t.border,
-    },
-    sheetTitle: { marginTop: spacing.lg },
-    swatches: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.md,
-      marginTop: spacing.lg,
-    },
-    swatchOption: {
-      width: 56,
-      height: 56,
-      borderRadius: radius.md,
-      borderWidth: 3,
-      borderColor: 'transparent',
-    },
   });
