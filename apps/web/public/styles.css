@@ -772,7 +772,8 @@ main > section.hero {
 }
 
 .ring-track {
-  stroke: var(--border);
+  stroke: var(--accent);
+  stroke-opacity: 0.18;
 }
 
 .ring-progress {
@@ -979,7 +980,7 @@ main > section.hero {
 
 .m-row {
   display: grid;
-  grid-template-columns: 3.75rem 0.5rem minmax(0, 1fr);
+  grid-template-columns: 3.75rem 0.5rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
@@ -1275,7 +1276,268 @@ main > section.hero {
   right: 0.1875rem;
 }
 
-/* ── Motion: one thing moves, once, and only if the visitor has not asked for stillness ── */
+/* Amounts sit on the right of a timeline line, lined up */
+
+.m-val {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A habit's last seven days, under its name */
+
+.m-week {
+  display: flex;
+  gap: 0.3125rem;
+  margin-top: 0.375rem;
+}
+
+.m-week span {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  border: 1px solid var(--habit);
+}
+
+.m-week .on {
+  background: var(--habit);
+}
+
+.m-week .some {
+  background: var(--habit);
+  opacity: 0.4;
+}
+
+/* The ticking card's check: a plus at rest is drawn as the check, and swaps while playing */
+
+.m-check .tick + .plus,
+.m-habit.ticking .m-check .plus {
+  display: none;
+}
+
+.m-habit.ticking .m-check {
+  position: relative;
+  background: var(--habit);
+}
+
+.m-habit.ticking .m-check .tick {
+  stroke: var(--surface);
+}
+
+/* The week beside today */
+
+.week-split {
+  margin-top: 4rem;
+}
+
+.m-ring.small {
+  width: 8.5rem;
+  margin-top: 0.75rem;
+}
+
+.m-ring.small .m-ring-value {
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  align-content: center;
+  gap: 0.125rem;
+}
+
+.m-ring.small .m-ring-value small {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.ring-track.water,
+.ring-progress.water {
+  stroke: var(--dot-move);
+}
+
+.ring-track.water {
+  stroke-opacity: 0.18;
+}
+
+.m-swap {
+  display: grid;
+}
+
+.m-swap > span,
+.m-wval > span {
+  grid-area: 1 / 1;
+}
+
+.v-before {
+  opacity: 0;
+}
+
+.m-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.875rem;
+}
+
+.m-presets span {
+  padding: 0.5rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.m-weekcard,
+.m-glasses {
+  margin-top: 0.875rem;
+  padding: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: var(--surface);
+}
+
+.m-weekhead {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.m-muted {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.m-wbars,
+.m-wdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.m-wbars {
+  margin-top: 0.625rem;
+}
+
+.m-wcol {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+}
+
+.m-wval {
+  display: grid;
+  color: var(--text-muted);
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-wcol.today .m-wval {
+  color: var(--text);
+}
+
+.m-wtrack {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  width: 0.625rem;
+  height: 3.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.m-wtrack::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--dot-move);
+  opacity: 0.16;
+}
+
+.m-wfill {
+  width: 100%;
+  border-radius: 999px;
+  background: var(--dot-move);
+  opacity: 0.55;
+}
+
+.m-wcol.met .m-wfill,
+.m-wcol.today .m-wfill {
+  opacity: 1;
+}
+
+.h-56 { height: 56%; }
+.h-60 { height: 60%; }
+.h-70 { height: 70%; }
+.h-76 { height: 76%; }
+.h-80 { height: 80%; }
+.h-100 { height: 100%; }
+
+.m-wdays {
+  margin-top: 0.375rem;
+  color: var(--text-muted);
+  font-size: 0.625rem;
+  text-align: center;
+}
+
+.m-wdays .today {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.m-glasses {
+  display: grid;
+  padding-block: 0.25rem;
+}
+
+.m-glass {
+  display: grid;
+  grid-template-columns: 0.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.m-glass + .m-glass {
+  border-top: 1px solid var(--border);
+}
+
+/* Connected Context: one switch, and the AI switch once the source is on */
+
+.m-ai {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.m-ai .m-toggle-title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.m-ai .i {
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-muted);
+}
+
+.m-once-on .m-evidence {
+  margin-top: 0.5rem;
+}
+
+/* ── Motion ───────────────────────────────────────────────────────────────────────────────
+ * The screens move only while they are on screen (app.js marks them .in-view) and only for a
+ * visitor who has not asked for stillness. At rest, and without the script, every screen
+ * shows its finished state, so nothing is ever hidden behind an animation.
+ */
 
 @media (prefers-reduced-motion: no-preference) {
   html {
@@ -1286,10 +1548,188 @@ main > section.hero {
   .ring-progress {
     animation: ring-draw 900ms ease-out both;
   }
+
+  /* Today: the suggestion rises in once the ring has drawn. */
+  .motion-ready .mock:not(.in-view) .phone .m-card {
+    opacity: 0;
+  }
+
+  .mock.in-view .phone .m-card {
+    animation: rise 520ms 900ms ease-out both;
+  }
+
+  /* Your Day: the lines arrive in the order they happened. */
+  .motion-ready .mock:not(.in-view) .m-row {
+    opacity: 0;
+  }
+
+  .mock.in-view .m-row {
+    animation: rise 420ms ease-out both;
+  }
+
+  .mock.in-view .m-bucket:nth-child(2) .m-row:nth-child(1) { animation-delay: 150ms; }
+  .mock.in-view .m-bucket:nth-child(2) .m-row:nth-child(2) { animation-delay: 300ms; }
+  .mock.in-view .m-bucket:nth-child(2) .m-row:nth-child(3) { animation-delay: 450ms; }
+  .mock.in-view .m-bucket:nth-child(3) .m-row:nth-child(1) { animation-delay: 650ms; }
+  .mock.in-view .m-bucket:nth-child(3) .m-row:nth-child(2) { animation-delay: 800ms; }
+  .mock.in-view .m-bucket:nth-child(3) .m-row:nth-child(3) { animation-delay: 950ms; }
+
+  /* Habits: Meditate is ticked, held, and untouched again, on a loop. */
+  .mock.in-view .m-habit.ticking {
+    animation: tick-card 6s ease-in-out infinite;
+  }
+
+  .mock.in-view .m-habit.ticking .m-check {
+    animation: tick-fill 6s ease-in-out infinite;
+  }
+
+  .mock.in-view .m-habit.ticking .m-check .tick {
+    animation: tick-show 6s ease-in-out infinite;
+  }
+
+  .mock.in-view .m-habit.ticking .m-check .plus {
+    display: block;
+    position: absolute;
+    animation: tick-hide 6s ease-in-out infinite;
+  }
+
+  .mock.in-view .m-habit.ticking .m-week .today {
+    animation: tick-dot 6s ease-in-out infinite;
+  }
+
+  /* Water: a tap on +250, then the ring, today's bar and the list all take the glass. */
+  .mock.in-view .m-presets .tapped {
+    animation: tap 7s ease-in-out infinite;
+  }
+
+  .mock.in-view .ring-progress.water {
+    animation: water-ring 7s ease-in-out infinite;
+  }
+
+  .mock.in-view .v-before {
+    animation: swap-out 7s ease-in-out infinite;
+  }
+
+  .mock.in-view .v-after {
+    animation: swap-in 7s ease-in-out infinite;
+  }
+
+  .mock.in-view .m-wcol.today .m-wfill {
+    animation: water-bar 7s ease-in-out infinite;
+  }
+
+  .mock.in-view .m-glass.new {
+    animation: glass-in 7s ease-in-out infinite;
+  }
+
+  /* Connected Context: the source is switched on, and only then does the AI switch appear. */
+  .mock.in-view .m-switch.flips {
+    animation: switch-track 6s ease-in-out infinite;
+  }
+
+  .mock.in-view .m-switch.flips::after {
+    animation: switch-knob 6s ease-in-out infinite;
+  }
+
+  .mock.in-view .m-once-on {
+    animation: once-on 6s ease-in-out infinite;
+  }
 }
 
 @keyframes ring-draw {
   from {
     stroke-dashoffset: 490.09;
   }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+@keyframes tick-card {
+  0%, 30% { background: var(--surface); }
+  40%, 85% { background: var(--habit-wash); }
+  100% { background: var(--surface); }
+}
+
+@keyframes tick-fill {
+  0%, 30% { background: transparent; transform: scale(1); }
+  36% { background: var(--habit); transform: scale(1.15); }
+  42%, 85% { background: var(--habit); transform: scale(1); }
+  100% { background: transparent; }
+}
+
+@keyframes tick-show {
+  0%, 32% { opacity: 0; }
+  40%, 85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes tick-hide {
+  0%, 30% { opacity: 1; }
+  34%, 90% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes tick-dot {
+  0%, 34% { background: transparent; }
+  42%, 85% { background: var(--habit); }
+  100% { background: transparent; }
+}
+
+@keyframes tap {
+  0%, 20% { transform: scale(1); background: var(--surface-raised); }
+  24% { transform: scale(0.92); background: var(--accent-wash); }
+  30%, 100% { transform: scale(1); background: var(--surface-raised); }
+}
+
+@keyframes water-ring {
+  0%, 26% { stroke-dashoffset: 196.04; }
+  40%, 92% { stroke-dashoffset: 147.03; }
+  100% { stroke-dashoffset: 196.04; }
+}
+
+@keyframes swap-out {
+  0%, 28% { opacity: 1; }
+  34%, 92% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes swap-in {
+  0%, 28% { opacity: 0; }
+  34%, 92% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes water-bar {
+  0%, 26% { height: 60%; }
+  40%, 92% { height: 70%; }
+  100% { height: 60%; }
+}
+
+@keyframes glass-in {
+  0%, 30% { opacity: 0; transform: translateY(-0.375rem); }
+  40%, 92% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+
+@keyframes switch-track {
+  0%, 20% { background: var(--border); }
+  30%, 92% { background: var(--accent); }
+  100% { background: var(--border); }
+}
+
+@keyframes switch-knob {
+  0%, 20% { transform: translateX(-1.25rem); }
+  30%, 92% { transform: none; }
+  100% { transform: translateX(-1.25rem); }
+}
+
+@keyframes once-on {
+  0%, 30% { opacity: 0; }
+  40%, 92% { opacity: 1; }
+  100% { opacity: 0; }
 }

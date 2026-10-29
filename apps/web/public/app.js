@@ -29,3 +29,27 @@ async function showLatestRelease() {
 }
 
 showLatestRelease();
+
+/**
+ * Play a screen's animation only while it is on screen.
+ *
+ * The stylesheet animates a mock only under `.in-view`, and only for visitors who have not
+ * asked for reduced motion. Without this script nothing is marked, so every screen simply
+ * shows its finished state. `motion-ready` lets the stylesheet hold back a screen's entrance
+ * until it is seen, which is only safe once something is going to reveal it.
+ */
+function playMocksInView() {
+  const mocks = document.querySelectorAll('.mock');
+  if (mocks.length === 0 || !('IntersectionObserver' in window)) return;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) entry.target.classList.toggle('in-view', entry.isIntersecting);
+    },
+    { threshold: 0.3 },
+  );
+  for (const mock of mocks) observer.observe(mock);
+  document.documentElement.classList.add('motion-ready');
+}
+
+playMocksInView();
