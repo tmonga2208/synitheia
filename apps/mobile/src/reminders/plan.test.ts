@@ -323,7 +323,7 @@ describe('food, spending and custom reminders', () => {
         expenses: { totalMinor: 32000, count: 2, budgetRemainingMinor: null },
       }),
     });
-    expect(logged[0]!.body).toBe('₹320.00 logged today. Tap to add another.');
+    expect(logged[0]!.body).toBe('₹320 logged today. Tap to add another.');
   });
 
   it('a custom reminder is its own words, and opens Today', () => {

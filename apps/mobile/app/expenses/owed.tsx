@@ -160,7 +160,7 @@ export default function OwedScreen() {
           <EmptyState
             icon={<HandCoins size={26} color={t.onAccent} strokeWidth={1.6} />}
             title="Nobody owes you"
-            body="When you split an expense with people, what they owe you shows up here until they pay you back."
+            body="Split an expense, and what people owe you waits here until they pay."
           />
         ) : (
           <>

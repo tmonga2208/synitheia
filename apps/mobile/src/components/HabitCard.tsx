@@ -76,7 +76,7 @@ function metadataFor(habit: TodayHabit, readOnly: boolean): string {
   if (readOnly) return goal;
 
   // A zero streak is a beginning, not a failure. "0D Streak" reads as a scolding.
-  const streak = habit.currentStreak > 0 ? `${habit.currentStreak}D Streak` : 'First Day';
+  const streak = habit.currentStreak > 0 ? `${habit.currentStreak}-day streak` : 'First day';
 
   return [goal, streak].join(' • ');
 }

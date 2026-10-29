@@ -15,7 +15,6 @@ import {
 } from 'lucide-react-native';
 import { asMinor, formatMoney, netMinor, owedMinor, type Participant } from '@synitheia/shared';
 import {
-  Button,
   Card,
   Chip,
   ErrorState,
@@ -460,17 +459,24 @@ export default function ExpenseDetail() {
           </Text>
         ) : null}
 
-        <Button
-          label="Delete expense"
-          variant="ghost"
-          style={{ marginTop: spacing['2xl'] }}
+        {/* Quiet, at the very end, like Archive on a habit; the confirm does the warning. */}
+        <Touchable
+          style={styles.deleteRow}
+          haptic={false}
+          accessibilityRole="button"
+          accessibilityLabel="Delete expense"
           onPress={() =>
             Alert.alert('Delete this expense?', 'This cannot be undone.', [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Delete', style: 'destructive', onPress: () => remove.mutate() },
             ])
           }
-        />
+        >
+          <Trash2 size={16} color={t.danger} strokeWidth={1.8} />
+          <Text variant="body" color={t.danger}>
+            Delete expense
+          </Text>
+        </Touchable>
       </ScrollView>
 
       <ReceiptConsentSheet
@@ -494,6 +500,14 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
     content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
+    deleteRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      marginTop: spacing['2xl'],
+      paddingVertical: spacing.md,
+    },
     back: {
       width: 44,
       height: 44,

@@ -106,3 +106,32 @@ describe('stepping a habit back below its target', () => {
     expect(await completions(user.id)).toHaveLength(1);
   });
 });
+
+/**
+ * A habit ticked for an earlier day, from the day screen or the history calendar, belongs on
+ * that day's timeline. It was stamped with the moment of the tap, so it landed on today.
+ */
+describe('completing a habit for an earlier day', () => {
+  it('puts the completion on that day, not on today', async () => {
+    const user = await seedUser();
+    const habit = await seedHabit(user.id);
+    const threeDaysAgo = addLocalDays(todayLocalDate(IST), -3);
+
+    await logHabit(user, habit._id.toString(), { localDate: threeDaysAgo, count: 1 });
+
+    const events = await completions(user.id);
+    expect(events.map((e) => e.localDate)).toEqual([threeDaysAgo]);
+  });
+
+  it('keeps the real time for a habit completed today', async () => {
+    const user = await seedUser();
+    const habit = await seedHabit(user.id);
+    const before = Date.now();
+
+    await logHabit(user, habit._id.toString(), { count: 1 });
+
+    const [event] = await completions(user.id);
+    expect(event!.localDate).toBe(todayLocalDate(IST));
+    expect(new Date(event!.timestamp).getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+});

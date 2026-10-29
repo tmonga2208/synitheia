@@ -299,14 +299,11 @@ export default function Reminders() {
                   onPress={() => confirmDelete(reminder)}
                   style={styles.iconButton}
                 >
-                  <Trash2 size={18} color={t.danger} strokeWidth={1.6} />
+                  <Trash2 size={18} color={t.textFaint} strokeWidth={1.6} />
                 </Touchable>
               </Card>
             ))}
 
-            <Text variant="caption" color={t.textFaint} style={styles.footnote}>
-              Planned two weeks ahead, and refreshed whenever you open Synítheia.
-            </Text>
           </View>
         )}
       </ScrollView>
@@ -544,7 +541,6 @@ const makeStyles = (t: Theme) =>
     list: { gap: spacing.md },
     blocked: { gap: spacing.sm, marginBottom: spacing.base },
     blockedAction: { marginTop: spacing.sm, alignSelf: 'flex-start' },
-    footnote: { marginTop: spacing.sm, textAlign: 'center' },
     reminder: {
       flexDirection: 'row',
       alignItems: 'center',

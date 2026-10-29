@@ -246,8 +246,8 @@ export default function Insights() {
             title={notConfigured ? 'Synítheia is unavailable' : 'Synítheia is off'}
             body={
               notConfigured
-                ? 'This build has no AI provider configured, so no insights can be generated. Nothing you do here will change that — and nothing of yours has been sent anywhere.'
-                : 'Synítheia can look across your habits, spending, food, and water to notice patterns you would not. It is off until you say otherwise, and you choose exactly which sources it may read.'
+                ? 'Not available yet. Nothing of yours has been sent anywhere.'
+                : 'Off until you turn it on, and it reads only the sources you choose.'
             }
             actionLabel={notConfigured ? undefined : 'Review Connected Context'}
             onAction={notConfigured ? undefined : () => router.push('/privacy')}
@@ -287,7 +287,7 @@ export default function Insights() {
           <EmptyState
             icon={<Sparkles size={30} color={t.onAccent} strokeWidth={1.5} />}
             title="No insights yet"
-            body="Synítheia only speaks when it has something to say. Generate a pass over the last 30 days and see what it finds."
+            body="Synítheia speaks only when it has something to say. Look over the last 30 days."
           />
         ) : (
           <View style={styles.list}>

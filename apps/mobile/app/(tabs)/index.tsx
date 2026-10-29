@@ -258,7 +258,7 @@ export default function Today() {
         <View style={styles.chips}>
           {/* At zero these become an invitation rather than a score of nothing. */}
           <Chip
-            label={data.streakDays > 0 ? `${data.streakDays} Day Streak` : 'Streaks'}
+            label={data.streakDays > 0 ? `${data.streakDays}-day streak` : 'Streaks'}
             icon={<Zap size={14} color={t.textPrimary} strokeWidth={2} />}
             accessibilityRole="text"
             haptic={false}
@@ -491,7 +491,8 @@ const makeStyles = (t: Theme) =>
     screen: { flex: 1, backgroundColor: t.bg },
     content: {
       paddingHorizontal: spacing.xl,
-      paddingBottom: spacing.xl,
+      // Clears the floating tab bar, so the last habit can be scrolled fully into view.
+      paddingBottom: 120,
     },
     header: {
       flexDirection: 'row',

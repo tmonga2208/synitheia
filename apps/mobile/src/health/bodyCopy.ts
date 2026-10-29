@@ -45,9 +45,9 @@ export function missingSentence(missing: readonly BodyField[]): string {
  */
 export function bodyProvenance(sourceName: string, storeHoldsIdentity: boolean): string {
   if (storeHoldsIdentity) {
-    return `These come from ${sourceName} when it has them, and its values replace what you enter here each time it syncs.`;
+    return `Filled in from ${sourceName} when it has them. If you change one here, ${sourceName}'s value wins next time.`;
   }
-  return `Height and weight come from ${sourceName} when it has them, and its values replace what you enter here each time it syncs. Sex and date of birth are only ever what you enter.`;
+  return `Height and weight are filled in from ${sourceName} when it has them, and its value wins over yours. Sex and date of birth are only ever what you enter.`;
 }
 
 // A date of birth is a calendar label, not an instant. Anchoring it at UTC midnight and

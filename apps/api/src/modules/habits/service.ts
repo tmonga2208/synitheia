@@ -8,6 +8,7 @@ import {
   diffLocalDays,
   isHabitComplete,
   startOfLocalWeek,
+  startOfLocalDay,
   toLocalDate,
   todayLocalDate,
   type ClientId,
@@ -294,7 +295,7 @@ export async function logHabit(
     await emit({
       userId: user.id,
       source: 'manual',
-      timestamp: log.completedAt ?? new Date(),
+      timestamp: completionMoment(log.completedAt ?? new Date(), localDate, user.timezone),
       timezone: user.timezone,
       refId: habit._id,
       // Keyed on the habit and the DAY, not on the log id — re-completing the same
@@ -313,6 +314,16 @@ export async function logHabit(
   }
 
   return { log, habit: updated };
+}
+
+/**
+ * When a completion goes on the timeline. A tap for today keeps its real time; a tap for an
+ * earlier day (the day screen, the history calendar) has no real time on that day, so it
+ * goes at midday. Stamped with the tap itself, it landed on today's timeline instead.
+ */
+function completionMoment(tappedAt: Date, localDate: LocalDate, timezone: string): Date {
+  if (toLocalDate(tappedAt, timezone) === localDate) return tappedAt;
+  return new Date(startOfLocalDay(localDate, timezone).getTime() + 12 * 60 * 60 * 1000);
 }
 
 /**

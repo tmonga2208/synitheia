@@ -26,16 +26,16 @@ describe('bodyProvenance', () => {
   it('on Android, says which values the health store can supply and which it never can', () => {
     const copy = bodyProvenance('Health Connect', false);
 
-    expect(copy).toContain('Height and weight come from Health Connect when it has them');
-    expect(copy).toContain('replace what you enter here');
+    expect(copy).toContain('Height and weight are filled in from Health Connect when it has them');
+    expect(copy).toContain('its value wins over yours');
     expect(copy).toContain('Sex and date of birth are only ever what you enter');
   });
 
   it('on iPhone, does not claim anything is hand-entered only', () => {
     const copy = bodyProvenance('Apple Health', true);
 
-    expect(copy).toContain('come from Apple Health when it has them');
-    expect(copy).toContain('replace what you enter here');
+    expect(copy).toContain('Filled in from Apple Health when it has them');
+    expect(copy).toContain("Apple Health's value wins next time");
     expect(copy).not.toContain('only ever');
   });
 });

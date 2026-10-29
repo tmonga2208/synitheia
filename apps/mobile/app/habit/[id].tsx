@@ -12,7 +12,6 @@ import {
   type TodayResponse,
 } from '@synitheia/shared';
 import {
-  Button,
   Card,
   Chip,
   ErrorState,
@@ -197,7 +196,7 @@ export default function HabitDetail() {
           <Chip
             label={
               habit.currentStreak > 0
-                ? `${habit.currentStreak} Day Streak`
+                ? `${habit.currentStreak}-day streak`
                 : 'No streak yet'
             }
             icon={<Flame size={14} color={accent.text} strokeWidth={2} />}
@@ -206,7 +205,7 @@ export default function HabitDetail() {
             haptic={false}
           />
           <Chip
-            label={`Longest: ${habit.longestStreak}`}
+            label={`Best: ${habit.longestStreak} days`}
             icon={<Trophy size={14} color={accent.text} strokeWidth={2} />}
             accent={accent.base}
             accessibilityRole="text"
@@ -223,23 +222,20 @@ export default function HabitDetail() {
           </Card>
         ) : null}
 
-        <Card style={styles.archiveCard}>
-          <View style={styles.archiveCopy}>
-            <Archive size={18} color={t.textMuted} strokeWidth={1.6} />
-            <Text variant="cardTitle">Archive this habit</Text>
-          </View>
+        {/* Quiet, at the very end: archiving is rare, and the confirm explains what it keeps. */}
+        <Touchable
+          style={styles.archiveRow}
+          onPress={confirmArchive}
+          disabled={archive.isPending}
+          haptic={false}
+          accessibilityRole="button"
+          accessibilityLabel="Archive this habit"
+        >
+          <Archive size={16} color={t.textMuted} strokeWidth={1.6} />
           <Text variant="body" color={t.textMuted}>
-            It leaves your daily list, but every log you have made stays in your history.
+            {archive.isPending ? 'Archiving…' : 'Archive this habit'}
           </Text>
-
-          <Button
-            label="Archive"
-            variant="secondary"
-            loading={archive.isPending}
-            onPress={confirmArchive}
-            haptic={false}
-          />
-        </Card>
+        </Touchable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -289,10 +285,12 @@ const makeStyles = (t: Theme) =>
       alignItems: 'center',
       gap: spacing.md,
     },
-    archiveCard: { marginTop: spacing.xl, gap: spacing.md },
-    archiveCopy: {
+    archiveRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
       gap: spacing.sm,
+      marginTop: spacing['2xl'],
+      paddingVertical: spacing.md,
     },
   });

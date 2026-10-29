@@ -33,7 +33,6 @@ import { api } from '../src/api/client.js';
 import { missingSentence } from '../src/health/bodyCopy.js';
 import { BodyDetails } from '../src/health/BodyDetails.js';
 import { BodyDetailsForm } from '../src/health/BodyDetailsForm.js';
-import { healthSourceName } from '../src/health/healthStore.js';
 import { WeightCard } from '../src/health/WeightCard.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
@@ -126,8 +125,6 @@ export default function Body() {
 
   const { insight, options, today } = data;
 
-  // Named once, from the platform — never "Apple Health" hardcoded into copy.
-  const source = healthSourceName();
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -235,7 +232,9 @@ export default function Body() {
               */}
               <Text variant="caption" color={t.textFaint}>
                 {insight.tdee.estimated
-                  ? `Estimated from ${(today.steps ?? 0).toLocaleString()} steps — ${source} has not recorded your active energy today.`
+                  ? today.steps
+                    ? `Estimated from your ${today.steps.toLocaleString()} steps today.`
+                    : 'An estimate until today’s activity comes in.'
                   : `Measured: ${insight.bmrKcal.toLocaleString()} at rest plus ${(today.activeEnergyKcal ?? 0).toLocaleString()} active.`}
               </Text>
             </Card>

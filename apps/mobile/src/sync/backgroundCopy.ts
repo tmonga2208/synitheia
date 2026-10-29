@@ -20,18 +20,19 @@ export function backgroundSyncCopy(
       .filter((name) => name !== null)
       .join(' and ');
 
-    return `Keeps ${sources} up to date when your phone allows it. This is best-effort: iOS decides when it runs, and it stops if you force-quit the app.`;
+    return `Keeps ${sources} up to date. Your phone decides when it runs, and swiping Synítheia away stops it.`;
   }
 
-  const bestEffort = 'This is best-effort: Android decides when it runs.';
-  const condition =
-    'you have allowed background access for Synítheia in Health Connect, which not every phone offers';
+  // Health Connect is named because it is an app on the reader's own phone, where the
+  // switch lives; the operating system is not.
+  const decides = 'Your phone decides when it runs.';
+  const condition = 'you allow background access for Synítheia in Health Connect';
 
   if (connected.health && connected.calendar) {
-    return `Keeps Calendar up to date when your phone allows it. Health is included only if ${condition}. ${bestEffort}`;
+    return `Keeps Calendar up to date, and Health too if ${condition}. ${decides}`;
   }
   if (connected.health) {
-    return `Keeps Health up to date, but only if ${condition}. ${bestEffort}`;
+    return `Keeps Health up to date if ${condition}. ${decides}`;
   }
-  return `Keeps Calendar up to date when your phone allows it. ${bestEffort}`;
+  return `Keeps Calendar up to date. ${decides}`;
 }

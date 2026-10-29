@@ -489,7 +489,7 @@ export default function NewExpense() {
           <Text variant="body" color={t.textMuted} style={styles.subtitle}>
             {reviewing
               ? 'We read these from what you shared. Nothing is saved until you confirm — check each one and correct anything we got wrong.'
-              : 'Type it in, or hand us a screenshot, a message, or a statement and confirm what we read.'}
+              : 'Type it in, or add a screenshot or statement and check what we read.'}
           </Text>
 
           {error ? (

@@ -298,12 +298,13 @@ describe('monthSummaryFor', () => {
       // Nothing seeded the cache, and logHabit invalidates rather than rebuilds.
       expect(await DailySummaryModel.countDocuments({})).toBe(0);
 
+      // A backdated completion now lands on its own day's timeline. Remove it, so this
+      // day can only be found by the HabitLog scan, which is what this test is for.
+      await PersonalEventModel.deleteMany({});
+
       const result = await monthSummaryFor(user, '2026-07', '2026-08-01');
 
-      // Habits are the only active component: 1 of 1 completed. eventCount is 0 —
-      // logHabit stamps its timeline event with `new Date()`, so a BACKDATED log's
-      // event lands on the real today, not on 2026-07-18. Which is the point: this
-      // day is found by the HabitLog scan, not the PersonalEvent one.
+      // Habits are the only active component: 1 of 1 completed, and no timeline events.
       expect(result.days).toEqual([
         { localDate: '2026-07-18', percent: 100, eventCount: 0 },
       ]);

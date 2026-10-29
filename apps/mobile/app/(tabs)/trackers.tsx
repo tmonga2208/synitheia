@@ -157,7 +157,7 @@ export default function Trackers() {
                 <Utensils size={20} color={ACCENTS.nutrition.text} strokeWidth={1.7} />
               }
               accent={ACCENTS.nutrition}
-              value={String(Math.round(data.nutrition.totals.calories))}
+              value={Math.round(data.nutrition.totals.calories).toLocaleString()}
               caption={`of ${data.nutrition.calorieTarget.toLocaleString()} kcal`}
               progress={data.nutrition.totals.calories / data.nutrition.calorieTarget}
               onPress={() => router.push('/nutrition')}

@@ -87,7 +87,7 @@ function googleClientId(): string {
     default: extra.googleWebClientId,
   });
 
-  if (!id) throw new Error('Google sign-in is not configured for this build.');
+  if (!id) throw new Error('Google sign-in isn’t available right now. Use email instead.');
   return id;
 }
 

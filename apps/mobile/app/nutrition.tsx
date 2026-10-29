@@ -145,13 +145,13 @@ export default function NutritionScreen() {
         {back}
 
         <Text variant="overline" color={ACCENT.text} style={{ marginTop: spacing.base }}>
-          Nutrition
+          Today
         </Text>
-        <Text variant="title">Today</Text>
+        <Text variant="title">Food</Text>
 
         <View style={styles.ring}>
           <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={18}>
-            <Text variant="title">{Math.round(totals.calories)}</Text>
+            <Text variant="title">{Math.round(totals.calories).toLocaleString()}</Text>
             <Text variant="caption" color={t.textMuted}>
               of {target.toLocaleString()} kcal
             </Text>

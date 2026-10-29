@@ -208,9 +208,9 @@ export default function History() {
             <>
               <SectionHeader title={`${formatMonthLabel(month)} at a glance`} />
               <View style={styles.stats}>
-                <Stat value={`${data.stats.avgPercent}%`} label="avg flow" />
+                <Stat value={`${data.stats.avgPercent}%`} label="average day" />
                 <Stat value={String(data.stats.daysLogged)} label="days logged" />
-                <Stat value={String(data.stats.bestFlowRun)} label="best run" />
+                <Stat value={String(data.stats.bestFlowRun)} label="good days in a row" />
               </View>
             </>
           )}

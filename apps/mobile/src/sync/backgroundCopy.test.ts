@@ -33,18 +33,18 @@ describe('backgroundSyncCopy', () => {
       { health: true, calendar: true },
       { health: true, calendar: false },
       { health: false, calendar: true },
-    ])('is plain that Android decides when it runs (%o)', (connected) => {
+    ])('says the phone decides when it runs, without naming the system (%o)', (connected) => {
       const copy = backgroundSyncCopy('android', connected);
 
-      expect(copy).toContain('best-effort');
-      expect(copy).toContain('Android decides when it runs');
+      expect(copy).toContain('Your phone decides when it runs');
+      expect(copy).not.toMatch(/Android|best-effort/);
     });
   });
 
   describe('on iPhone', () => {
     it('names both sources when both are connected', () => {
       expect(backgroundSyncCopy('ios', { health: true, calendar: true })).toBe(
-        'Keeps Health and Calendar up to date when your phone allows it. This is best-effort: iOS decides when it runs, and it stops if you force-quit the app.',
+        'Keeps Health and Calendar up to date. Your phone decides when it runs, and swiping Synítheia away stops it.',
       );
     });
 
