@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 // CommonJS, as Expo loads config plugins; required the same way so prebuild's file is tested.
@@ -9,7 +10,10 @@ const plugin = createRequire(import.meta.url)('./withSceneLifecycle.js') as {
 };
 
 /** The AppDelegate.swift Expo 54's prebuild generates, unchanged. */
-const template = readFileSync(new URL('./fixtures/AppDelegate.expo54.swift', import.meta.url), 'utf8');
+const template = readFileSync(
+  fileURLToPath(new URL('./fixtures/AppDelegate.expo54.swift', import.meta.url)),
+  'utf8',
+);
 
 describe('withSceneLifecycle', () => {
   it('names our scene delegate in a single-scene manifest and keeps other keys', () => {
