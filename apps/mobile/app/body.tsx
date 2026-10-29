@@ -209,7 +209,7 @@ export default function Body() {
               </View>
               {/* Said once, plainly, rather than buried in a disclaimer nobody reads. */}
               <Text variant="caption" color={t.textFaint}>
-                A rough ratio of weight to height. It cannot tell muscle from fat.
+                A rough guide from weight and height. It can’t tell muscle from fat.
               </Text>
             </Card>
           ) : null}

@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { asLocalDate, localWeekdayIndex, type TodayResponse } from '@synitheia/shared';
 import { Card, Text } from './primitives.js';
-import { motion, radius, spacing } from '../theme/theme.js';
+import { flowTint, motion, radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
 
@@ -33,6 +33,9 @@ const WEEKDAY_NAME = [
 ] as const;
 
 const PLOT_HEIGHT = 132;
+/** Room over each bar for its number; a full bar's top meets the goal line under it. */
+const LABEL_SPACE = 20;
+const BAR_SPACE = PLOT_HEIGHT - LABEL_SPACE;
 /** A day with nothing logged still gets a visible stub — an absent bar reads as a rendering bug. */
 const MIN_BAR_HEIGHT = 24;
 
@@ -47,8 +50,26 @@ export function WeeklyChart({ days }: WeeklyChartProps) {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
 
+  // Today is left out: it is not over, and a morning would drag the average down.
+  const past = days.filter((d) => !d.isToday && d.percent > 0);
+  const average =
+    past.length > 0
+      ? Math.round(past.reduce((sum, d) => sum + d.percent, 0) / past.length)
+      : null;
+
   return (
     <Card style={styles.card} elevated={false}>
+      <View style={styles.header}>
+        <Text variant="caption" color={t.textMuted}>
+          How much of each day you did
+        </Text>
+        {average != null ? (
+          <Text variant="caption" color={t.textPrimary}>
+            {`Usually ${average}%`}
+          </Text>
+        ) : null}
+      </View>
+
       <View style={styles.plot}>
         <View style={styles.goalLine} pointerEvents="none">
           <View style={styles.dash} />
@@ -67,10 +88,7 @@ export function WeeklyChart({ days }: WeeklyChartProps) {
           const weekday = localWeekdayIndex(asLocalDate(day.localDate));
           return (
             <View key={day.localDate} style={styles.axisCell}>
-              <Text
-                variant="caption"
-                color={day.isToday ? t.textPrimary : t.textFaint}
-              >
+              <Text variant="caption" color={day.isToday ? t.textPrimary : t.textFaint}>
                 {WEEKDAY_INITIAL[weekday]}
               </Text>
             </View>
@@ -84,7 +102,7 @@ export function WeeklyChart({ days }: WeeklyChartProps) {
 function Bar({ day, index }: { day: WeeklyDay; index: number }) {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const target = Math.max(MIN_BAR_HEIGHT, (day.percent / 100) * PLOT_HEIGHT);
+  const target = Math.max(MIN_BAR_HEIGHT, (day.percent / 100) * BAR_SPACE);
 
   const height = useSharedValue(MIN_BAR_HEIGHT);
 
@@ -92,7 +110,10 @@ function Bar({ day, index }: { day: WeeklyDay; index: number }) {
     // Bars rise left-to-right, so the week reads as a sequence rather than a snapshot.
     height.value = withDelay(
       index * 60,
-      withTiming(target, { duration: motion.ring.duration, easing: Easing.out(Easing.cubic) }),
+      withTiming(target, {
+        duration: motion.ring.duration,
+        easing: Easing.out(Easing.cubic),
+      }),
     );
   }, [target, index, height]);
 
@@ -107,12 +128,24 @@ function Bar({ day, index }: { day: WeeklyDay; index: number }) {
       accessibilityRole="text"
       accessibilityLabel={`${WEEKDAY_NAME[weekday]}${day.isToday ? ', today' : ''}: ${day.percent} percent`}
     >
+      <Text
+        variant="caption"
+        color={day.isToday ? t.textPrimary : t.textMuted}
+        style={styles.barLabel}
+      >
+        {day.percent > 0 ? `${day.percent}` : ' '}
+      </Text>
       <Animated.View
         style={[
           styles.bar,
           day.isToday
             ? { backgroundColor: t.accent, ...t.shadow.card }
-            : { backgroundColor: t.border },
+            : // Past days take the History calendar's tint, so a strong day looks strong
+              // here too rather than every finished day being the same grey.
+              {
+                backgroundColor:
+                  day.percent > 0 ? flowTint(day.percent, t).background : t.border,
+              },
           animatedStyle,
         ]}
       />
@@ -135,9 +168,15 @@ const makeStyles = (t: Theme) =>
       flexDirection: 'row',
       alignItems: 'flex-end',
     },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+    },
+    barLabel: { fontSize: 11, marginBottom: spacing.xs },
     goalLine: {
       position: 'absolute',
-      top: 0,
+      top: LABEL_SPACE,
       left: 0,
       right: 0,
       flexDirection: 'row',

@@ -20,6 +20,7 @@ import { iconFor } from './IconPicker.js';
 import { MIN_TAP_TARGET, motion, radius, spacing } from '../theme/theme.js';
 import { useTheme } from '../theme/ThemeProvider.js';
 import { accentFor } from '../theme/theme.js';
+import type { RecentDay } from '../habits/lastSeven.js';
 
 /** A habit as Today sees it: the domain record plus this local day's progress. */
 export type TodayHabit = TodayResponse['habits'][number];
@@ -46,6 +47,8 @@ interface HabitCardProps {
    * invitation to rewrite it.
    */
   readOnly?: boolean;
+  /** The last seven days as dots under the name, oldest first. Shown only when given. */
+  recent?: RecentDay[];
 }
 
 /**
@@ -76,7 +79,8 @@ function metadataFor(habit: TodayHabit, readOnly: boolean): string {
   if (readOnly) return goal;
 
   // A zero streak is a beginning, not a failure. "0D Streak" reads as a scolding.
-  const streak = habit.currentStreak > 0 ? `${habit.currentStreak}-day streak` : 'First day';
+  const streak =
+    habit.currentStreak > 0 ? `${habit.currentStreak}-day streak` : 'First day';
 
   return [goal, streak].join(' • ');
 }
@@ -88,7 +92,15 @@ function metadataFor(habit: TodayHabit, readOnly: boolean): string {
  * completion affordance. It is the most distinctive thing in the design language:
  * a list of habits should read as a list of individual rituals, not as rows in a table.
  */
-export function HabitCard({ habit, onPress, onLog, onUnlog, onAdjust, readOnly = false }: HabitCardProps) {
+export function HabitCard({
+  habit,
+  onPress,
+  onLog,
+  onUnlog,
+  onAdjust,
+  readOnly = false,
+  recent,
+}: HabitCardProps) {
   const t = useTheme();
   const accent = accentFor(habit.color, t);
   const { Icon } = iconFor(habit.icon);
@@ -144,6 +156,28 @@ export function HabitCard({ habit, onPress, onLog, onUnlog, onAdjust, readOnly =
             <Text variant="caption" color={accent.text} numberOfLines={1}>
               {metadata}
             </Text>
+            {recent ? (
+              <View
+                style={styles.dots}
+                accessible
+                accessibilityLabel={`Done ${recent.filter((d) => d.state === 'done').length} of the last 7 days`}
+              >
+                {recent.map((day) => (
+                  <View
+                    key={day.localDate}
+                    style={[
+                      styles.dot,
+                      day.state === 'none'
+                        ? { borderWidth: 1, borderColor: accent.base, opacity: 0.5 }
+                        : {
+                            backgroundColor: accent.base,
+                            opacity: day.state === 'done' ? 1 : 0.4,
+                          },
+                    ]}
+                  />
+                ))}
+              </View>
+            ) : null}
           </View>
 
           <Touchable
@@ -154,13 +188,15 @@ export function HabitCard({ habit, onPress, onLog, onUnlog, onAdjust, readOnly =
                 : isCounter && onAdjust
                   ? `Log ${habit.name}, ${formatHabitProgress(habit, habit.todayCount)}`
                   : habit.todayComplete
-                  ? `${habit.name} is complete for today`
-                  : isCounter
-                    ? `Add ${HABIT_MEASURES[measure].step} to ${habit.name}, ${formatHabitProgress(habit, habit.todayCount)}`
-                    : `Complete ${habit.name}`
+                    ? `${habit.name} is complete for today`
+                    : isCounter
+                      ? `Add ${HABIT_MEASURES[measure].step} to ${habit.name}, ${formatHabitProgress(habit, habit.todayCount)}`
+                      : `Complete ${habit.name}`
             }
             accessibilityHint={
-              !readOnly && habit.todayComplete && onUnlog ? 'Takes the last step back' : undefined
+              !readOnly && habit.todayComplete && onUnlog
+                ? 'Takes the last step back'
+                : undefined
             }
             accessibilityState={{
               checked: habit.todayComplete,
@@ -233,6 +269,8 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xs,
   },
+  dots: { flexDirection: 'row', gap: 5, marginTop: 2 },
+  dot: { width: 8, height: 8, borderRadius: radius.full },
   affordanceTarget: {
     minWidth: MIN_TAP_TARGET,
     minHeight: MIN_TAP_TARGET,

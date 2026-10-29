@@ -9,6 +9,7 @@ import {
   formatHabitProgress,
   formatHabitTarget,
   measureOf,
+  todayLocalDate,
   type TodayResponse,
 } from '@synitheia/shared';
 import {
@@ -21,7 +22,9 @@ import {
 import { SkeletonList } from '../../src/components/Skeleton.js';
 import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { iconFor } from '../../src/components/IconPicker.js';
+import { RecentDays } from '../../src/habits/RecentDays.js';
 import { api } from '../../src/api/client.js';
+import { useAuth } from '../../src/store/auth.js';
 import { describeError } from '../../src/api/errorCopy.js';
 import type { HabitHistory, ListResponse, WireHabit } from '../../src/api/types.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
@@ -36,6 +39,7 @@ export default function HabitDetail() {
   const styles = useThemedStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const timezone = useAuth((s) => s.user?.timezone) ?? 'UTC';
 
   const habitsQuery = useQuery({
     queryKey: HABITS_KEY,
@@ -88,7 +92,11 @@ export default function HabitDetail() {
       'It leaves your daily list. Your logs and streaks are kept — nothing is deleted.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Archive', style: 'destructive', onPress: () => archive.mutate() },
+        {
+          text: 'Archive',
+          style: 'destructive',
+          onPress: () => archive.mutate(),
+        },
       ],
     );
   }
@@ -163,7 +171,10 @@ export default function HabitDetail() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           {back}
           <View style={[styles.iconChip, { backgroundColor: accent.wash }]}>
@@ -182,7 +193,12 @@ export default function HabitDetail() {
         </Text>
 
         <View style={styles.ring}>
-          <ProgressRing percent={percent} color={accent.base} />
+          <ProgressRing
+            percent={percent}
+            color={accent.base}
+            size={168}
+            strokeWidth={22}
+          />
           <Text variant="label" color={t.textFaint} style={styles.ringCaption}>
             {history
               ? `${history.completedPeriods} of ${history.scheduledPeriods} ${
@@ -205,13 +221,24 @@ export default function HabitDetail() {
             haptic={false}
           />
           <Chip
-            label={`Best: ${habit.longestStreak} days`}
+            label={`Best: ${habit.longestStreak} ${habit.longestStreak === 1 ? 'day' : 'days'}`}
             icon={<Trophy size={14} color={accent.text} strokeWidth={2} />}
             accent={accent.base}
             accessibilityRole="text"
             haptic={false}
           />
         </View>
+
+        {history ? (
+          <Card style={styles.recent}>
+            <Text variant="label">Last 4 weeks</Text>
+            <RecentDays
+              logs={history.logs}
+              today={todayQuery.data?.localDate ?? todayLocalDate(timezone)}
+              color={accent.base}
+            />
+          </Card>
+        ) : null}
 
         {habit.reminderTime ? (
           <Card style={styles.reminderCard}>
@@ -271,8 +298,9 @@ const makeStyles = (t: Theme) =>
     },
     name: { marginTop: spacing.xs },
     goal: { marginTop: spacing.xs },
-    ring: { alignItems: 'center', marginTop: spacing.xl, gap: spacing.md },
-    ringCaption: { marginTop: spacing.sm },
+    ring: { alignItems: 'center', marginTop: spacing.lg, gap: spacing.md },
+    ringCaption: { marginTop: spacing.xs },
+    recent: { marginTop: spacing.xl, gap: spacing.base },
     chips: {
       flexDirection: 'row',
       justifyContent: 'space-between',

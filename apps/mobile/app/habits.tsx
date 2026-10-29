@@ -3,19 +3,15 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Leaf, Plus } from 'lucide-react-native';
 import type { TodayResponse } from '@synitheia/shared';
-import {
-  EmptyState,
-  ErrorState,
-  Text,
-  Touchable,
-} from '../src/components/primitives.js';
+import { EmptyState, ErrorState, Text, Touchable } from '../src/components/primitives.js';
 import { SkeletonList } from '../src/components/Skeleton.js';
 import { HabitCard, type TodayHabit } from '../src/components/HabitCard.js';
+import { lastSeven } from '../src/habits/lastSeven.js';
 import { api } from '../src/api/client.js';
-import type { ListResponse, WireHabit } from '../src/api/types.js';
+import type { HabitHistory, ListResponse, WireHabit } from '../src/api/types.js';
 import { useHabitLog } from '../src/habits/useHabitLog.js';
 import { LogAmountSheet } from '../src/habits/LogAmountSheet.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
@@ -75,6 +71,15 @@ export default function Habits() {
     () => merge(habitsQuery.data?.items ?? [], todayQuery.data),
     [habitsQuery.data, todayQuery.data],
   );
+
+  // Shares its cache with each habit's own page, which loads the same 30 days.
+  const histories = useQueries({
+    queries: habits.map((habit) => ({
+      queryKey: ['habit-history', habit.id],
+      queryFn: () => api.get<HabitHistory>(`/habits/${habit.id}/history?days=30`),
+    })),
+  });
+  const todayDate = todayQuery.data?.localDate;
 
   const back = (
     <Touchable
@@ -158,10 +163,15 @@ export default function Habits() {
           />
         ) : (
           <View style={styles.list}>
-            {habits.map((habit) => (
+            {habits.map((habit, index) => (
               <HabitCard
                 key={habit.id}
                 habit={habit}
+                recent={
+                  histories[index]?.data && todayDate
+                    ? lastSeven(histories[index].data.logs, todayDate, habit)
+                    : undefined
+                }
                 onPress={openHabit}
                 onLog={habitLog.log}
                 onUnlog={habitLog.unlog}
@@ -172,7 +182,11 @@ export default function Habits() {
         )}
       </ScrollView>
 
-      <LogAmountSheet habit={adjusting} onClose={() => setAdjusting(null)} onSave={habitLog.setCount} />
+      <LogAmountSheet
+        habit={adjusting}
+        onClose={() => setAdjusting(null)}
+        onSave={habitLog.setCount}
+      />
     </SafeAreaView>
   );
 }

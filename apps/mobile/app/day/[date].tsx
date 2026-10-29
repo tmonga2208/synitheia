@@ -118,7 +118,7 @@ export default function Day() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.ring}>
-            <ProgressRing percent={data.dailyFlow.percent} />
+            <ProgressRing percent={data.dailyFlow.percent} caption="of the day done" />
           </View>
 
           {totals ? (

@@ -16,8 +16,6 @@ import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image as ImageIcon, RefreshCw,
   ArrowLeft,
-  Ban,
-  Check,
   Download,
   Sparkles,
   Trash2,
@@ -84,19 +82,6 @@ async function openHealthConnectInStore(): Promise<void> {
   }
 }
 const AVAILABILITY_KEY = ['insights', 'availability'] as const;
-
-const STATUS_LABEL: Record<DataSourceStatus, string> = {
-  connected: 'Connected',
-  disabled: 'Not enabled',
-  denied: 'Not enabled',
-  unavailable: 'Unavailable',
-};
-
-function statusColor(status: DataSourceStatus, t: Theme): string {
-  if (status === 'connected') return t.accent;
-  if (status === 'unavailable') return t.textFaint;
-  return t.textMuted;
-}
 
 /**
  * "Updated Oct 29, 1:04 PM · 12 entries", in the user's words: nothing about syncing or
@@ -645,104 +630,70 @@ function SourceCard({
 
   return (
     <Card style={styles.source}>
+      {/* The source's name is the switch's label: "Weather", on or off. An unavailable
+          source gets no switch at all — a control that can never move implies a choice
+          the user does not have. */}
       <View style={styles.sourceHeader}>
         <Text variant="cardTitle" style={styles.sourceTitle}>
           {item.title}
         </Text>
 
-        <View style={[styles.badge, { borderColor: statusColor(item.status, t) }]}>
-          {connected ? (
-            <Check size={12} color={t.accent} strokeWidth={2.5} />
-          ) : unavailable ? (
-            <Ban size={12} color={t.textFaint} strokeWidth={2} />
-          ) : null}
-          <Text variant="caption" color={statusColor(item.status, t)}>
-            {STATUS_LABEL[item.status]}
+        {unavailable ? (
+          <Text variant="caption" color={t.textFaint}>
+            Not available
           </Text>
-        </View>
+        ) : (
+          <Switch
+            value={connected}
+            onValueChange={onCollectChange}
+            accessibilityLabel={`Use ${item.title}`}
+            trackColor={{ false: t.border, true: t.accent }}
+            thumbColor={t.onAccent}
+            ios_backgroundColor={t.border}
+          />
+        )}
       </View>
 
       {/* The `why` is written and served by the server, so the stated purpose cannot
           drift from the actual collection across an app-store release cycle. */}
-      <Text variant="body" color={t.textMuted}>
+      <Text variant="label" color={t.textMuted}>
         {item.why}
       </Text>
 
-      {/* Which phones support a source is the app's business, not the reader's; only what
-          it means for them is shown. */}
-      {item.reliability || (!unavailable && activity) ? (
-        <View style={styles.meta}>
-          {item.reliability ? (
-            <Text variant="caption" color={t.textFaint}>
-              {item.reliability}
-            </Text>
-          ) : null}
-          {!unavailable && activity ? (
-            <Text variant="caption" color={t.textFaint}>
-              {activity}
-            </Text>
-          ) : null}
-        </View>
+      {connected && activity ? (
+        <Text variant="caption" color={t.textFaint}>
+          {activity}
+        </Text>
       ) : null}
 
-      {/* ── Two decisions, two switches, visibly apart ─────────────────────
-          An unavailable source gets no switches at all. A control that can never
-          move is not a control — it implies a choice the user does not have, and
-          the badge and the explanation above already say the whole story. */}
-      {!unavailable ? (
-        <View style={styles.consents}>
-          <View style={styles.consentRow}>
-            <View style={styles.consentCopy}>
-              <Text variant="bodyMedium" color={t.textPrimary}>
-                Collect this data
-              </Text>
-              <Text variant="caption" color={t.textFaint}>
-                Read it into your timeline and your day.
+      {/* The AI switch appears once there is something for it to apply to. Shown greyed
+          out under every source that is off, it repeated the same "turn the other one
+          on first" note five times down the screen. */}
+      {connected ? (
+        <View style={styles.aiRow}>
+          <View style={styles.consentCopy}>
+            <View style={styles.aiLabel}>
+              <Sparkles size={14} color={t.textMuted} strokeWidth={1.8} />
+              <Text variant="bodyMedium" color={aiEnabled ? t.textPrimary : t.textFaint}>
+                Let Synítheia AI use it
               </Text>
             </View>
-
-            <Switch
-              value={connected}
-              onValueChange={onCollectChange}
-              accessibilityLabel={`Collect ${item.title}`}
-              trackColor={{ false: t.border, true: t.accent }}
-              thumbColor={t.onAccent}
-              ios_backgroundColor={t.border}
-            />
-          </View>
-
-          <View style={styles.consentDivider} />
-
-          <View style={styles.consentRow}>
-            <View style={styles.consentCopy}>
-              <View style={styles.aiLabel}>
-                <Sparkles size={14} color={t.textMuted} strokeWidth={1.8} />
-                <Text
-                  variant="bodyMedium"
-                  color={connected && aiEnabled ? t.textPrimary : t.textFaint}
-                >
-                  Let Synítheia AI use it
-                </Text>
-              </View>
+            {!aiEnabled ? (
               <Text variant="caption" color={t.textFaint}>
-                {!connected
-                  ? 'Turn on “Collect this data” first.'
-                  : !aiEnabled
-                    ? 'Turn Synítheia AI on above to allow this.'
-                    : 'Separate from collecting: you can keep a source and still keep it from the AI.'}
+                Turn Synítheia AI on above to allow this.
               </Text>
-            </View>
-
-            <Switch
-              value={item.aiAllowed}
-              disabled={!connected || !aiEnabled}
-              onValueChange={onAiChange}
-              accessibilityLabel={`Let Synítheia AI use ${item.title}`}
-              trackColor={{ false: t.border, true: t.accent }}
-              thumbColor={t.onAccent}
-              ios_backgroundColor={t.border}
-            />
+            ) : null}
           </View>
+
+          <Switch
+            value={item.aiAllowed}
+            disabled={!aiEnabled}
+            onValueChange={onAiChange}
+            accessibilityLabel={`Let Synítheia AI use ${item.title}`}
+            trackColor={{ false: t.border, true: t.accent }}
+            thumbColor={t.onAccent}
+            ios_backgroundColor={t.border}
+          />
         </View>
       ) : null}
 
@@ -903,7 +854,7 @@ const makeStyles = (t: Theme) =>
     aiCopy: { flex: 1, gap: spacing.xs },
     aiNote: { marginTop: spacing.md },
     sources: { marginTop: spacing.xl, gap: spacing.base },
-    source: { gap: spacing.md },
+    source: { gap: spacing.sm },
     sourceHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -911,37 +862,16 @@ const makeStyles = (t: Theme) =>
       gap: spacing.sm,
     },
     sourceTitle: { flexShrink: 1 },
-    badge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 3,
-      borderRadius: radius.full,
-      borderWidth: 1,
-      backgroundColor: t.surfaceRaised,
-    },
-    meta: { gap: spacing.xs },
-    consents: {
-      marginTop: spacing.xs,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: t.border,
-      backgroundColor: t.surfaceRaised,
-      paddingHorizontal: spacing.base,
-    },
-    consentRow: {
+    aiRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
-      minHeight: MIN_TAP_TARGET + spacing.md,
-      paddingVertical: spacing.md,
+      minHeight: MIN_TAP_TARGET,
+      paddingTop: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: t.border,
     },
     consentCopy: { flex: 1, gap: spacing.xs },
-    consentDivider: {
-      height: 1,
-      backgroundColor: t.border,
-    },
     aiLabel: {
       flexDirection: 'row',
       alignItems: 'center',

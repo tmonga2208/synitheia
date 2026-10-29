@@ -6,6 +6,15 @@ import { aiInsightSchema } from './insight.js';
 import { macrosSchema } from './nutrition.js';
 import { personalEventSchema } from './personal-event.js';
 
+export const weekDayTotalsSchema = z.object({
+  waterMl: z.number().int().nonnegative(),
+  calories: z.number().nonnegative(),
+  spentMinor: minorAmountSchema,
+  habitsDone: z.number().int().nonnegative(),
+  habitsScheduled: z.number().int().nonnegative(),
+});
+export type WeekDayTotals = z.infer<typeof weekDayTotalsSchema>;
+
 /**
  * Everything the Today screen needs, in one request.
  *
@@ -77,6 +86,11 @@ export const todayResponseSchema = z.object({
       localDate: localDateSchema,
       percent: z.number().int().min(0).max(100),
       isToday: z.boolean(),
+      /**
+       * What the day added up to, so a tracker can show its week without a request per day.
+       * Optional because an older API (and a day rolled in offline) has none.
+       */
+      totals: weekDayTotalsSchema.optional(),
     }),
   ),
 });
