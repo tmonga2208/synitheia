@@ -20,7 +20,6 @@ import type {
   WeightPoint,
 } from '@synitheia/shared';
 import {
-  Button,
   Card,
   EmptyState,
   ErrorState,
@@ -30,6 +29,7 @@ import {
 } from '../src/components/primitives.js';
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { api } from '../src/api/client.js';
+import { showToast } from '../src/feedback/toast.js';
 import { missingSentence } from '../src/health/bodyCopy.js';
 import { BodyDetails } from '../src/health/BodyDetails.js';
 import { BodyDetailsForm } from '../src/health/BodyDetailsForm.js';
@@ -88,9 +88,14 @@ export default function Body() {
   const pickGoal = useMutation({
     meta: { failed: 'Couldn’t set your calorie goal' },
     mutationFn: (goal: CalorieGoal) => api.put<BodyReport>('/health/calorie-goal', { goal }),
-    onSuccess: () => {
+    // A goal saves the moment it is tapped, so say so: there is no button to press after.
+    onSuccess: (report, goal) => {
       void queryClient.invalidateQueries({ queryKey: KEY });
       void queryClient.invalidateQueries({ queryKey: ['today'] });
+      const kcal = report.options?.[goal].kcal;
+      showToast({
+        message: kcal ? `Goal set: ${kcal.toLocaleString()} kcal a day` : 'Goal set',
+      });
     },
   });
 
@@ -257,7 +262,9 @@ export default function Body() {
                       styles.goal,
                       chosen && { borderColor: ACCENT.base, backgroundColor: ACCENT.wash },
                     ]}
-                    onPress={() => pickGoal.mutate(goal.key)}
+                    onPress={() => {
+                      if (!chosen) pickGoal.mutate(goal.key);
+                    }}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: chosen }}
                     accessibilityLabel={`${goal.label}, ${option.kcal} calories a day`}
@@ -292,12 +299,6 @@ export default function Body() {
                   your body burns at rest.
                 </Text>
               ) : null}
-
-              <Button
-                label="Done"
-                onPress={() => goBackOrHome(router)}
-                style={{ marginTop: spacing.lg }}
-              />
             </>
           ) : null}
         </ScrollView>
