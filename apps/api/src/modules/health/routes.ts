@@ -1,7 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { bodyMetricsSchema, calorieGoalSchema, syncHealthSchema } from '@synitheia/shared';
+import {
+  bodyMetricsSchema,
+  calorieGoalSchema,
+  logWeightSchema,
+  syncHealthSchema,
+  type LocalDate,
+} from '@synitheia/shared';
 import * as service from './service.js';
 
 export async function registerHealthRoutes(app: FastifyInstance): Promise<void> {
@@ -30,6 +36,17 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
     '/health/body',
     { onRequest: [app.requireAuth], schema: { body: bodyMetricsSchema.partial() } },
     async (req) => service.updateBody(req.user, req.body),
+  );
+
+  /** A weight check-in. Moves a chosen calorie goal's target along with the weight. */
+  api.post(
+    '/health/weight',
+    { onRequest: [app.requireAuth], schema: { body: logWeightSchema } },
+    async (req) =>
+      service.logWeight(req.user, {
+        weightKg: req.body.weightKg,
+        localDate: req.body.localDate as LocalDate | undefined,
+      }),
   );
 
   /**

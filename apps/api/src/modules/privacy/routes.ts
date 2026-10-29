@@ -16,6 +16,7 @@ import {
   HabitLogModel,
   HabitModel,
   HealthDayModel,
+  WeightEntryModel,
   IdempotencyRecordModel,
   InferredContextModel,
   PasswordResetModel,
@@ -146,6 +147,7 @@ const USER_DATA: UserCollection[] = [
   userCollection('water', WaterEntryModel),
   userCollection('reminders', ReminderModel),
   userCollection('healthDays', HealthDayModel),
+  userCollection('weights', WeightEntryModel),
   userCollection('events', PersonalEventModel),
   userCollection('inferences', InferredContextModel),
   userCollection('dailySummaries', DailySummaryModel),
@@ -348,6 +350,8 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
       // of the thing and keeping the thing.
       if (req.params.source === 'health') {
         await HealthDayModel.deleteMany({ userId: uid });
+        // Weights the user typed are theirs, not Health's; only Health's readings go.
+        await WeightEntryModel.deleteMany({ userId: uid, source: 'health' });
       }
 
       // Summaries are derived from events, so they are now stale. Drop them; they
