@@ -7,7 +7,8 @@
     "icon": "./assets/icon.png",
     "scheme": [
       "synitheia",
-      "com.googleusercontent.apps.491586558032-vfm2c1bb95gloce2bkbhkluu79ren83c"
+      "com.googleusercontent.apps.491586558032-vfm2c1bb95gloce2bkbhkluu79ren83c",
+      "com.googleusercontent.apps.491586558032-oqcrq55fqktd78r8i4i65gq02u42ace1"
     ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -136,7 +137,8 @@
     ],
     "extra": {
       "apiUrl": "https://api-production-ee61.up.railway.app",
-      "googleIosClientId": "491586558032-vfm2c1bb95gloce2bkbhkluu79ren83c.apps.googleusercontent.com"
+      "googleIosClientId": "491586558032-vfm2c1bb95gloce2bkbhkluu79ren83c.apps.googleusercontent.com",
+      "googleAndroidClientId": "491586558032-oqcrq55fqktd78r8i4i65gq02u42ace1.apps.googleusercontent.com"
     }
   }
 }
