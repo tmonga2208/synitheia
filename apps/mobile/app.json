@@ -131,7 +131,8 @@
           }
         }
       ],
-      "./plugins/withHealthConnectRationale"
+      "./plugins/withHealthConnectRationale",
+      "./plugins/withSceneLifecycle"
     ],
     "extra": {
       "apiUrl": "https://api-production-ee61.up.railway.app",
