@@ -6,6 +6,7 @@ import {
   formatAmount,
   formatWhole,
   initialOf,
+  loadMoreLabel,
   normalizeTotals,
   previousComparable,
   type CalendarCell,
@@ -115,5 +116,20 @@ describe('amounts', () => {
   it('writes paise only when there are some', () => {
     expect(formatAmount(10000, 'INR')).toBe('₹100');
     expect(formatAmount(39796, 'INR')).toBe('₹397.96');
+  });
+});
+
+describe('loadMoreLabel', () => {
+  it('says how many come next and how many are left', () => {
+    expect(loadMoreLabel({ total: 179, shown: 50, pageSize: 50 })).toBe('Show 50 more · 129 left');
+  });
+
+  it('says when the next page is the last one', () => {
+    expect(loadMoreLabel({ total: 62, shown: 50, pageSize: 50 })).toBe('Show the last 12');
+  });
+
+  it('falls back to plain words when the count is unknown or behind', () => {
+    expect(loadMoreLabel({ total: null, shown: 50, pageSize: 50 })).toBe('Show more');
+    expect(loadMoreLabel({ total: 50, shown: 50, pageSize: 50 })).toBe('Show more');
   });
 });

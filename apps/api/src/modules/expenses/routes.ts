@@ -34,18 +34,19 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
           to: localDateSchema.optional(),
           categoryId: objectIdSchema.optional(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
+          /** `nextCursor` from the previous page. */
+          before: z.string().max(64).optional(),
         }),
       },
     },
-    async (req) => {
-      const items = await service.listExpenses(req.user, {
+    async (req) =>
+      service.listExpenses(req.user, {
         from: req.query.from as LocalDate | undefined,
         to: req.query.to as LocalDate | undefined,
         categoryId: req.query.categoryId,
         limit: req.query.limit,
-      });
-      return { items };
-    },
+        before: req.query.before,
+      }),
   );
 
   api.post(

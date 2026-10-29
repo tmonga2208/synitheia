@@ -235,10 +235,28 @@ export async function getExpense(user: AuthedUser, id: string): Promise<ExpenseD
   return { ...expense, participants: participantsOf(expense) } as ExpenseDetail;
 }
 
+/**
+ * Where a page ended: the last payment's time and id. The id breaks ties, because a
+ * statement import files many payments at the same moment and a time alone would skip
+ * or repeat them across pages.
+ */
+function encodeCursor(expense: ExpenseLean): string {
+  return `${expense.occurredAt.getTime()}_${expense._id.toString()}`;
+}
+
+function decodeCursor(cursor: string): { at: Date; id: Types.ObjectId } {
+  const [ms, id] = cursor.split('_');
+  const at = new Date(Number(ms));
+  if (!ms || !id || Number.isNaN(at.getTime()) || !Types.ObjectId.isValid(id)) {
+    throw AppError.badRequest('That page of expenses could not be found');
+  }
+  return { at, id: new Types.ObjectId(id) };
+}
+
 export async function listExpenses(
   user: AuthedUser,
-  opts: { from?: LocalDate; to?: LocalDate; categoryId?: string; limit: number },
-): Promise<ExpenseLean[]> {
+  opts: { from?: LocalDate; to?: LocalDate; categoryId?: string; limit: number; before?: string },
+): Promise<{ items: ExpenseLean[]; nextCursor?: string }> {
   const query: Record<string, unknown> = { userId: new Types.ObjectId(user.id) };
 
   if (opts.from || opts.to) {
@@ -248,11 +266,20 @@ export async function listExpenses(
     query.localDate = range;
   }
   if (opts.categoryId) query.categoryId = new Types.ObjectId(opts.categoryId);
+  if (opts.before) {
+    const { at, id } = decodeCursor(opts.before);
+    query.$or = [{ occurredAt: { $lt: at } }, { occurredAt: at, _id: { $lt: id } }];
+  }
 
-  return ExpenseModel.find(query)
-    .sort({ occurredAt: -1 })
-    .limit(opts.limit)
+  // One extra tells us whether another page exists without a second count query.
+  const found = await ExpenseModel.find(query)
+    .sort({ occurredAt: -1, _id: -1 })
+    .limit(opts.limit + 1)
     .lean<ExpenseLean[]>();
+
+  const items = found.slice(0, opts.limit);
+  const last = items[items.length - 1];
+  return found.length > opts.limit && last ? { items, nextCursor: encodeCursor(last) } : { items };
 }
 
 export interface ExpenseTotals {

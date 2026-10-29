@@ -124,3 +124,14 @@ export function formatAmount(minor: number, currency: string): string {
   const { decimals } = currencyMeta(currency);
   return format(minor, currency, minor % 10 ** decimals === 0 ? 0 : decimals);
 }
+
+/**
+ * The "load more" button's words. `total` comes from the month's totals and can be missing
+ * or stale for a moment, so the remainder is never shown as zero or negative.
+ */
+export function loadMoreLabel(i: { total: number | null; shown: number; pageSize: number }): string {
+  const left = i.total === null ? 0 : i.total - i.shown;
+  if (left <= 0) return 'Show more';
+  const next = Math.min(left, i.pageSize);
+  return next === left ? `Show the last ${left}` : `Show ${next} more · ${left} left`;
+}

@@ -3,7 +3,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Wallet } from 'lucide-react-native';
 import {
   addMonths,
@@ -15,7 +15,7 @@ import {
   type LocalDate,
   type MonthKey,
 } from '@synitheia/shared';
-import { EmptyState, ErrorState, Text, Touchable } from '../../src/components/primitives.js';
+import { Button, EmptyState, ErrorState, Text, Touchable } from '../../src/components/primitives.js';
 import { SkeletonList } from '../../src/components/Skeleton.js';
 import { CountUp } from '../../src/components/CountUp.js';
 import { BillsRow, OwedBanner } from '../../src/components/OwedBanner.js';
@@ -32,6 +32,7 @@ import {
   comparisonLine,
   formatAmount,
   formatWhole,
+  loadMoreLabel,
   normalizeTotals,
   previousComparable,
 } from '../../src/expenses/monthView.js';
@@ -39,21 +40,26 @@ import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import type { Theme } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 
-/** The list endpoint's ceiling; the month's total, calendar and payees come from totals. */
-const LIST_LIMIT = 200;
+/** Payments per page. The month's total, calendar and payees come from totals, not the list. */
+const PAGE_SIZE = 50;
 /** "Mostly to" and the first payments rise in once the calendar's wave has mostly passed. */
 const AFTER_CALENDAR_MS = 450;
 const ROW_STAGGER_MS = 70;
 const EASED_ROWS = 8;
 const HIGHLIGHT_MS = 1400;
 
-function expenseQuery(month: MonthKey) {
+function expensePagesQuery(month: MonthKey) {
   return {
-    queryKey: ['expenses', month] as const,
-    queryFn: () =>
+    // Not ['expenses', month]: that key held a single list, and a cache saved by an
+    // older build must not be read as pages.
+    queryKey: ['expenses', 'pages', month] as const,
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
       api.get<ListResponse<WireExpense>>(
-        `/expenses?from=${firstOfMonth(month)}&to=${lastOfMonth(month)}&limit=${LIST_LIMIT}`,
+        `/expenses?from=${firstOfMonth(month)}&to=${lastOfMonth(month)}&limit=${PAGE_SIZE}` +
+          (pageParam ? `&before=${encodeURIComponent(pageParam)}` : ''),
       ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last: ListResponse<WireExpense>) => last.nextCursor ?? null,
   };
 }
 
@@ -111,12 +117,13 @@ export default function Expenses() {
   const previous = addMonths(month, -1);
   const atLatest = month >= currentMonth;
 
-  const query = useQuery(expenseQuery(month));
+  const query = useInfiniteQuery(expensePagesQuery(month));
   const totalsQuery = useQuery(monthTotalQuery(month));
   const previousQuery = useQuery(monthTotalQuery(previous));
   const totals = totalsQuery.data ? normalizeTotals(totalsQuery.data) : null;
 
-  const days = useMemo(() => groupByDay(query.data?.items ?? []), [query.data]);
+  const items = useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data]);
+  const days = useMemo(() => groupByDay(items), [items]);
   const cells = useMemo(() => calendarCells(month, totals?.byDay ?? {}, today), [month, totals, today]);
 
   const comparison = useMemo(() => {
@@ -136,6 +143,8 @@ export default function Expenses() {
   const dayY = useRef(new Map<string, number>());
   const [selected, setSelected] = useState<LocalDate | null>(null);
   const [highlighted, setHighlighted] = useState<LocalDate | null>(null);
+  /** A day tapped on the calendar whose payments are on a page not loaded yet. */
+  const [pendingDay, setPendingDay] = useState<LocalDate | null>(null);
 
   useEffect(() => {
     if (!highlighted) return;
@@ -143,9 +152,24 @@ export default function Expenses() {
     return () => clearTimeout(id);
   }, [highlighted]);
 
+  // Keep loading until the tapped day arrives; its row then scrolls itself into view.
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  useEffect(() => {
+    if (!pendingDay || isFetchingNextPage) return;
+    if (days.some((d) => d.localDate === pendingDay)) return;
+    if (hasNextPage) void fetchNextPage();
+    else setPendingDay(null);
+  }, [pendingDay, days, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const scrollToDay = (date: LocalDate, y: number) => {
+    scrollRef.current?.scrollTo({ y: bodyY.current + listY.current + y - spacing.sm, animated: true });
+    setHighlighted(date);
+  };
+
   const changeMonth = (delta: number) => {
     setSelected(null);
     setHighlighted(null);
+    setPendingDay(null);
     dayY.current.clear();
     setMonth(addMonths(month, delta));
   };
@@ -153,9 +177,8 @@ export default function Expenses() {
   const goToDay = (date: LocalDate) => {
     setSelected(date);
     const y = dayY.current.get(date);
-    if (y === undefined) return;
-    scrollRef.current?.scrollTo({ y: bodyY.current + listY.current + y - spacing.sm, animated: true });
-    setHighlighted(date);
+    if (y === undefined) setPendingDay(date);
+    else scrollToDay(date, y);
   };
 
   const header = (
@@ -205,7 +228,7 @@ export default function Expenses() {
   }
 
   const empty = days.length === 0;
-  const listed = query.data?.items.length ?? 0;
+  const listed = items.length;
   let row = 0;
 
   return (
@@ -314,7 +337,14 @@ export default function Expenses() {
                 {days.map((day) => (
                   <View
                     key={day.localDate}
-                    onLayout={(e) => dayY.current.set(day.localDate, e.nativeEvent.layout.y)}
+                    onLayout={(e) => {
+                      const y = e.nativeEvent.layout.y;
+                      dayY.current.set(day.localDate, y);
+                      if (pendingDay === day.localDate) {
+                        setPendingDay(null);
+                        scrollToDay(day.localDate, y);
+                      }
+                    }}
                     style={[styles.day, highlighted === day.localDate && styles.highlight]}
                   >
                     <View style={styles.dayHeader}>
@@ -345,9 +375,18 @@ export default function Expenses() {
                   </View>
                 ))}
 
-                {totals && totals.count > listed ? (
-                  <Text variant="caption" color={t.textMuted} center style={styles.more}>
-                    Showing the latest {LIST_LIMIT}
+                {hasNextPage ? (
+                  <Button
+                    variant="secondary"
+                    label={loadMoreLabel({ total: totals?.count ?? null, shown: listed, pageSize: PAGE_SIZE })}
+                    loading={isFetchingNextPage}
+                    onPress={() => void fetchNextPage()}
+                    style={styles.more}
+                  />
+                ) : null}
+                {query.isFetchNextPageError ? (
+                  <Text variant="caption" color={t.textMuted} center style={styles.moreError}>
+                    Those payments could not be loaded. Try again.
                   </Text>
                 ) : null}
               </View>
@@ -393,4 +432,5 @@ const makeStyles = (t: Theme) =>
     highlight: { backgroundColor: t.accentWash },
     dayHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.xs, paddingBottom: spacing.xs },
     more: { marginTop: spacing.xl },
+    moreError: { marginTop: spacing.sm },
   });
