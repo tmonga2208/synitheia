@@ -7,6 +7,7 @@ import {
   calorieTargetFor,
   goalPace,
   retargetForWeight,
+  startOfLocalDay,
   weeklyChangeKg,
   type GoalPace,
   type WeightPoint,
@@ -437,6 +438,21 @@ async function recordWeight(
     { $set: { weightKg, source } },
     { upsert: true },
   );
+
+  // On the day's timeline too. One entry per day whatever its source, so a typed weight
+  // replaces Health's for that day there as it does in the log. Today's keeps its real
+  // time; an earlier day's goes at midday, as habit completions do.
+  const isToday = localDate === todayLocalDate(user.timezone);
+  await engine.emit({
+    userId: user.id,
+    source: source === 'health' ? 'health' : 'manual',
+    timestamp: isToday
+      ? new Date()
+      : new Date(startOfLocalDay(localDate, user.timezone).getTime() + 12 * 60 * 60 * 1000),
+    timezone: user.timezone,
+    metadata: { type: 'weight.logged', weightKg },
+    dedupeKey: engine.dedupeKey('manual', 'weight', localDate),
+  });
 
   // A weight for an earlier day goes on the trend but does not replace today's.
   if (newest && newest.localDate > localDate) return;

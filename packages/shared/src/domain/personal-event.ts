@@ -34,6 +34,7 @@ export const eventTypeSchema = z.enum([
   'calendar.completed',
   'reminder.completed',
   'weather.observed',
+  'weight.logged',
 ]);
 export type EventType = z.infer<typeof eventTypeSchema>;
 
@@ -82,6 +83,10 @@ export const eventMetadataSchema = z.discriminatedUnion('type', [
     proteinG: z.number().nonnegative(),
     carbsG: z.number().nonnegative(),
     fatG: z.number().nonnegative(),
+  }),
+  z.object({
+    type: z.literal('weight.logged'),
+    weightKg: z.number().positive(),
   }),
   z.object({
     type: z.literal('water.logged'),
@@ -206,6 +211,7 @@ export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   'habit.missed': 'Habit missed',
   'food.logged': 'Food',
   'water.logged': 'Water',
+  'weight.logged': 'Weight',
   'workout.detected': 'Workout',
   'steps.recorded': 'Steps',
   'sleep.detected': 'Sleep',

@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { addLocalDays, todayLocalDate, type LocalDate } from '@synitheia/shared';
 import {
   DataSourceConnectionModel,
+  PersonalEventModel,
   UserModel,
   UserPreferenceModel,
   WeightEntryModel,
@@ -113,5 +114,20 @@ describe('weight check-ins', () => {
     const report = await bodyReport(user);
     expect(report.body.weightKg).toBe(78);
     expect(report.weight.entries).toHaveLength(2);
+  });
+
+  it('show on the timeline of the day they were for, one entry a day', async () => {
+    const user = await seedUser();
+    const lastWeek = addLocalDays(today(), -7) as LocalDate;
+
+    await logWeight(user, { weightKg: 79.5, localDate: lastWeek });
+    await sync(user, healthSync(78.9));
+    await logWeight(user, { weightKg: 78.4 });
+
+    const events = await PersonalEventModel.find({ type: 'weight.logged' }).sort({ localDate: 1 }).lean();
+    expect(events.map((e) => [e.localDate, (e.metadata as { weightKg: number }).weightKg])).toEqual([
+      [lastWeek, 79.5],
+      [today(), 78.4],
+    ]);
   });
 });

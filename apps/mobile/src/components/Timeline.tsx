@@ -98,6 +98,8 @@ function describe(metadata: EventMetadata, numbers: Intl.NumberFormat): string {
       return `${metadata.label} · done`;
     case 'weather.observed':
       return `${roundedInt(metadata.tempC)}°C · ${metadata.conditionCode.replace(/[_-]/g, ' ')}`;
+    case 'weight.logged':
+      return `Weighed ${metadata.weightKg.toFixed(1)} kg`;
   }
 }
 
@@ -124,7 +126,12 @@ function domainOf(type: PersonalEvent['type']): Domain {
   if (type.startsWith('habit')) return 'habit';
   if (type === 'food.logged') return 'food';
   if (type === 'water.logged') return 'water';
-  if (type === 'steps.recorded' || type === 'sleep.detected' || type === 'workout.detected') {
+  if (
+    type === 'steps.recorded' ||
+    type === 'sleep.detected' ||
+    type === 'workout.detected' ||
+    type === 'weight.logged'
+  ) {
     return 'body';
   }
   return 'other';
