@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { AnimatedSplash } from '../src/components/AnimatedSplash.js';
+import { markSplashDone } from '../src/components/splashState.js';
 import {
   Manrope_400Regular,
   Manrope_500Medium,
@@ -297,7 +298,15 @@ export default function RootLayout() {
   return (
     <>
       {ready ? <App /> : null}
-      {splashDone ? null : <AnimatedSplash ready={ready} onDone={() => setSplashDone(true)} />}
+      {splashDone ? null : (
+        <AnimatedSplash
+          ready={ready}
+          onDone={() => {
+            setSplashDone(true);
+            markSplashDone();
+          }}
+        />
+      )}
     </>
   );
 }

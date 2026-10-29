@@ -26,6 +26,8 @@ interface ProgressRingProps {
   trackColor?: string;
   /** The big number in the middle. Off for the small rings on tracker cards. */
   showLabel?: boolean;
+  /** Stay empty until this turns false, then fill. Today holds it while the splash is up. */
+  hold?: boolean;
   children?: React.ReactNode;
 }
 
@@ -48,6 +50,7 @@ export function ProgressRing({
   color,
   trackColor,
   showLabel = true,
+  hold = false,
   children,
 }: ProgressRingProps) {
   const t = useTheme();
@@ -66,11 +69,12 @@ export function ProgressRing({
   const [shown, setShown] = useState(reduceMotion ? Math.round(clamped) : 0);
 
   useEffect(() => {
+    if (hold) return;
     progress.value = withTiming(clamped / 100, {
       duration: reduceMotion ? 0 : motion.ring.duration,
       easing: Easing.out(Easing.cubic),
     });
-  }, [clamped, progress, reduceMotion]);
+  }, [clamped, progress, reduceMotion, hold]);
 
   // The label follows the arc. Only whole-number changes cross to JS, so about one per percent.
   useAnimatedReaction(

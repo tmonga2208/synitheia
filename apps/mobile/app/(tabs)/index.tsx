@@ -32,6 +32,8 @@ import {
 } from '../../src/components/primitives.js';
 import { SkeletonToday } from '../../src/components/Skeleton.js';
 import { ProgressRing } from '../../src/components/ProgressRing.js';
+import { dayLine } from '../../src/today/dayLine.js';
+import { useSplashDone } from '../../src/components/splashState.js';
 import { HabitCard, type TodayHabit } from '../../src/components/HabitCard.js';
 import { WeeklyChart } from '../../src/components/WeeklyChart.js';
 import { Timeline } from '../../src/components/Timeline.js';
@@ -159,6 +161,8 @@ export default function Today() {
   const timezone =
     user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
   const currency = user?.currency ?? 'INR';
+  // The ring fills once the launch splash has gone, so the fill is seen rather than missed.
+  const splashDone = useSplashDone();
 
   if (isPending) return <SkeletonToday />;
 
@@ -245,14 +249,12 @@ export default function Today() {
           {`${data.greeting}, ${firstName}`}
         </Text>
         <Text variant="body" color={t.textFaint} style={styles.subtitle}>
-          {data.streakDays > 0
-            ? `You're on a ${data.streakDays}-day streak. Keep the momentum.`
-            : 'Take a deep breath and start your journey.'}
+          {dayLine(data, currency)}
         </Text>
 
         {/* ─── Daily Flow ──────────────────────────────────────────────────── */}
         <View style={styles.ring}>
-          <ProgressRing percent={data.dailyFlow.percent} />
+          <ProgressRing percent={data.dailyFlow.percent} hold={!splashDone} />
         </View>
 
         <View style={styles.chips}>
