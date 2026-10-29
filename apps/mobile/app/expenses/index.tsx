@@ -48,7 +48,11 @@ const ROW_STAGGER_MS = 70;
 const EASED_ROWS = 8;
 const HIGHLIGHT_MS = 1400;
 
-function expensePagesQuery(month: MonthKey) {
+/**
+ * `chase` is read when a page is fetched: set, the next page reaches down to that day in one
+ * request instead of ten payments at a time.
+ */
+function expensePagesQuery(month: MonthKey, chase: { current: LocalDate | null }) {
   return {
     // Not ['expenses', month]: that key held a single list, and a cache saved by an
     // older build must not be read as pages.
@@ -56,7 +60,8 @@ function expensePagesQuery(month: MonthKey) {
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       api.get<ListResponse<WireExpense>>(
         `/expenses?from=${firstOfMonth(month)}&to=${lastOfMonth(month)}&limit=${PAGE_SIZE}` +
-          (pageParam ? `&before=${encodeURIComponent(pageParam)}` : ''),
+          (pageParam ? `&before=${encodeURIComponent(pageParam)}` : '') +
+          (pageParam && chase.current ? `&through=${chase.current}` : ''),
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (last: ListResponse<WireExpense>) => last.nextCursor ?? null,
@@ -117,7 +122,8 @@ export default function Expenses() {
   const previous = addMonths(month, -1);
   const atLatest = month >= currentMonth;
 
-  const query = useInfiniteQuery(expensePagesQuery(month));
+  const chase = useRef<LocalDate | null>(null);
+  const query = useInfiniteQuery(expensePagesQuery(month, chase));
   const totalsQuery = useQuery(monthTotalQuery(month));
   const previousQuery = useQuery(monthTotalQuery(previous));
   const totals = totalsQuery.data ? normalizeTotals(totalsQuery.data) : null;
@@ -152,13 +158,19 @@ export default function Expenses() {
     return () => clearTimeout(id);
   }, [highlighted]);
 
-  // Keep loading until the tapped day arrives; its row then scrolls itself into view.
+  // One request brings everything down to the tapped day; its row then scrolls itself into view.
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
   useEffect(() => {
     if (!pendingDay || isFetchingNextPage) return;
     if (days.some((d) => d.localDate === pendingDay)) return;
-    if (hasNextPage) void fetchNextPage();
-    else setPendingDay(null);
+    if (!hasNextPage) {
+      setPendingDay(null);
+      return;
+    }
+    chase.current = pendingDay;
+    void fetchNextPage().finally(() => {
+      chase.current = null;
+    });
   }, [pendingDay, days, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const scrollToDay = (date: LocalDate, y: number) => {

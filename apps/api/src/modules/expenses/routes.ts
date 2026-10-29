@@ -36,6 +36,8 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
           limit: z.coerce.number().int().min(1).max(200).default(50),
           /** `nextCursor` from the previous page. */
           before: z.string().max(64).optional(),
+          /** Load down to this day in one page, e.g. for a day tapped on the calendar. */
+          through: localDateSchema.optional(),
         }),
       },
     },
@@ -46,6 +48,7 @@ export async function registerExpenseRoutes(app: FastifyInstance): Promise<void>
         categoryId: req.query.categoryId,
         limit: req.query.limit,
         before: req.query.before,
+        through: req.query.through as LocalDate | undefined,
       }),
   );
 

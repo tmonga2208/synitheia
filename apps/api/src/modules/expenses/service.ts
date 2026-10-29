@@ -253,9 +253,25 @@ function decodeCursor(cursor: string): { at: Date; id: Types.ObjectId } {
   return { at, id: new Types.ObjectId(id) };
 }
 
+/** Payments strictly older than `cursor` in the list's order. */
+function olderThan(cursor: { at: Date; id: Types.ObjectId }) {
+  return { $or: [{ occurredAt: { $lt: cursor.at } }, { occurredAt: cursor.at, _id: { $lt: cursor.id } }] };
+}
+
+/** A page that reaches back to a given day can be long, but never unbounded. */
+const THROUGH_CAP = 500;
+
 export async function listExpenses(
   user: AuthedUser,
-  opts: { from?: LocalDate; to?: LocalDate; categoryId?: string; limit: number; before?: string },
+  opts: {
+    from?: LocalDate;
+    to?: LocalDate;
+    categoryId?: string;
+    limit: number;
+    before?: string;
+    /** Instead of `limit`, every payment down to and including this day. */
+    through?: LocalDate;
+  },
 ): Promise<{ items: ExpenseLean[]; nextCursor?: string }> {
   const query: Record<string, unknown> = { userId: new Types.ObjectId(user.id) };
 
@@ -266,9 +282,11 @@ export async function listExpenses(
     query.localDate = range;
   }
   if (opts.categoryId) query.categoryId = new Types.ObjectId(opts.categoryId);
-  if (opts.before) {
-    const { at, id } = decodeCursor(opts.before);
-    query.$or = [{ occurredAt: { $lt: at } }, { occurredAt: at, _id: { $lt: id } }];
+  if (opts.before) Object.assign(query, olderThan(decodeCursor(opts.before)));
+
+  if (opts.through) {
+    const page = await pageThrough(query, opts.through);
+    if (page) return page;
   }
 
   // One extra tells us whether another page exists without a second count query.
@@ -280,6 +298,39 @@ export async function listExpenses(
   const items = found.slice(0, opts.limit);
   const last = items[items.length - 1];
   return found.length > opts.limit && last ? { items, nextCursor: encodeCursor(last) } : { items };
+}
+
+/**
+ * Everything from where the list stands down to the oldest payment on or after `day`, in
+ * the list's own time order. Filtering by `localDate` alone could leave a gap, because a
+ * payment's local date and its place in time order can disagree across time zones, and the
+ * next page would then start past a payment never shown. Null when nothing reaches that day.
+ */
+async function pageThrough(
+  query: Record<string, unknown>,
+  day: LocalDate,
+): Promise<{ items: ExpenseLean[]; nextCursor?: string } | null> {
+  const range = (query.localDate as Record<string, string> | undefined) ?? {};
+  const onOrAfter = { ...range, $gte: range.$gte && range.$gte > day ? range.$gte : day };
+  const boundary = await ExpenseModel.findOne({ ...query, localDate: onOrAfter })
+    .sort({ occurredAt: 1, _id: 1 })
+    .select({ occurredAt: 1 })
+    .lean<{ _id: Types.ObjectId; occurredAt: Date } | null>();
+  if (!boundary) return null;
+
+  const notOlderThanBoundary = {
+    $nor: [olderThan({ at: boundary.occurredAt, id: boundary._id })],
+  };
+  const found = await ExpenseModel.find({ $and: [query, notOlderThanBoundary] })
+    .sort({ occurredAt: -1, _id: -1 })
+    .limit(THROUGH_CAP)
+    .lean<ExpenseLean[]>();
+
+  const last = found[found.length - 1];
+  if (!last) return null;
+  const cursor = { at: last.occurredAt, id: last._id };
+  const more = await ExpenseModel.exists({ $and: [query, olderThan(cursor)] });
+  return more ? { items: found, nextCursor: encodeCursor(last) } : { items: found };
 }
 
 export interface ExpenseTotals {

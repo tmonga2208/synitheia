@@ -77,6 +77,37 @@ describe('listExpenses', () => {
     expect(page.nextCursor).toBeUndefined();
   });
 
+  it('loads down to a given day in one page, then carries on where it stopped', async () => {
+    const { user, category } = await setup();
+    for (let day = 1; day <= 10; day++) {
+      for (let n = 0; n < 2; n++) {
+        await createExpense(user, { amountMinor: day * 100 + n, categoryId: category, occurredAt: on(day) });
+      }
+    }
+
+    const first = await listExpenses(user, { ...SEPTEMBER, limit: 4 });
+    const jump = await listExpenses(user, { ...SEPTEMBER, limit: 4, before: first.nextCursor, through: '2026-09-03' as LocalDate });
+    const rest = await listExpenses(user, { ...SEPTEMBER, limit: 50, before: jump.nextCursor });
+
+    // Days 10 and 9 came first; the jump brings days 8 to 3, both payments of each.
+    expect(jump.items.map((e) => e.localDate).at(-1)).toBe('2026-09-03');
+    expect(jump.items).toHaveLength(12);
+    expect(rest.items.map((e) => e.localDate)).toEqual(['2026-09-02', '2026-09-02', '2026-09-01', '2026-09-01']);
+    expect(rest.nextCursor).toBeUndefined();
+  });
+
+  it('says nothing is left when the jump reaches the oldest payment', async () => {
+    const { user, category } = await setup();
+    for (let day = 1; day <= 3; day++) {
+      await createExpense(user, { amountMinor: day * 100, categoryId: category, occurredAt: on(day) });
+    }
+
+    const page = await listExpenses(user, { ...SEPTEMBER, limit: 1, through: '2026-09-01' as LocalDate });
+
+    expect(page.items).toHaveLength(3);
+    expect(page.nextCursor).toBeUndefined();
+  });
+
   it('rejects a cursor it did not write', async () => {
     const { user } = await setup();
 
