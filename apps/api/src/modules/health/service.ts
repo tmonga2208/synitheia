@@ -1,8 +1,16 @@
 import { Types } from 'mongoose';
 import type { FastifyBaseLogger } from 'fastify';
 import {
+  addLocalDays,
+  ageOn,
   bodyInsight,
   calorieTargetFor,
+  goalPace,
+  retargetForWeight,
+  weeklyChangeKg,
+  type GoalPace,
+  type WeightPoint,
+  type WeightSource,
   measureOf,
   todayLocalDate,
   type BodyInsight,
@@ -20,6 +28,7 @@ import {
   HabitModel,
   HealthDayModel,
   UserPreferenceModel,
+  WeightEntryModel,
 } from '../../db/models.js';
 import { AppError } from '../../core/errors.js';
 import { invalidateDailySummary } from '../../context/aggregator.js';
@@ -67,9 +76,11 @@ export async function sync(
 
   if (input.body) {
     // $set only the keys Health actually returned. A missing weight must not blank a weight
-    // the user typed in by hand — absent is not the same as zero.
+    // the user typed in by hand — absent is not the same as zero. Weight goes through the
+    // check-in path instead, so it lands on the trend and can move the calorie target.
     const set: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(input.body)) {
+      if (key === 'weightKg') continue;
       if (value !== undefined && value !== null) set[`bodyMetrics.${key}`] = value;
     }
 
@@ -77,6 +88,10 @@ export async function sync(
       set['bodyMetrics.updatedAt'] = new Date();
       await UserPreferenceModel.updateOne({ userId }, { $set: set }, { upsert: true });
     }
+  }
+
+  if (input.body?.weightKg != null) {
+    await recordWeight(user, { weightKg: input.body.weightKg }, 'health');
   }
 
   let stepsApplied = 0;
@@ -257,15 +272,27 @@ export interface BodyReport {
   currentCalorieTarget: number;
   /** Today's activity, so the UI can say whether TDEE was measured or estimated. */
   today: { steps: number | null; activeEnergyKcal: number | null };
+  weight: {
+    /** The last eight weeks of check-ins, oldest first. */
+    entries: WeightPoint[];
+    weeklyChangeKg: number | null;
+    /** Null until there is both a goal and a weekly change to judge. */
+    pace: GoalPace | null;
+  };
 }
+
+const TREND_DAYS = 56;
 
 export async function bodyReport(user: AuthedUser): Promise<BodyReport> {
   const userId = new Types.ObjectId(user.id);
   const localDate = todayLocalDate(user.timezone);
 
-  const [prefs, day] = await Promise.all([
+  const [prefs, day, weights] = await Promise.all([
     UserPreferenceModel.findOne({ userId }).lean(),
     HealthDayModel.findOne({ userId, localDate }).lean(),
+    WeightEntryModel.find({ userId, localDate: { $gte: addLocalDays(localDate, -TREND_DAYS) } })
+      .sort({ localDate: 1 })
+      .lean(),
   ]);
 
   const stored = prefs?.bodyMetrics;
@@ -302,21 +329,30 @@ export async function bodyReport(user: AuthedUser): Promise<BodyReport> {
         }
       : null;
 
+  const goal = (prefs?.calorieGoal as CalorieGoal | null) ?? null;
+  const entries = weights.map((w) => ({
+    localDate: w.localDate as LocalDate,
+    weightKg: w.weightKg,
+  }));
+  const change = weeklyChangeKg(entries);
+
   return {
     body,
     insight,
-    goal: (prefs?.calorieGoal as CalorieGoal | null) ?? null,
+    goal,
     options,
     currentCalorieTarget: prefs?.calorieTarget ?? 2000,
     today: activity,
+    weight: {
+      entries,
+      weeklyChangeKg: change,
+      pace: goal && change !== null ? goalPace(goal, change) : null,
+    },
   };
 }
 
 /** The CONFIRM step. Nothing above ever writes calorieTarget — only this, on a real tap. */
-export async function setCalorieGoal(
-  user: AuthedUser,
-  goal: CalorieGoal,
-): Promise<BodyReport> {
+export async function setCalorieGoal(user: AuthedUser, goal: CalorieGoal): Promise<BodyReport> {
   const userId = new Types.ObjectId(user.id);
   const report = await bodyReport(user);
 
@@ -328,7 +364,13 @@ export async function setCalorieGoal(
 
   await UserPreferenceModel.updateOne(
     { userId },
-    { $set: { calorieGoal: goal, calorieTarget: report.options[goal].kcal } },
+    {
+      $set: {
+        calorieGoal: goal,
+        calorieTarget: report.options[goal].kcal,
+        calorieMaintenanceKcal: report.options[goal].maintenanceKcal,
+      },
+    },
     { upsert: true },
   );
 
@@ -344,9 +386,122 @@ export async function updateBody(
 
   const set: Record<string, unknown> = { 'bodyMetrics.updatedAt': new Date() };
   for (const [key, value] of Object.entries(patch)) {
+    if (key === 'weightKg') continue;
     if (value !== undefined) set[`bodyMetrics.${key}`] = value;
   }
 
   await UserPreferenceModel.updateOne({ userId }, { $set: set }, { upsert: true });
+  if (patch.weightKg != null) await recordWeight(user, { weightKg: patch.weightKg }, 'manual');
   return bodyReport(user);
+}
+
+/** A weight check-in from the Body screen. */
+export async function logWeight(
+  user: AuthedUser,
+  input: { weightKg: number; localDate?: LocalDate },
+): Promise<BodyReport> {
+  await recordWeight(user, input, 'manual');
+  return bodyReport(user);
+}
+
+/**
+ * Store a day's weight, make it the current weight if it is the newest, and carry a chosen
+ * calorie goal along with it.
+ *
+ * Health hands over its latest sample on every sync, often the same one for days. Only a
+ * reading that differs from the newest stored weight becomes an entry, or a week of one stale
+ * sample would draw a flat line the user never weighed.
+ */
+async function recordWeight(
+  user: AuthedUser,
+  input: { weightKg: number; localDate?: LocalDate },
+  source: WeightSource,
+): Promise<void> {
+  const userId = new Types.ObjectId(user.id);
+  const localDate = input.localDate ?? todayLocalDate(user.timezone);
+  const weightKg = Math.round(input.weightKg * 10) / 10;
+
+  const [prefs, newest, sameDay] = await Promise.all([
+    UserPreferenceModel.findOne({ userId }).lean(),
+    WeightEntryModel.findOne({ userId }).sort({ localDate: -1 }).lean(),
+    WeightEntryModel.findOne({ userId, localDate }).lean(),
+  ]);
+
+  if (source === 'health') {
+    if (sameDay?.source === 'manual') return;
+    if (newest && newest.weightKg === weightKg) return;
+  }
+
+  await WeightEntryModel.updateOne(
+    { userId, localDate },
+    { $set: { weightKg, source } },
+    { upsert: true },
+  );
+
+  // A weight for an earlier day goes on the trend but does not replace today's.
+  if (newest && newest.localDate > localDate) return;
+
+  const previousKg = prefs?.bodyMetrics?.weightKg ?? null;
+  const set: Record<string, unknown> = {
+    'bodyMetrics.weightKg': weightKg,
+    'bodyMetrics.updatedAt': new Date(),
+  };
+
+  const retarget =
+    previousKg !== null && previousKg !== weightKg
+      ? retargetFrom(prefs, previousKg, weightKg, user)
+      : null;
+  if (retarget) {
+    set.calorieTarget = retarget.target.kcal;
+    set.calorieMaintenanceKcal = retarget.maintenanceKcal;
+  }
+
+  await UserPreferenceModel.updateOne({ userId }, { $set: set }, { upsert: true });
+}
+
+/** The preference fields a retarget reads. */
+interface GoalPrefs {
+  calorieGoal?: string | null;
+  calorieTarget?: number | null;
+  calorieMaintenanceKcal?: number | null;
+  bodyMetrics?: {
+    heightCm?: number | null;
+    biologicalSex?: string | null;
+    birthDate?: string | null;
+  } | null;
+}
+
+/** The goal's target at the new weight, or null when there is no goal or not enough body. */
+function retargetFrom(
+  prefs: GoalPrefs | null,
+  fromKg: number,
+  toKg: number,
+  user: AuthedUser,
+): ReturnType<typeof retargetForWeight> | null {
+  const goal = (prefs?.calorieGoal as CalorieGoal | null) ?? null;
+  const body = prefs?.bodyMetrics;
+  if (!goal || !body?.heightCm || !body.biologicalSex || !body.birthDate) return null;
+
+  // Goals picked before maintenance was stored: work back from the target they set.
+  const target = prefs?.calorieTarget ?? null;
+  const maintenanceKcal =
+    prefs?.calorieMaintenanceKcal ??
+    (target === null
+      ? null
+      : goal === 'lose'
+        ? target + 500
+        : goal === 'gain'
+          ? target - 300
+          : target);
+  if (maintenanceKcal === null) return null;
+
+  return retargetForWeight({
+    goal,
+    maintenanceKcal,
+    fromKg,
+    toKg,
+    heightCm: body.heightCm,
+    biologicalSex: body.biologicalSex as NonNullable<BodyMetrics['biologicalSex']>,
+    age: ageOn(body.birthDate as LocalDate, todayLocalDate(user.timezone)),
+  });
 }

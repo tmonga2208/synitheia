@@ -218,6 +218,11 @@ const userPreferenceSchema = new Schema(
 
     /** null until the user picks one. A calorie goal is never inferred on their behalf. */
     calorieGoal: { type: String, default: null, enum: ['lose', 'maintain', 'gain', null] },
+    /**
+     * What the user burned in a day when they picked the goal. Kept so a new weight can move
+     * the target by what the weight changes, and not by how many steps that morning had.
+     */
+    calorieMaintenanceKcal: { type: Number, default: null },
 
     aiEnabled: { type: Boolean, required: true, default: false },
     aiAllowedSources: { type: [String], required: true, default: [] },
@@ -729,6 +734,25 @@ healthDaySchema.index({ userId: 1, localDate: 1 }, { unique: true });
 
 export type HealthDayDoc = InferSchemaType<typeof healthDaySchema>;
 export const HealthDayModel = model('HealthDay', healthDaySchema);
+
+/**
+ * One weight per day. A typed weight outranks Health's for the same day: the user standing
+ * on a scale and saying so is the better reading.
+ */
+const weightEntrySchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    localDate: { type: String, required: true },
+    weightKg: { type: Number, required: true },
+    source: { type: String, required: true, enum: ['manual', 'health'] },
+  },
+  opts,
+);
+
+weightEntrySchema.index({ userId: 1, localDate: -1 }, { unique: true });
+
+export type WeightEntryDoc = InferSchemaType<typeof weightEntrySchema>;
+export const WeightEntryModel = model('WeightEntry', weightEntrySchema);
 
 const aiInsightSchema = new Schema(
   {

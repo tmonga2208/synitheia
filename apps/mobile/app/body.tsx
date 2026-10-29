@@ -10,7 +10,15 @@ import { router } from 'expo-router';
 import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, HeartPulse } from 'lucide-react-native';
-import type { BmiBand, BodyInsight, BodyMetrics, CalorieGoal, CalorieTarget } from '@synitheia/shared';
+import type {
+  BmiBand,
+  BodyInsight,
+  BodyMetrics,
+  CalorieGoal,
+  CalorieTarget,
+  GoalPace,
+  WeightPoint,
+} from '@synitheia/shared';
 import {
   Button,
   Card,
@@ -26,6 +34,7 @@ import { missingSentence } from '../src/health/bodyCopy.js';
 import { BodyDetails } from '../src/health/BodyDetails.js';
 import { BodyDetailsForm } from '../src/health/BodyDetailsForm.js';
 import { healthSourceName } from '../src/health/healthStore.js';
+import { WeightCard } from '../src/health/WeightCard.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
@@ -40,6 +49,8 @@ interface BodyReport {
   options: Record<CalorieGoal, CalorieTarget> | null;
   currentCalorieTarget: number;
   today: { steps: number | null; activeEnergyKcal: number | null };
+  /** Absent from an API older than weight check-ins. */
+  weight?: { entries: WeightPoint[]; weeklyChangeKg: number | null; pace: GoalPace | null };
 }
 
 const BAND_LABEL: Record<BmiBand, string> = {
@@ -169,6 +180,19 @@ export default function Body() {
             is impossible for sex and date of birth, which Health Connect does not hold.
           */}
           {insight.missing.length > 0 ? <BodyDetailsForm mode="add" stored={data.body} /> : null}
+
+          {data.weight ? (
+            <WeightCard
+              weightKg={data.body.weightKg}
+              entries={data.weight.entries}
+              weeklyChangeKg={data.weight.weeklyChangeKg}
+              pace={data.weight.pace}
+              goal={data.goal}
+              calorieTarget={data.currentCalorieTarget}
+              accent={ACCENT.base}
+              queryKey={KEY}
+            />
+          ) : null}
 
           {insight.bmi !== null ? (
             <Card style={styles.card} accent={ACCENT.base}>
