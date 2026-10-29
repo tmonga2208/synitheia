@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import Svg, { Circle, G } from 'react-native-svg';
+import Svg, { Circle, Defs, G, LinearGradient, Stop } from 'react-native-svg';
 import Animated, {
   runOnJS,
   useAnimatedProps,
@@ -48,7 +48,7 @@ interface ProgressRingProps {
 export function ProgressRing({
   percent,
   size = 240,
-  strokeWidth = 16,
+  strokeWidth = 30,
   color,
   trackColor,
   showLabel = true,
@@ -62,7 +62,12 @@ export function ProgressRing({
   const strokeColor = color ?? t.accent;
   // The track is a faint wash of the ring's own colour, so ring and track read as one shape.
   const track = trackColor ?? strokeColor;
-  const trackOpacity = trackColor ? 1 : 0.16;
+  const trackOpacity = trackColor ? 1 : 0.18;
+  // Like the Fitness rings, the arc deepens towards its start and brightens towards its tip.
+  // The default sage has a deeper step; a custom colour fades in from itself instead.
+  const tailColor = color ? strokeColor : t.accentDeep;
+  const tailOpacity = color ? 0.75 : 1;
+  const gradientId = `ring-${size}-${strokeColor.replace(/[^a-zA-Z0-9]/g, '')}`;
   const clamped = Math.min(100, Math.max(0, percent));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -111,12 +116,19 @@ export function ProgressRing({
           strokeWidth={strokeWidth}
           fill="none"
         />
+        <Defs>
+          {/* In the ring's turned frame, (1,1) is the top right and (0,0) the bottom left. */}
+          <LinearGradient id={gradientId} x1="1" y1="1" x2="0" y2="0">
+            <Stop offset="0" stopColor={tailColor} stopOpacity={tailOpacity} />
+            <Stop offset="1" stopColor={strokeColor} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
         <G rotation={startDeg} origin={`${centre}, ${centre}`}>
           <AnimatedCircle
             cx={centre}
             cy={centre}
             r={radius}
-            stroke={strokeColor}
+            stroke={`url(#${gradientId})`}
             strokeWidth={strokeWidth}
             fill="none"
             strokeDasharray={circumference}

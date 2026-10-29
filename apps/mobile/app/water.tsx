@@ -141,7 +141,7 @@ export default function WaterScreen() {
         <Text variant="title">Water</Text>
 
         <View style={styles.ring}>
-          <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={18}>
+          <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={26}>
             <Text variant="title">{formatVolume(data.totalMl)}</Text>
             <Text variant="caption" color={t.textMuted}>
               of {formatVolume(data.targetMl)}

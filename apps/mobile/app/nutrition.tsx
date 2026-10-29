@@ -150,7 +150,7 @@ export default function NutritionScreen() {
         <Text variant="title">Food</Text>
 
         <View style={styles.ring}>
-          <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={18}>
+          <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={26}>
             <Text variant="title">{Math.round(totals.calories).toLocaleString()}</Text>
             <Text variant="caption" color={t.textMuted}>
               of {target.toLocaleString()} kcal
