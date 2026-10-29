@@ -98,15 +98,21 @@ function statusColor(status: DataSourceStatus, t: Theme): string {
   return t.textMuted;
 }
 
-function formatSynced(iso: string | null): string {
-  if (!iso) return 'Never synced';
-
-  return `Last synced ${new Intl.DateTimeFormat('en-US', {
+/**
+ * "Updated Oct 29, 1:04 PM · 12 entries", in the user's words: nothing about syncing or
+ * events. Null when nothing has come in yet, so a fresh source shows no line at all.
+ */
+function sourceActivity(iso: string | null, count: number): string | null {
+  if (!iso && count === 0) return null;
+  const entries = `${count.toLocaleString()} ${count === 1 ? 'entry' : 'entries'}`;
+  if (!iso) return entries;
+  const when = new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-  }).format(new Date(iso))}`;
+  }).format(new Date(iso));
+  return `Updated ${when} · ${entries}`;
 }
 
 /**
@@ -233,7 +239,7 @@ export default function Privacy() {
           // build reads Health fine in the Simulator but not on device. Say so, because no
           // amount of retrying or toggling Settings fixes a stripped entitlement.
           throw new Error(
-            "Couldn't connect Apple Health. On a real device this needs the app signed with a paid Apple Developer account — a free Apple ID removes the Health entitlement. It works in the Simulator. If you're signed in with a paid account, check Health access for Synítheia in Settings.",
+            "Couldn't connect Apple Health. Check that Synítheia is allowed in the Health app, under Sharing, then try again.",
           );
         }
       }
@@ -479,8 +485,8 @@ export default function Privacy() {
               <Text variant="cardTitle">Synítheia AI</Text>
               <Text variant="caption" color={t.textFaint}>
                 {aiConfigured
-                  ? 'Off by default. Nothing is sent to a model until you turn this on.'
-                  : 'Unavailable in this build — no model provider is configured.'}
+                  ? 'Off until you turn it on. Nothing is shared before then.'
+                  : 'Not available yet.'}
               </Text>
             </View>
 
@@ -634,6 +640,7 @@ function SourceCard({
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
   const unavailable = item.status === 'unavailable';
+  const activity = sourceActivity(item.lastSyncedAt, item.eventCount);
   const connected = item.status === 'connected';
 
   return (
@@ -661,21 +668,22 @@ function SourceCard({
         {item.why}
       </Text>
 
-      <View style={styles.meta}>
-        <Text variant="caption" color={t.textFaint}>
-          {item.platforms}
-        </Text>
-        <Text variant="caption" color={t.textFaint}>
-          {item.reliability}
-        </Text>
-        {!unavailable ? (
-          <Text variant="caption" color={t.textFaint}>
-            {`${formatSynced(item.lastSyncedAt)} · ${item.eventCount} ${
-              item.eventCount === 1 ? 'event' : 'events'
-            }`}
-          </Text>
-        ) : null}
-      </View>
+      {/* Which phones support a source is the app's business, not the reader's; only what
+          it means for them is shown. */}
+      {item.reliability || (!unavailable && activity) ? (
+        <View style={styles.meta}>
+          {item.reliability ? (
+            <Text variant="caption" color={t.textFaint}>
+              {item.reliability}
+            </Text>
+          ) : null}
+          {!unavailable && activity ? (
+            <Text variant="caption" color={t.textFaint}>
+              {activity}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* ── Two decisions, two switches, visibly apart ─────────────────────
           An unavailable source gets no switches at all. A control that can never
@@ -718,10 +726,10 @@ function SourceCard({
               </View>
               <Text variant="caption" color={t.textFaint}>
                 {!connected
-                  ? 'Turn collection on first — a source we do not read cannot be reasoned about.'
+                  ? 'Turn on “Collect this data” first.'
                   : !aiEnabled
                     ? 'Turn Synítheia AI on above to allow this.'
-                    : 'A separate decision. You can keep a source and still keep it out of the model.'}
+                    : 'Separate from collecting: you can keep a source and still keep it from the AI.'}
               </Text>
             </View>
 

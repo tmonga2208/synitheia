@@ -40,19 +40,19 @@ describe('canForget', () => {
 });
 
 describe('forgetConfirmation', () => {
-  it('counts the events it will delete', () => {
+  it('counts the entries it will delete', () => {
     expect(forgetConfirmation(source({ eventCount: 1 }), 'Health Connect').message).toContain(
-      '1 event ',
+      '1 entry ',
     );
     expect(forgetConfirmation(source({ eventCount: 23 }), 'Health Connect').message).toContain(
-      '23 events',
+      '23 entries',
     );
   });
 
-  it('does not claim to delete "0 events" when only other records are left', () => {
+  it('does not claim to delete "0 entries" when only other records are left', () => {
     const { message } = forgetConfirmation(source({ source: 'health', eventCount: 0 }), 'Apple Health');
 
-    expect(message).not.toMatch(/\b0 events?\b/);
+    expect(message).not.toMatch(/\b0 entr(y|ies)\b/);
   });
 
   it('says the source is turned off as well', () => {
@@ -73,12 +73,12 @@ describe('forgetConfirmation', () => {
 });
 
 describe('forgottenNotice', () => {
-  it('reports how many events went', () => {
-    expect(forgottenNotice('Calendar', 1).message).toMatch(/^1 event deleted/);
-    expect(forgottenNotice('Calendar', 12).message).toMatch(/^12 events deleted/);
+  it('reports how many entries went', () => {
+    expect(forgottenNotice('Calendar', 1).message).toMatch(/^1 entry deleted/);
+    expect(forgottenNotice('Calendar', 12).message).toMatch(/^12 entries deleted/);
   });
 
-  it('does not report "0 events deleted"', () => {
-    expect(forgottenNotice('Health & Activity', 0).message).not.toMatch(/\b0 events?\b/);
+  it('does not report "0 entries deleted"', () => {
+    expect(forgottenNotice('Health & Activity', 0).message).not.toMatch(/\b0 entr(y|ies)\b/);
   });
 });

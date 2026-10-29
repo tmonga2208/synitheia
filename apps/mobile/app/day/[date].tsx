@@ -67,11 +67,17 @@ export default function Day() {
 
   const totals = useMemo(() => {
     if (!data) return null;
-    return [
-      formatMoney(asMinor(data.expenses.totalMinor), user?.currency ?? 'INR'),
-      formatVolume(data.water.totalMl),
-      `${Math.round(data.nutrition.totals.calories)} kcal`,
-    ].join('  ·  ');
+    // Only what the day had: "₹327 · 0 ml · 0 kcal" made two zeros read as data.
+    const parts = [
+      data.expenses.totalMinor > 0
+        ? formatMoney(asMinor(data.expenses.totalMinor), user?.currency ?? 'INR')
+        : null,
+      data.water.totalMl > 0 ? formatVolume(data.water.totalMl) : null,
+      data.nutrition.totals.calories > 0
+        ? `${Math.round(data.nutrition.totals.calories).toLocaleString()} kcal`
+        : null,
+    ].filter((part) => part !== null);
+    return parts.length > 0 ? parts.join('  ·  ') : null;
   }, [data, user?.currency]);
 
   return (

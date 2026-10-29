@@ -22,8 +22,9 @@ export function canForget(item: DataSourceItem): boolean {
   return item.eventCount > 0 || item.lastSyncedAt !== null;
 }
 
+/** "12 entries": what the user sees on their timeline, not what the app calls them. */
 function events(count: number): string {
-  return `${count} ${count === 1 ? 'event' : 'events'}`;
+  return `${count.toLocaleString()} ${count === 1 ? 'entry' : 'entries'}`;
 }
 
 /** What each source put on the timeline, in the words the user knows it by. */

@@ -221,7 +221,7 @@ export default function NewHabit() {
 
           <Text variant="title">New Habit</Text>
           <Text variant="body" color={t.textMuted} style={styles.subtitle}>
-            Design a habit that nourishes your daily life.
+            Something small you want to do regularly.
           </Text>
 
           {/* ─── Name ─────────────────────────────────────────────────────── */}
@@ -381,7 +381,7 @@ export default function NewHabit() {
 
           {/* ─── Gentle Reminder ──────────────────────────────────────────── */}
           <Card style={styles.card}>
-            <Text variant="section">Gentle Reminder</Text>
+            <Text variant="section">Reminder</Text>
 
             <View style={styles.clock}>
               <TimeField

@@ -246,7 +246,7 @@ export default function Insights() {
             title={notConfigured ? 'Synítheia is unavailable' : 'Synítheia is off'}
             body={
               notConfigured
-                ? 'This build has no AI provider set up. Nothing of yours has been sent anywhere.'
+                ? 'Not available yet. Nothing of yours has been sent anywhere.'
                 : 'Off until you turn it on, and it reads only the sources you choose.'
             }
             actionLabel={notConfigured ? undefined : 'Review Connected Context'}
