@@ -170,7 +170,7 @@ export default function SubscriptionsScreen() {
           <EmptyState
             icon={<Repeat size={26} color={t.onAccent} strokeWidth={1.6} />}
             title="No bills yet"
-            body="Add Netflix, rent, the gym — anything that charges you on a schedule. They'll be added on their due date so you don't have to remember."
+            body="Netflix, rent, the gym: add them once, and they're logged on their due date."
             actionLabel="Add a bill"
             onAction={() => setAdding(true)}
           />

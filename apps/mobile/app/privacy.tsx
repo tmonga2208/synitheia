@@ -429,8 +429,8 @@ export default function Privacy() {
           Connected Context
         </Text>
         <Text variant="body" color={t.textMuted} style={styles.intro}>
-          Everything Synítheia knows about you, and where it came from. A source you turn
-          off here cannot be read again — even if the operating system still permits it.
+          What Synítheia knows, and where it came from. A source you turn off is never read
+          again, even if your phone still allows it.
         </Text>
 
         {/* ─── Receipt images ──────────────────────────────────────────────── */}
