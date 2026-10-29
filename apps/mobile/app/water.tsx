@@ -136,9 +136,9 @@ export default function WaterScreen() {
         {back}
 
         <Text variant="overline" color={ACCENT.text} style={{ marginTop: spacing.base }}>
-          Water
+          Today
         </Text>
-        <Text variant="title">Today</Text>
+        <Text variant="title">Water</Text>
 
         <View style={styles.ring}>
           <ProgressRing percent={percent} color={ACCENT.base} size={200} strokeWidth={18}>
