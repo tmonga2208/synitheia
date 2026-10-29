@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -11,7 +12,7 @@ const plugin = createRequire(import.meta.url)('./withSceneLifecycle.js') as {
 
 /** The AppDelegate.swift Expo 54's prebuild generates, unchanged. */
 const template = readFileSync(
-  fileURLToPath(new URL('./fixtures/AppDelegate.expo54.swift', import.meta.url)),
+  join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'AppDelegate.expo54.swift'),
   'utf8',
 );
 
