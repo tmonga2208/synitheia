@@ -38,6 +38,7 @@ import { Timeline } from '../../src/components/Timeline.js';
 import { api, isQueued } from '../../src/api/client.js';
 import { useCalendarSync } from '../../src/calendar/useCalendarSync.js';
 import { useHabitLog } from '../../src/habits/useHabitLog.js';
+import { LogAmountSheet } from '../../src/habits/LogAmountSheet.js';
 import { useSourcePrefsMirror } from '../../src/sync/useSourcePrefsMirror.js';
 import { useHealthSync } from '../../src/health/useHealthSync.js';
 import { useAuth } from '../../src/store/auth.js';
@@ -112,6 +113,7 @@ export default function Today() {
 
   // Ticks are optimistic and offer Undo; a tap on a ticked habit takes the step back.
   const habitLog = useHabitLog();
+  const [adjusting, setAdjusting] = useState<TodayHabit | null>(null);
 
   const resolveSuggestion = useMutation({
     meta: { failed: 'Couldn’t save your answer' },
@@ -293,6 +295,7 @@ export default function Today() {
                   onPress={openHabit}
                   onLog={habitLog.log}
                   onUnlog={habitLog.unlog}
+                  onAdjust={setAdjusting}
                 />
               ))}
             </View>
@@ -410,6 +413,8 @@ export default function Today() {
           </View>
         )}
       </ScrollView>
+
+      <LogAmountSheet habit={adjusting} onClose={() => setAdjusting(null)} onSave={habitLog.setCount} />
     </SafeAreaView>
   );
 }

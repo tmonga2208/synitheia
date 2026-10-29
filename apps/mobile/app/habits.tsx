@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -17,6 +17,7 @@ import { HabitCard, type TodayHabit } from '../src/components/HabitCard.js';
 import { api } from '../src/api/client.js';
 import type { ListResponse, WireHabit } from '../src/api/types.js';
 import { useHabitLog } from '../src/habits/useHabitLog.js';
+import { LogAmountSheet } from '../src/habits/LogAmountSheet.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -64,6 +65,7 @@ export default function Habits() {
 
   // The same ticking as Today: optimistic, with Undo, and a tap on a ticked habit steps back.
   const habitLog = useHabitLog();
+  const [adjusting, setAdjusting] = useState<TodayHabit | null>(null);
 
   const openHabit = useCallback((habit: TodayHabit) => {
     router.push(`/habit/${habit.id}`);
@@ -163,11 +165,14 @@ export default function Habits() {
                 onPress={openHabit}
                 onLog={habitLog.log}
                 onUnlog={habitLog.unlog}
+                onAdjust={setAdjusting}
               />
             ))}
           </View>
         )}
       </ScrollView>
+
+      <LogAmountSheet habit={adjusting} onClose={() => setAdjusting(null)} onSave={habitLog.setCount} />
     </SafeAreaView>
   );
 }
