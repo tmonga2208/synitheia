@@ -41,7 +41,7 @@ import type { Theme } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 
 /** Payments per page. The month's total, calendar and payees come from totals, not the list. */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 10;
 /** "Mostly to" and the first payments rise in once the calendar's wave has mostly passed. */
 const AFTER_CALENDAR_MS = 450;
 const ROW_STAGGER_MS = 70;
