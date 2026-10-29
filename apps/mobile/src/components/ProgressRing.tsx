@@ -28,6 +28,8 @@ interface ProgressRingProps {
   showLabel?: boolean;
   /** Stay empty until this turns false, then fill. Today holds it while the splash is up. */
   hold?: boolean;
+  /** A short line under the number saying what the percent is of. */
+  caption?: string;
   children?: React.ReactNode;
 }
 
@@ -51,13 +53,16 @@ export function ProgressRing({
   trackColor,
   showLabel = true,
   hold = false,
+  caption,
   children,
 }: ProgressRingProps) {
   const t = useTheme();
   const reduceMotion = useReducedMotion();
   // Defaults resolved here, not in the destructure, so they can reach the theme.
   const strokeColor = color ?? t.accent;
-  const track = trackColor ?? t.border;
+  // The track is a faint wash of the ring's own colour, so ring and track read as one shape.
+  const track = trackColor ?? strokeColor;
+  const trackOpacity = trackColor ? 1 : 0.16;
   const clamped = Math.min(100, Math.max(0, percent));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -102,7 +107,7 @@ export function ProgressRing({
           cy={centre}
           r={radius}
           stroke={track}
-          strokeOpacity={0.7}
+          strokeOpacity={trackOpacity}
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -123,12 +128,19 @@ export function ProgressRing({
 
       {children ??
         (showLabel ? (
-          <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text variant="display">{shown}</Text>
-            {/* The % sits smaller and muted — the number is what matters. */}
-            <Text color={t.textFaint} style={{ ...type.title, marginLeft: 2 }}>
-              %
-            </Text>
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+              <Text style={{ ...type.display, fontSize: 52, lineHeight: 56 }}>{shown}</Text>
+              {/* The % sits smaller and muted — the number is what matters. */}
+              <Text color={t.textFaint} style={{ ...type.heading, marginLeft: 2 }}>
+                %
+              </Text>
+            </View>
+            {caption ? (
+              <Text variant="caption" color={t.textMuted} style={{ marginTop: 2 }}>
+                {caption}
+              </Text>
+            ) : null}
           </View>
         ) : null)}
     </View>

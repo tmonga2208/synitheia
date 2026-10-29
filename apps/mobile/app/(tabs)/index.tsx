@@ -254,7 +254,7 @@ export default function Today() {
 
         {/* ─── Daily Flow ──────────────────────────────────────────────────── */}
         <View style={styles.ring}>
-          <ProgressRing percent={data.dailyFlow.percent} hold={!splashDone} />
+          <ProgressRing percent={data.dailyFlow.percent} hold={!splashDone} caption="of today done" />
         </View>
 
         <View style={styles.chips}>
