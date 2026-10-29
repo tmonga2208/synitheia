@@ -108,7 +108,6 @@ export const DEFAULT_PREFERENCES = {
   storeReceipts: false, // asked on first use, never assumed
 } as const;
 
-
 // ─── Onboarding ─────────────────────────────────────────────────────────────
 
 /**
@@ -158,6 +157,14 @@ export const updateTargetsSchema = z
     waterTargetMl: z.number().int().min(250).max(10_000).optional(),
     calorieTarget: z.number().int().min(800).max(10_000).optional(),
     monthlyBudgetMinor: z.number().int().nonnegative().nullable().optional(),
+    /** Setup's choice, changeable later from Targets. At least one, each named once. */
+    trackedDomains: z
+      .array(trackedDomainSchema)
+      .min(1)
+      .refine((d) => new Set(d).size === d.length, {
+        message: 'Each area once',
+      })
+      .optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update' });
 export type UpdateTargetsInput = z.infer<typeof updateTargetsSchema>;
