@@ -253,7 +253,7 @@ async function requestUpiLens(
     const response = await fetch(new URL(path, env.UPI_LENS_API_URL).toString(), {
       method: 'POST',
       body,
-      headers,
+      headers: env.UPI_LENS_API_KEY ? { ...headers, 'x-api-key': env.UPI_LENS_API_KEY } : headers,
       signal: controller.signal,
     });
     if (!response.ok) return null;
