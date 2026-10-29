@@ -22,6 +22,8 @@ import type {
 
 export interface ListResponse<T> {
   items: T[];
+  /** Present only on paged lists, and only when another page exists. */
+  nextCursor?: string;
 }
 
 export interface WireHabit

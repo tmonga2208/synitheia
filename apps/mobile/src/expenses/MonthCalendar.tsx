@@ -8,7 +8,7 @@ import type { Theme } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import { formatAmount, type CalendarCell } from './monthView.js';
 
-const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
+export const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 /** The squares fill in as a wave, one day a beat after the one before. */
 const STAGGER_MS = 20;
 
@@ -28,7 +28,7 @@ function spokenDate(date: LocalDate): string {
   }).format(new Date(`${date}T00:00:00Z`));
 }
 
-function weeksOf(cells: CalendarCell[]): CalendarCell[][] {
+export function weeksOf(cells: CalendarCell[]): CalendarCell[][] {
   const weeks: CalendarCell[][] = [];
   for (let i = 0; i < cells.length; i += 7) {
     const week = cells.slice(i, i + 7);

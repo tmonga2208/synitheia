@@ -3,7 +3,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Wallet } from 'lucide-react-native';
 import {
   addMonths,
@@ -15,8 +15,13 @@ import {
   type LocalDate,
   type MonthKey,
 } from '@synitheia/shared';
-import { EmptyState, ErrorState, Text, Touchable } from '../../src/components/primitives.js';
-import { SkeletonList } from '../../src/components/Skeleton.js';
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  Text,
+  Touchable,
+} from '../../src/components/primitives.js';
 import { CountUp } from '../../src/components/CountUp.js';
 import { BillsRow, OwedBanner } from '../../src/components/OwedBanner.js';
 import { api } from '../../src/api/client.js';
@@ -26,12 +31,14 @@ import { useAuth } from '../../src/store/auth.js';
 import { MonthCalendar } from '../../src/expenses/MonthCalendar.js';
 import { PayeeStrip } from '../../src/expenses/PayeeStrip.js';
 import { PaymentRow } from '../../src/expenses/PaymentRow.js';
+import { MonthSkeleton } from '../../src/expenses/MonthSkeleton.js';
 import type { WireExpenseTotals } from '../../src/expenses/monthTotal.js';
 import {
   calendarCells,
   comparisonLine,
   formatAmount,
   formatWhole,
+  loadMoreLabel,
   normalizeTotals,
   previousComparable,
 } from '../../src/expenses/monthView.js';
@@ -39,21 +46,31 @@ import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import type { Theme } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 
-/** The list endpoint's ceiling; the month's total, calendar and payees come from totals. */
-const LIST_LIMIT = 200;
+/** Payments per page. The month's total, calendar and payees come from totals, not the list. */
+const PAGE_SIZE = 10;
 /** "Mostly to" and the first payments rise in once the calendar's wave has mostly passed. */
 const AFTER_CALENDAR_MS = 450;
 const ROW_STAGGER_MS = 70;
 const EASED_ROWS = 8;
 const HIGHLIGHT_MS = 1400;
 
-function expenseQuery(month: MonthKey) {
+/**
+ * `chase` is read when a page is fetched: set, the next page reaches down to that day in one
+ * request instead of ten payments at a time.
+ */
+function expensePagesQuery(month: MonthKey, chase: { current: LocalDate | null }) {
   return {
-    queryKey: ['expenses', month] as const,
-    queryFn: () =>
+    // Not ['expenses', month]: that key held a single list, and a cache saved by an
+    // older build must not be read as pages.
+    queryKey: ['expenses', 'pages', month] as const,
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
       api.get<ListResponse<WireExpense>>(
-        `/expenses?from=${firstOfMonth(month)}&to=${lastOfMonth(month)}&limit=${LIST_LIMIT}`,
+        `/expenses?from=${firstOfMonth(month)}&to=${lastOfMonth(month)}&limit=${PAGE_SIZE}` +
+          (pageParam ? `&before=${encodeURIComponent(pageParam)}` : '') +
+          (pageParam && chase.current ? `&through=${chase.current}` : ''),
       ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last: ListResponse<WireExpense>) => last.nextCursor ?? null,
   };
 }
 
@@ -76,9 +93,11 @@ interface Day {
 
 /** "Sat 19". The date is anchored at UTC so no zone can shift it a day. */
 function dayLabel(localDate: string): string {
-  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(
-    new Date(`${localDate}T00:00:00Z`),
-  );
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${localDate}T00:00:00Z`));
 }
 
 /** The list arrives newest first, so insertion order keeps the days in order. */
@@ -111,13 +130,18 @@ export default function Expenses() {
   const previous = addMonths(month, -1);
   const atLatest = month >= currentMonth;
 
-  const query = useQuery(expenseQuery(month));
+  const chase = useRef<LocalDate | null>(null);
+  const query = useInfiniteQuery(expensePagesQuery(month, chase));
   const totalsQuery = useQuery(monthTotalQuery(month));
   const previousQuery = useQuery(monthTotalQuery(previous));
   const totals = totalsQuery.data ? normalizeTotals(totalsQuery.data) : null;
 
-  const days = useMemo(() => groupByDay(query.data?.items ?? []), [query.data]);
-  const cells = useMemo(() => calendarCells(month, totals?.byDay ?? {}, today), [month, totals, today]);
+  const items = useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data]);
+  const days = useMemo(() => groupByDay(items), [items]);
+  const cells = useMemo(
+    () => calendarCells(month, totals?.byDay ?? {}, today),
+    [month, totals, today],
+  );
 
   const comparison = useMemo(() => {
     if (!totals || totals.count === 0 || !previousQuery.data) return null;
@@ -126,7 +150,11 @@ export default function Expenses() {
       previousMonth: previous,
       ongoingDay: month === currentMonth ? Number(today.slice(8, 10)) : null,
     });
-    return comparisonLine({ thisMinor: totals.totalMinor, previousMinor: prev.minor, previousLabel: prev.label });
+    return comparisonLine({
+      thisMinor: totals.totalMinor,
+      previousMinor: prev.minor,
+      previousLabel: prev.label,
+    });
   }, [totals, previousQuery.data, previous, month, currentMonth, today]);
 
   // Where each day's payments start, so tapping a day can bring them into view.
@@ -136,6 +164,12 @@ export default function Expenses() {
   const dayY = useRef(new Map<string, number>());
   const [selected, setSelected] = useState<LocalDate | null>(null);
   const [highlighted, setHighlighted] = useState<LocalDate | null>(null);
+  // Only a pull shows the spinner. Tied to isRefetching, every quiet re-check of a month
+  // already on the phone (switching back to it, returning to the screen) dropped the
+  // spinner in at the top and pushed the whole month down.
+  const [pulling, setPulling] = useState(false);
+  /** A day tapped on the calendar whose payments are on a page not loaded yet. */
+  const [pendingDay, setPendingDay] = useState<LocalDate | null>(null);
 
   useEffect(() => {
     if (!highlighted) return;
@@ -143,9 +177,33 @@ export default function Expenses() {
     return () => clearTimeout(id);
   }, [highlighted]);
 
+  // One request brings everything down to the tapped day; its row then scrolls itself into view.
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  useEffect(() => {
+    if (!pendingDay || isFetchingNextPage) return;
+    if (days.some((d) => d.localDate === pendingDay)) return;
+    if (!hasNextPage) {
+      setPendingDay(null);
+      return;
+    }
+    chase.current = pendingDay;
+    void fetchNextPage().finally(() => {
+      chase.current = null;
+    });
+  }, [pendingDay, days, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const scrollToDay = (date: LocalDate, y: number) => {
+    scrollRef.current?.scrollTo({
+      y: bodyY.current + listY.current + y - spacing.sm,
+      animated: true,
+    });
+    setHighlighted(date);
+  };
+
   const changeMonth = (delta: number) => {
     setSelected(null);
     setHighlighted(null);
+    setPendingDay(null);
     dayY.current.clear();
     setMonth(addMonths(month, delta));
   };
@@ -153,9 +211,8 @@ export default function Expenses() {
   const goToDay = (date: LocalDate) => {
     setSelected(date);
     const y = dayY.current.get(date);
-    if (y === undefined) return;
-    scrollRef.current?.scrollTo({ y: bodyY.current + listY.current + y - spacing.sm, animated: true });
-    setHighlighted(date);
+    if (y === undefined) setPendingDay(date);
+    else scrollToDay(date, y);
   };
 
   const header = (
@@ -181,31 +238,12 @@ export default function Expenses() {
     </View>
   );
 
-  if (query.isPending) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <SkeletonList />
-      </SafeAreaView>
-    );
-  }
-
-  if (query.error) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <View style={styles.content}>
-          {header}
-          <ErrorState
-            error={query.error}
-            message="We could not load your expenses."
-            onRetry={() => void query.refetch()}
-          />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // The header and month switcher always stay; only the month itself waits. Both the list
+  // and the totals are waited for, so the calendar and total never pop in after the rows.
+  const loading = query.isPending || totalsQuery.isPending;
 
   const empty = days.length === 0;
-  const listed = query.data?.items.length ?? 0;
+  const listed = items.length;
   let row = 0;
 
   return (
@@ -216,11 +254,14 @@ export default function Expenses() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={query.isRefetching}
+            refreshing={pulling}
             onRefresh={() => {
-              void query.refetch();
-              void totalsQuery.refetch();
-              void previousQuery.refetch();
+              setPulling(true);
+              void Promise.all([
+                query.refetch(),
+                totalsQuery.refetch(),
+                previousQuery.refetch(),
+              ]).finally(() => setPulling(false));
             }}
             tintColor={t.accent}
           />
@@ -250,110 +291,154 @@ export default function Expenses() {
             onPress={() => changeMonth(1)}
             style={styles.iconButton}
           >
-            <ChevronRight size={20} color={atLatest ? t.textFaint : t.textMuted} strokeWidth={1.8} />
+            <ChevronRight
+              size={20}
+              color={atLatest ? t.textFaint : t.textMuted}
+              strokeWidth={1.8}
+            />
           </Touchable>
         </View>
 
-        {/* Keyed by month: everything below eases in again only when the month changes. */}
-        <View key={month} onLayout={(e) => (bodyY.current = e.nativeEvent.layout.y)}>
-          <View style={styles.hero}>
-            {totals ? (
-              <CountUp
-                to={totals.totalMinor}
-                format={(n) => formatWhole(n, currency)}
-                animate
-                variant="display"
-                center
-                numberOfLines={1}
-                adjustsFontSizeToFit
-              />
-            ) : (
-              <Text variant="display" center color={t.textFaint}>
-                {' '}
-              </Text>
-            )}
-            <Text variant="body" color={t.textMuted} center>
-              {comparison ?? ' '}
-            </Text>
-          </View>
-
-          <MonthCalendar cells={cells} selected={selected} onSelect={goToDay} currency={currency} />
-
-          {empty ? (
-            <View style={styles.empty}>
-              <EmptyState
-                icon={<Wallet size={30} color={t.onAccent} strokeWidth={1.5} />}
-                title={`Nothing logged in ${formatMonthLabel(month)}`}
-                body="Add an expense by hand, or pick a payment screenshot and let Synítheia read it for you."
-                actionLabel="+ Add an expense"
-                onAction={() => router.push('/expenses/new')}
-              />
-            </View>
-          ) : totals && totals.topPayees.length > 0 ? (
-            <Animated.View entering={FadeInDown.delay(AFTER_CALENDAR_MS).duration(420)}>
-              <Text variant="overline" color={t.textFaint} style={styles.label}>
-                Mostly to
-              </Text>
-              <PayeeStrip payees={totals.topPayees} currency={currency} />
-            </Animated.View>
-          ) : null}
-
-          {/* Always here, so bills stay one tap away even in a month with nothing logged. */}
-          <View style={styles.rows}>
-            <OwedBanner />
-            <BillsRow />
-          </View>
-
-          {empty ? null : (
-            <>
-              <View onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}>
-                <Text variant="overline" color={t.textFaint} style={styles.label}>
-                  Every payment
+        {query.error ? (
+          <ErrorState
+            error={query.error}
+            message="We could not load your expenses."
+            onRetry={() => void query.refetch()}
+          />
+        ) : loading ? (
+          <MonthSkeleton month={month} today={today} />
+        ) : (
+          /* Keyed by month: everything below eases in again only when the month changes. */
+          <View key={month} onLayout={(e) => (bodyY.current = e.nativeEvent.layout.y)}>
+            <View style={styles.hero}>
+              {totals ? (
+                <CountUp
+                  to={totals.totalMinor}
+                  format={(n) => formatWhole(n, currency)}
+                  animate
+                  variant="display"
+                  center
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                />
+              ) : (
+                <Text variant="display" center color={t.textFaint}>
+                  {' '}
                 </Text>
+              )}
+              <Text variant="body" color={t.textMuted} center>
+                {comparison ?? ' '}
+              </Text>
+            </View>
 
-                {days.map((day) => (
-                  <View
-                    key={day.localDate}
-                    onLayout={(e) => dayY.current.set(day.localDate, e.nativeEvent.layout.y)}
-                    style={[styles.day, highlighted === day.localDate && styles.highlight]}
-                  >
-                    <View style={styles.dayHeader}>
-                      <Text variant="label" color={t.textMuted}>
-                        {dayLabel(day.localDate)}
-                      </Text>
-                      <Text variant="label" color={t.textMuted}>
-                        {formatAmount(day.totalMinor, currency)}
-                      </Text>
-                    </View>
+            <MonthCalendar
+              cells={cells}
+              selected={selected}
+              onSelect={goToDay}
+              currency={currency}
+            />
 
-                    {day.items.map((expense) => {
-                      const index = row++;
-                      const payment = (
-                        <PaymentRow expense={expense} onPress={() => router.push(`/expenses/${expense._id}`)} />
-                      );
-                      return index < EASED_ROWS ? (
-                        <Animated.View
-                          key={expense._id}
-                          entering={FadeInDown.delay(AFTER_CALENDAR_MS + 150 + index * ROW_STAGGER_MS).duration(420)}
-                        >
-                          {payment}
-                        </Animated.View>
-                      ) : (
-                        <View key={expense._id}>{payment}</View>
-                      );
-                    })}
-                  </View>
-                ))}
-
-                {totals && totals.count > listed ? (
-                  <Text variant="caption" color={t.textMuted} center style={styles.more}>
-                    Showing the latest {LIST_LIMIT}
-                  </Text>
-                ) : null}
+            {empty ? (
+              <View style={styles.empty}>
+                <EmptyState
+                  icon={<Wallet size={30} color={t.onAccent} strokeWidth={1.5} />}
+                  title={`Nothing logged in ${formatMonthLabel(month)}`}
+                  body="Add an expense by hand, or pick a payment screenshot and let Synítheia read it for you."
+                  actionLabel="+ Add an expense"
+                  onAction={() => router.push('/expenses/new')}
+                />
               </View>
-            </>
-          )}
-        </View>
+            ) : totals && totals.topPayees.length > 0 ? (
+              <Animated.View entering={FadeInDown.delay(AFTER_CALENDAR_MS).duration(420)}>
+                <Text variant="overline" color={t.textFaint} style={styles.label}>
+                  Mostly to
+                </Text>
+                <PayeeStrip payees={totals.topPayees} currency={currency} />
+              </Animated.View>
+            ) : null}
+
+            {/* Always here, so bills stay one tap away even in a month with nothing logged. */}
+            <View style={styles.rows}>
+              <OwedBanner />
+              <BillsRow />
+            </View>
+
+            {empty ? null : (
+              <>
+                <View onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}>
+                  <Text variant="overline" color={t.textFaint} style={styles.label}>
+                    Every payment
+                  </Text>
+
+                  {days.map((day) => (
+                    <View
+                      key={day.localDate}
+                      onLayout={(e) => {
+                        const y = e.nativeEvent.layout.y;
+                        dayY.current.set(day.localDate, y);
+                        if (pendingDay === day.localDate) {
+                          setPendingDay(null);
+                          scrollToDay(day.localDate, y);
+                        }
+                      }}
+                      style={[styles.day, highlighted === day.localDate && styles.highlight]}
+                    >
+                      <View style={styles.dayHeader}>
+                        <Text variant="label" color={t.textMuted}>
+                          {dayLabel(day.localDate)}
+                        </Text>
+                        <Text variant="label" color={t.textMuted}>
+                          {formatAmount(day.totalMinor, currency)}
+                        </Text>
+                      </View>
+
+                      {day.items.map((expense) => {
+                        const index = row++;
+                        const payment = (
+                          <PaymentRow
+                            expense={expense}
+                            onPress={() => router.push(`/expenses/${expense._id}`)}
+                          />
+                        );
+                        return index < EASED_ROWS ? (
+                          <Animated.View
+                            key={expense._id}
+                            entering={FadeInDown.delay(
+                              AFTER_CALENDAR_MS + 150 + index * ROW_STAGGER_MS,
+                            ).duration(420)}
+                          >
+                            {payment}
+                          </Animated.View>
+                        ) : (
+                          <View key={expense._id}>{payment}</View>
+                        );
+                      })}
+                    </View>
+                  ))}
+
+                  {hasNextPage ? (
+                    <Button
+                      variant="secondary"
+                      label={loadMoreLabel({
+                        total: totals?.count ?? null,
+                        shown: listed,
+                        pageSize: PAGE_SIZE,
+                      })}
+                      loading={isFetchingNextPage}
+                      onPress={() => void fetchNextPage()}
+                      style={styles.more}
+                    />
+                  ) : null}
+                  {query.isFetchNextPageError ? (
+                    <Text variant="caption" color={t.textMuted} center style={styles.moreError}>
+                      Those payments could not be loaded. Try again.
+                    </Text>
+                  ) : null}
+                </View>
+              </>
+            )}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -384,13 +469,24 @@ const makeStyles = (t: Theme) =>
       justifyContent: 'center',
       backgroundColor: t.accent,
     },
-    monthBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
+    monthBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+    },
     hero: { alignItems: 'center', marginTop: spacing.md, gap: spacing.xs },
     label: { marginTop: spacing['2xl'], marginBottom: spacing.md },
     rows: { gap: spacing.sm, marginTop: spacing.xl },
     empty: { marginTop: spacing.xl },
     day: { marginTop: spacing.base, borderRadius: radius.md, paddingHorizontal: spacing.xs },
     highlight: { backgroundColor: t.accentWash },
-    dayHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.xs, paddingBottom: spacing.xs },
+    dayHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingTop: spacing.xs,
+      paddingBottom: spacing.xs,
+    },
     more: { marginTop: spacing.xl },
+    moreError: { marginTop: spacing.sm },
   });

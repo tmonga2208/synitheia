@@ -109,6 +109,29 @@ describe('formatMoneyCompact', () => {
   it('uses K notation for USD', () => {
     expect(formatMoneyCompact(asMinor(120000), 'USD')).toBe('$1.2K');
   });
+
+  it('drops a trailing .0 and keeps small amounts whole', () => {
+    expect(formatMoneyCompact(asMinor(2200000), 'INR')).toBe('₹22K');
+    expect(formatMoneyCompact(asMinor(35900), 'INR')).toBe('₹359');
+    expect(formatMoneyCompact(asMinor(1500000000), 'INR')).toBe('₹1.5Cr');
+    expect(formatMoneyCompact(asMinor(250000000), 'USD')).toBe('$2.5M');
+  });
+
+  // Hermes, the engine the app runs on, ignores Intl's compact notation and printed
+  // "₹22,000.0" on the phone while these tests passed in Node.
+  it('does not depend on Intl compact notation', () => {
+    const Original = Intl.NumberFormat;
+    const spy = function (this: unknown, locale?: string, options?: Intl.NumberFormatOptions) {
+      if (options?.notation === 'compact') throw new Error('compact notation used');
+      return new Original(locale, options);
+    } as unknown as typeof Intl.NumberFormat;
+    Intl.NumberFormat = spy;
+    try {
+      expect(formatMoneyCompact(asMinor(2200000), 'INR')).toBe('₹22K');
+    } finally {
+      Intl.NumberFormat = Original;
+    }
+  });
 });
 
 describe('sumMoney', () => {
