@@ -62,7 +62,7 @@
           <p class="release-note"><span data-release="version">Latest release</span> · Free · Android 8.0 or newer · iPhone needs sideloading</p>
         </div>
         <figure class="mock" id="mock-today">
-          <div class="phone" role="img" aria-label="Example: the Today screen. A greeting, a ring showing the day 72 percent complete, a six-day streak and 240 XP, and a card asking whether a food expense at 1:04 PM was lunch, with Dismiss and Confirm.">
+          <div class="phone" role="img" aria-label="Example: the Today screen. A greeting over a line saying two of three habits are done, 320 rupees spent and 1.5 litres of water, a ring showing the day 72 percent complete, a six-day streak and 240 XP, and a card asking whether a food expense at 1:04 PM was lunch, with Dismiss and Confirm.">
             <div class="m-bar">
               <span class="m-avatar">A</span>
               <span class="m-icons">
@@ -72,7 +72,7 @@
             </div>
             <p class="m-overline">Friday, October 9</p>
             <p class="m-title">Good afternoon, Asha</p>
-            <p class="m-sub">You’re on a 6-day streak. Keep the momentum.</p>
+            <p class="m-sub">2 of 3 habits done · ₹320 spent · 1.5 L water</p>
             <div class="m-ring">
               <svg viewBox="0 0 200 200" aria-hidden="true">
                 <circle class="ring-track" cx="100" cy="100" r="78"/>
@@ -81,7 +81,7 @@
               <p class="m-ring-value"><span>72<small>%</small></span></p>
             </div>
             <div class="m-chips">
-              <span class="m-chip"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>6 Day Streak</span>
+              <span class="m-chip"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>6-day streak</span>
               <span class="m-chip">240 XP</span>
             </div>
             <div class="m-card">
@@ -109,7 +109,7 @@
           <p>The ring at the top is one number for the day: how far along you are on your habits, water and food targets.</p>
         </div>
         <figure class="mock" id="mock-your-day">
-          <div class="panel" role="img" aria-label="Example: the Your Day card, in three parts. Morning: one habit and 500 millilitres of water. Afternoon: a 320 rupee lunch, the meal it was logged as, and a design review. Evening: a 32 minute run, 6,480 steps and a completed habit.">
+          <div class="panel" role="img" aria-label="Example: the Your Day card, in three parts. Morning: one habit and 500 millilitres of water. Afternoon: 320 rupees at Green Bowl, dal and rice at 540 kilocalories, and a 45 minute design review. Evening: a 32 minute run, 6,480 steps and the Run habit done. Each line is a name with its amount on the right.">
             <div class="m-bucket">
               <div class="m-bucket-head">
                 <div class="m-dots"><span class="m-dot habit"></span><span class="m-dot water"></span></div>
@@ -124,13 +124,13 @@
                 <div class="m-dots"><span class="m-dot money"></span><span class="m-dot food"></span></div>
                 <div>
                   <p class="m-overline">Afternoon</p>
-                  <p class="m-bucket-summary">₹320.00 · 540 kcal</p>
+                  <p class="m-bucket-summary">₹320 · 540 kcal</p>
                 </div>
               </div>
               <div class="m-rows">
-                <p class="m-row"><span class="m-time">1:04 PM</span><span class="m-dot money"></span><span>₹320.00 spent at Green Bowl · Food</span></p>
-                <p class="m-row"><span class="m-time">1:10 PM</span><span class="m-dot food"></span><span>Dal and rice for lunch · 540 kcal</span></p>
-                <p class="m-row"><span class="m-time">3:00 PM</span><span class="m-dot context"></span><span>Design review · 45 min</span></p>
+                <p class="m-row"><span class="m-time">1:04 PM</span><span class="m-dot money"></span><span>Green Bowl</span><span class="m-val">₹320</span></p>
+                <p class="m-row"><span class="m-time">1:10 PM</span><span class="m-dot food"></span><span>Dal and rice</span><span class="m-val">540 kcal</span></p>
+                <p class="m-row"><span class="m-time">3:00 PM</span><span class="m-dot context"></span><span>Design review</span><span class="m-val">45 min</span></p>
               </div>
             </div>
             <div class="m-bucket">
@@ -142,9 +142,9 @@
                 </div>
               </div>
               <div class="m-rows">
-                <p class="m-row"><span class="m-time">6:15 PM</span><span class="m-dot move"></span><span>running · 32 min</span></p>
-                <p class="m-row"><span class="m-time">6:50 PM</span><span class="m-dot move"></span><span>6,480 steps</span></p>
-                <p class="m-row"><span class="m-time">7:05 PM</span><span class="m-dot habit"></span><span>Run completed</span></p>
+                <p class="m-row"><span class="m-time">6:15 PM</span><span class="m-dot move"></span><span>Running</span><span class="m-val">32 min</span></p>
+                <p class="m-row"><span class="m-time">6:50 PM</span><span class="m-dot move"></span><span>Steps</span><span class="m-val">6,480</span></p>
+                <p class="m-row"><span class="m-time">7:05 PM</span><span class="m-dot habit"></span><span>Run</span><span class="m-val">Done</span></p>
               </div>
             </div>
           </div>
@@ -216,30 +216,67 @@
             <figcaption>Sample data</figcaption>
           </figure>
           <figure class="mock" id="mock-habits">
-            <div class="panel plain" role="img" aria-label="Example: three habit cards, each in its own colour. Read is done for today, on a 14-day streak. Walk is at 3,500 of 8,000 steps, on a 6-day streak. Meditate, ten minutes daily, is on its first day.">
+            <div class="panel plain" role="img" aria-label="Example: three habit cards, each in its own colour, with a row of seven dots for the last week. Read is done for today, on a 14-day streak. Walk is at 3,500 of 8,000 steps, on a 6-day streak. Meditate, ten minutes daily, on a 2-day streak, gets ticked: its circle fills with a check and today's dot fills in.">
               <div class="m-habit sage done">
                 <span class="m-habit-icon"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21a2 2 0 0 0 2 2h13"/></svg></span>
                 <div>
                   <p class="m-habit-name">Read</p>
-                  <p class="m-habit-meta">Daily • 14D Streak</p>
+                  <p class="m-habit-meta">Daily • 14-day streak</p>
+                  <span class="m-week"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span>
                 </div>
-                <span class="m-check"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+                <span class="m-check"><svg class="i tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
               </div>
               <div class="m-habit indigo">
                 <span class="m-habit-icon"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
                 <div>
                   <p class="m-habit-name">Walk</p>
-                  <p class="m-habit-meta">3,500 / 8,000 steps • 6D Streak</p>
+                  <p class="m-habit-meta">3,500 / 8,000 steps • 6-day streak</p>
+                  <span class="m-week"><span class="some"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="some"></span></span>
                 </div>
-                <span class="m-check"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+                <span class="m-check"><svg class="i plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
               </div>
-              <div class="m-habit clay">
+              <div class="m-habit clay ticking">
                 <span class="m-habit-icon"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c0-8 5-14 14-14 0 9-6 14-14 14zM5 19c3-5 6-8 10-10"/></svg></span>
                 <div>
                   <p class="m-habit-name">Meditate</p>
-                  <p class="m-habit-meta">10 min daily • First Day</p>
+                  <p class="m-habit-meta">10 min daily • 2-day streak</p>
+                  <span class="m-week"><span></span><span class="on"></span><span></span><span class="on"></span><span></span><span class="on"></span><span class="on today"></span></span>
                 </div>
-                <span class="m-check"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+                <span class="m-check"><svg class="i plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><svg class="i tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+              </div>
+            </div>
+            <figcaption>Sample data</figcaption>
+          </figure>
+        </div>
+        <div class="split week-split">
+          <div class="split-text stack">
+            <h3>Your week, beside today</h3>
+            <p>Water, food and the Track tab show the last seven days next to today, so you can tell at a glance whether today is a usual day. Each habit shows its last week as dots, and its own page shows the last four weeks.</p>
+            <p>Spending sits beside your monthly budget, and Today’s week puts a number on every day.</p>
+          </div>
+          <figure class="mock" id="mock-week">
+            <div class="phone" role="img" aria-label="Example: the Water screen. A tap on plus 250 millilitres adds a glass: today's total goes from 1.5 to 1.75 litres of a 2.5 litre target, today's bar in the last seven days grows, and the new glass appears at the top of the list. The week says you usually drink 2.2 litres and met the goal on 3 of 7 days.">
+              <p class="m-overline">Today</p>
+              <p class="m-title">Water</p>
+              <div class="m-ring small">
+                <svg viewBox="0 0 200 200" aria-hidden="true">
+                  <circle class="ring-track water" cx="100" cy="100" r="78"/>
+                  <circle class="ring-progress water" cx="100" cy="100" r="78" stroke-dasharray="490.09" stroke-dashoffset="147.03" transform="rotate(-90 100 100)"/>
+                </svg>
+                <p class="m-ring-value"><span class="m-swap"><span class="v-before">1.5 L</span><span class="v-after">1.75 L</span></span><small>of 2.5 L</small></p>
+              </div>
+              <div class="m-presets">
+                <span>+200</span><span class="tapped">+250</span><span>+500</span>
+              </div>
+              <div class="m-weekcard">
+                <div class="m-weekhead"><span>Last 7 days</span><span class="m-muted">Usually 2.2 L · goal met 3 of 7</span></div>
+                <div class="m-wbars"><span class="m-wcol met"><span class="m-wval">2.6</span><span class="m-wtrack"><span class="m-wfill h-100"></span></span></span><span class="m-wcol"><span class="m-wval">1.9</span><span class="m-wtrack"><span class="m-wfill h-76"></span></span></span><span class="m-wcol met"><span class="m-wval">2.5</span><span class="m-wtrack"><span class="m-wfill h-100"></span></span></span><span class="m-wcol"><span class="m-wval">1.4</span><span class="m-wtrack"><span class="m-wfill h-56"></span></span></span><span class="m-wcol met"><span class="m-wval">2.8</span><span class="m-wtrack"><span class="m-wfill h-100"></span></span></span><span class="m-wcol"><span class="m-wval">2.0</span><span class="m-wtrack"><span class="m-wfill h-80"></span></span></span><span class="m-wcol today"><span class="m-wval"><span class="v-before">1.5</span><span class="v-after">1.8</span></span><span class="m-wtrack"><span class="m-wfill h-70"></span></span></span></div>
+                <div class="m-wdays"><span>S</span><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span class="today">F</span></div>
+              </div>
+              <div class="m-glasses">
+                <p class="m-glass new"><span class="m-dot move"></span><span>250 ml</span><span class="m-time">4:10 PM</span></p>
+                <p class="m-glass"><span class="m-dot move"></span><span>500 ml</span><span class="m-time">1:20 PM</span></p>
+                <p class="m-glass"><span class="m-dot move"></span><span>500 ml</span><span class="m-time">10:05 AM</span></p>
               </div>
             </div>
             <figcaption>Sample data</figcaption>
@@ -361,30 +398,21 @@
           <div class="split-text stack">
             <p class="overline">Privacy</p>
             <h2 id="your-data-title">Your data, switch by switch</h2>
-            <p>The Connected Context screen lists every source the app can read, what it is used for and when it last synced. Each source has two switches: one to collect it, and a separate one to let Synítheia AI use it.</p>
+            <p>The Connected Context screen lists every source the app can read, what it is used for and when it last synced. Each source has one switch to use it. Once it is on, a separate switch decides whether Synítheia AI may use it too.</p>
           </div>
           <figure class="mock" id="mock-source">
-            <div class="panel" role="img" aria-label="Example: a source card from Connected Context: Health and Activity, connected, with what it is used for, where it comes from on each phone and when it last synced. The switch to collect it is on. The separate switch to let Synítheia AI use it is off.">
+            <div class="panel" role="img" aria-label="Example: a source card from Connected Context. Health and Activity, with its switch being turned on, one line on what it is used for, when it last synced, and then a separate switch, off, to let Synítheia AI use it.">
               <div class="m-source-head">
                 <p class="m-card-title first">Health &amp; Activity</p>
-                <p class="m-status">Connected</p>
+                <span class="m-switch on flips"></span>
               </div>
               <p class="m-body">Steps, workouts, and sleep appear on your timeline and let Synítheia notice things like lower activity on days you eat more.</p>
-              <p class="m-evidence">Apple Health on iOS · Health Connect on Android</p>
-              <p class="m-evidence">Last synced Oct 9, 9:12 AM</p>
-              <div class="m-toggle">
-                <div>
-                  <p class="m-toggle-title">Collect this data</p>
-                  <p class="m-toggle-note">Read it into your timeline and your day.</p>
+              <div class="m-once-on">
+                <p class="m-evidence">Last synced Oct 9, 9:12 AM · 48 entries</p>
+                <div class="m-ai">
+                  <p class="m-toggle-title"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>Let Synítheia AI use it</p>
+                  <span class="m-switch"></span>
                 </div>
-                <span class="m-switch on"></span>
-              </div>
-              <div class="m-toggle">
-                <div>
-                  <p class="m-toggle-title">Let Synítheia AI use it</p>
-                  <p class="m-toggle-note">A separate decision. You can keep a source and still keep it out of the model.</p>
-                </div>
-                <span class="m-switch"></span>
               </div>
             </div>
             <figcaption>Sample data</figcaption>

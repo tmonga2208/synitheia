@@ -12,13 +12,14 @@ const EXPECTED = [
   'your-day',
   'expense-draft',
   'habits',
+  'week',
   'suggestion',
   'insight',
   'month',
   'source',
 ];
 
-test('the eight mocks are all there, in page order', () => {
+test('the nine mocks are all there, in page order', () => {
   assert.deepEqual(
     figures.map(({ name }) => name),
     EXPECTED,
