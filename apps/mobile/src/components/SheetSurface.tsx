@@ -5,6 +5,7 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,10 +33,15 @@ export function SheetSurface({ style, children, ...rest }: ViewProps) {
   const reduceMotion = useReducedMotion();
 
   // With Reduce Motion on it is simply there, and the Modal's fade is the whole entrance.
-  const offset = useSharedValue(reduceMotion ? 0 : height * RISE_FRACTION);
+  // Otherwise it starts below the screen: the Modal fades everything in it, this panel
+  // included, and a panel already in view would show the page through it as it arrived.
+  const offset = useSharedValue(reduceMotion ? 0 : height);
 
   useEffect(() => {
-    offset.value = withTiming(0, { duration: RISE_MS, easing: Easing.out(Easing.cubic) });
+    offset.value = withDelay(
+      RISE_DELAY_MS,
+      withTiming(0, { duration: RISE_MS, easing: Easing.out(Easing.cubic) }),
+    );
   }, [offset]);
 
   const rise = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));
@@ -54,7 +60,11 @@ export function SheetSurface({ style, children, ...rest }: ViewProps) {
   );
 }
 
-/** How far below its resting place the panel starts, as a share of the screen's height. */
-const RISE_FRACTION = 0.4;
-/** About the length of the Modal's own fade, so the dim and the panel settle together. */
-const RISE_MS = 320;
+/**
+ * The panel waits this long for the Modal's fade to get going, so it comes into view on a
+ * dim that is most of the way there. Short enough that the tap still feels answered: the
+ * dim itself starts at once.
+ */
+const RISE_DELAY_MS = 120;
+/** Ending a little after the fade does, so the panel is the last thing to settle. */
+const RISE_MS = 340;

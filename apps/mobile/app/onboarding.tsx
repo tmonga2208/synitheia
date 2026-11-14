@@ -2,9 +2,9 @@ import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Leaf } from 'lucide-react-native';
+import { BrandMark } from '../src/components/BrandMark.js';
 import { Button, Text, Touchable } from '../src/components/primitives.js';
-import { radius, spacing } from '../src/theme/theme.js';
+import { spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
 
@@ -27,8 +27,8 @@ export default function Onboarding() {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <Animated.View entering={FadeIn.duration(500)} style={styles.content}>
-        <View style={styles.mark} accessibilityRole="image" accessibilityLabel="Synítheia">
-          <Leaf size={38} color={t.accent} strokeWidth={1.4} />
+        <View style={styles.mark}>
+          <BrandMark size={96} />
         </View>
 
         <Animated.View entering={FadeInDown.delay(120).duration(420)}>
@@ -70,15 +70,8 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg, paddingHorizontal: spacing.xl },
     content: { flex: 1, justifyContent: 'center' },
-    mark: {
-      width: 72,
-      height: 72,
-      borderRadius: radius.xl,
-      backgroundColor: t.accentWash,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing['2xl'],
-    },
+    // Pulled left by the mark's own inner margin, so its outer arc lines up with the text.
+    mark: { marginLeft: -spacing.xs, marginBottom: spacing.xl },
     body: { marginTop: spacing.lg },
     footer: { gap: spacing.md, paddingBottom: spacing.xl },
     signIn: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },

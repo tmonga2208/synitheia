@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { asLocalDate, localWeekdayIndex, type TodayResponse } from '@synitheia/shared';
 import { Card, Text } from './primitives.js';
-import { flowTint, motion, radius, spacing } from '../theme/theme.js';
+import { flowTint, motion, radius, spacing, type } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
 
@@ -38,6 +38,8 @@ const LABEL_SPACE = 20;
 const BAR_SPACE = PLOT_HEIGHT - LABEL_SPACE;
 /** A day with nothing logged still gets a visible stub — an absent bar reads as a rendering bug. */
 const MIN_BAR_HEIGHT = 24;
+/** Kept clear at the right of the plot for the word "Goal", so today's bar never sits under it. */
+const GOAL_LABEL_SPACE = 40;
 
 /**
  * Weekly Analysis.
@@ -167,16 +169,27 @@ const makeStyles = (t: Theme) =>
       height: PLOT_HEIGHT,
       flexDirection: 'row',
       alignItems: 'flex-end',
+      paddingRight: GOAL_LABEL_SPACE,
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginBottom: spacing.md,
     },
-    barLabel: { fontSize: 11, marginBottom: spacing.xs },
+    // A day in the high eighties puts its number right on the goal line. The number carries
+    // a patch of the panel's own colour, so the line stops either side of it instead of
+    // running through the digits like a strikethrough.
+    barLabel: {
+      fontSize: 11,
+      marginBottom: spacing.xs,
+      paddingHorizontal: 3,
+      backgroundColor: t.accentWash,
+    },
     goalLine: {
       position: 'absolute',
-      top: LABEL_SPACE,
+      // The row is one caption line tall with the rule centred in it, so it starts half a
+      // line above where the rule belongs: level with the top of a full bar.
+      top: LABEL_SPACE - type.caption.lineHeight / 2,
       left: 0,
       right: 0,
       flexDirection: 'row',
@@ -201,6 +214,8 @@ const makeStyles = (t: Theme) =>
     axis: {
       flexDirection: 'row',
       marginTop: spacing.md,
+      // The same inset as the plot, so each letter stays under its bar.
+      paddingRight: GOAL_LABEL_SPACE,
     },
     axisCell: {
       flex: 1,

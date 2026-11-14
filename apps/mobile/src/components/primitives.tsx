@@ -147,6 +147,8 @@ interface ButtonProps extends Omit<TouchableProps, 'children'> {
   loading?: boolean;
   /** The reference CTAs read "Keep Growing →". */
   trailingArrow?: boolean;
+  /** A mark before the label: the Apple and Google marks on the sign-in buttons. */
+  leading?: React.ReactNode;
   fullWidth?: boolean;
 }
 
@@ -155,6 +157,7 @@ export function Button({
   variant = 'primary',
   loading,
   trailingArrow,
+  leading,
   fullWidth = true,
   disabled,
   style,
@@ -188,14 +191,17 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={isPrimary ? t.onAccent : t.textPrimary} />
       ) : (
-        <Text
-          variant="cardTitle"
-          color={isPrimary ? t.onAccent : t.textPrimary}
-          style={{ textAlign: 'center' }}
-        >
-          {label}
-          {trailingArrow ? '  →' : ''}
-        </Text>
+        <View style={styles.buttonContent}>
+          {leading}
+          <Text
+            variant="cardTitle"
+            color={isPrimary ? t.onAccent : t.textPrimary}
+            style={{ textAlign: 'center' }}
+          >
+            {label}
+            {trailingArrow ? '  →' : ''}
+          </Text>
+        </View>
       )}
     </Touchable>
   );
@@ -437,6 +443,12 @@ const makeStyles = (t: Theme) =>
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: spacing.xl,
+    },
+    buttonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.md,
     },
     chip: {
       minHeight: 36,

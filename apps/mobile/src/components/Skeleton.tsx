@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { StyleSheet, View, type DimensionValue, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
@@ -9,7 +9,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { radius, spacing } from '../theme/theme.js';
+import { radius, screen, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
 
@@ -120,13 +120,36 @@ export function SkeletonList({ rows = 4, showLeading = true }: { rows?: number; 
 /**
  * A whole-screen skeleton with the top safe-area inset — for the screens that returned a
  * bare centred spinner and just want "this screen is loading" in the right shape.
+ *
+ * Given the screen's own `header`, it shows that instead of a grey bar where the title will
+ * be: the back arrow works while the screen loads, and the arrow and title are already
+ * where they will stay when the data lands. Without it a loading screen had no way back.
  */
-export function SkeletonScreen({ rows = 4, showLeading = true }: { rows?: number; showLeading?: boolean }) {
+export function SkeletonScreen({
+  rows = 4,
+  showLeading = true,
+  header,
+}: {
+  rows?: number;
+  showLeading?: boolean;
+  header?: ReactNode;
+}) {
   const styles = useThemedStyles(makeStyles);
 
   return (
     <SafeAreaView style={styles.full} edges={['top']}>
-      <SkeletonList rows={rows} showLeading={showLeading} />
+      {header ? (
+        <View style={styles.framed}>
+          {header}
+          <View style={styles.stack}>
+            {Array.from({ length: rows }, (_, i) => (
+              <SkeletonCard key={i} showLeading={showLeading} />
+            ))}
+          </View>
+        </View>
+      ) : (
+        <SkeletonList rows={rows} showLeading={showLeading} />
+      )}
     </SafeAreaView>
   );
 }
@@ -191,7 +214,9 @@ export function SkeletonTrackers() {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     full: { flex: 1, backgroundColor: t.bg },
-    todayContent: { padding: spacing.lg },
+    // The frame Today and Track themselves sit in, so nothing shifts when they load.
+    todayContent: { paddingHorizontal: screen.gutter, paddingTop: spacing.sm },
+    framed: { paddingHorizontal: screen.gutter, paddingTop: screen.top },
     todayHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -200,7 +225,7 @@ const makeStyles = (t: Theme) =>
     ringWrap: { alignItems: 'center', marginTop: spacing['2xl'] },
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
     gridItem: { flexGrow: 1, flexBasis: '46%' },
-    screen: { padding: spacing.lg },
+    screen: { paddingHorizontal: screen.gutter, paddingVertical: spacing.lg },
     stack: { gap: spacing.md },
     card: {
       flexDirection: 'row',

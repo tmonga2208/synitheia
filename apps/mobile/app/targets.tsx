@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import {
   currencyMeta,
   parseMoneyInput,
@@ -16,7 +16,9 @@ import { Button, Card, ErrorState, Input, Text, Touchable } from '../src/compone
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { api } from '../src/api/client.js';
 import { errorLine } from '../src/api/errorCopy.js';
-import { spacing } from '../src/theme/theme.js';
+import { budgetInputValue } from '../src/expenses/budgetInput.js';
+import { ScreenHeader } from '../src/components/ScreenHeader.js';
+import { screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
 
@@ -36,12 +38,6 @@ const AREAS: { domain: TrackedDomain; label: string; blurb: string }[] = [
   { domain: 'water', label: 'Water', blurb: 'Daily hydration' },
 ];
 
-function minorToInput(minor: number | null, currency: string): string {
-  if (minor == null) return '';
-  const { decimals } = currencyMeta(currency);
-  return (minor / 10 ** decimals).toFixed(decimals);
-}
-
 function TargetsForm({ initial }: { initial: TargetsView }) {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -57,7 +53,7 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
 
   const [water, setWater] = useState(String(initial.waterTargetMl));
   const [calories, setCalories] = useState(String(initial.calorieTarget));
-  const [budget, setBudget] = useState(minorToInput(initial.monthlyBudgetMinor, initial.currency));
+  const [budget, setBudget] = useState(budgetInputValue(initial.monthlyBudgetMinor, initial.currency));
   const [error, setError] = useState<string | null>(null);
 
   const save = useMutation({
@@ -88,23 +84,10 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
 
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Touchable
-        onPress={() => goBackOrHome(router)}
-        style={styles.back}
-        haptic={false}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-      >
-        <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-      </Touchable>
-
-      <Text variant="title" style={styles.title}>
-        Targets
-      </Text>
-      <Text variant="body" color={t.textMuted} style={styles.sub}>
-        What you track, and the numbers your day is measured against. Change them whenever they stop
-        fitting.
-      </Text>
+      <ScreenHeader
+        title="Targets"
+        subtitle="What you track, and the numbers your day is measured against. Change them whenever they stop fitting."
+      />
 
       {AREAS.map(({ domain, label, blurb }) => {
         const on = tracks(domain);
@@ -148,6 +131,11 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
                 keyboardType="decimal-pad"
                 placeholder="Leave blank for none"
                 accessibilityLabel="Monthly budget"
+                leading={
+                  <Text variant="bodyMedium" color={t.textFaint}>
+                    {currencyMeta(initial.currency).symbol}
+                  </Text>
+                }
               />
             ) : null}
 
@@ -191,28 +179,21 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
 }
 
 export default function Targets() {
-  const t = useTheme();
   const styles = useThemedStyles(makeStyles);
   const query = useQuery({
     queryKey: ['targets'],
     queryFn: () => api.get<TargetsView>('/me/targets'),
   });
 
-  if (query.isPending) return <SkeletonScreen rows={3} showLeading={false} />;
+  if (query.isPending) {
+    return <SkeletonScreen rows={3} showLeading={false} header={<ScreenHeader title="Targets" />} />;
+  }
 
   if (query.error || !query.data) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          <Touchable
-            onPress={() => goBackOrHome(router)}
-            style={styles.back}
-            haptic={false}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-          </Touchable>
+          <ScreenHeader title="Targets" />
           <ErrorState
             error={query.error}
             message="Could not load your targets."
@@ -237,16 +218,11 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
     flex: { flex: 1 },
-    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
+    content: {
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
+      paddingBottom: spacing['4xl'],
     },
-    title: { marginTop: spacing.base },
-    sub: { marginTop: spacing.xs, marginBottom: spacing.xl },
     card: { gap: spacing.base, marginBottom: spacing.md },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     rowCopy: { flex: 1, gap: 2 },

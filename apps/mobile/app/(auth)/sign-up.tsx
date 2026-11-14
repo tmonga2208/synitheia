@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
 import { Lock, Mail, User as UserIcon } from 'lucide-react-native';
 import { Button, Input, Text, Touchable } from '../../src/components/primitives.js';
+import { AppleMark, GoogleMark } from '../../src/components/ProviderMarks.js';
 import { errorLine } from '../../src/api/errorCopy.js';
 import { useAuth } from '../../src/store/auth.js';
 import { radius, spacing } from '../../src/theme/theme.js';
@@ -151,6 +152,7 @@ export default function SignUp() {
               <Button
                 label="Continue with Apple"
                 variant="secondary"
+                leading={<AppleMark size={20} color={t.textPrimary} />}
                 loading={pending === 'apple'}
                 disabled={pending !== null}
                 onPress={() => void run('apple', signInWithApple)}
@@ -160,6 +162,7 @@ export default function SignUp() {
             <Button
               label="Continue with Google"
               variant="secondary"
+              leading={<GoogleMark size={20} />}
               loading={pending === 'google'}
               disabled={pending !== null}
               onPress={() => void run('google', signInWithGoogle)}

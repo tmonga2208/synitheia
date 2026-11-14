@@ -16,7 +16,6 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
   AlertTriangle,
-  ArrowLeft,
   Camera,
   ClipboardPaste,
   FileText,
@@ -32,7 +31,7 @@ import {
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
-import { SkeletonList } from '../../src/components/Skeleton.js';
+import { SkeletonScreen } from '../../src/components/Skeleton.js';
 import { DateField } from '../../src/components/DateField.js';
 import {
   SplitWith,
@@ -50,7 +49,14 @@ import type {
 } from '../../src/api/types.js';
 import { useAuth } from '../../src/store/auth.js';
 import { SheetSurface } from '../../src/components/SheetSurface.js';
-import { MIN_TAP_TARGET, radius, spacing, type as typeScale } from '../../src/theme/theme.js';
+import { ScreenHeader } from '../../src/components/ScreenHeader.js';
+import {
+  MIN_TAP_TARGET,
+  radius,
+  screen,
+  spacing,
+  type as typeScale,
+} from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 
@@ -428,31 +434,15 @@ export default function NewExpense() {
     );
   }
 
-  const back = (
-    <Touchable
-      style={styles.iconButton}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-      haptic={false}
-      onPress={() => goBackOrHome(router)}
-    >
-      <ArrowLeft size={22} color={t.textPrimary} />
-    </Touchable>
-  );
-
   if (categories.isPending) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <SkeletonList />
-      </SafeAreaView>
-    );
+    return <SkeletonScreen header={<ScreenHeader title="New expense" />} />;
   }
 
   if (categories.error) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
+          <ScreenHeader title="New expense" />
           <ErrorState
             error={categories.error}
             message="We could not load your categories."
@@ -484,14 +474,16 @@ export default function NewExpense() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>{back}</View>
-
-          <Text variant="title">{reviewing ? 'Review' : 'New expense'}</Text>
-          <Text variant="body" color={t.textMuted} style={styles.subtitle}>
-            {reviewing
-              ? 'We read these from what you shared. Nothing is saved until you confirm — check each one and correct anything we got wrong.'
-              : 'Type it in, or add a screenshot or statement and check what we read.'}
-          </Text>
+          {/* Every block below brings its own top margin, so the header adds none. */}
+          <ScreenHeader
+            title={reviewing ? 'Review' : 'New expense'}
+            subtitle={
+              reviewing
+                ? 'We read these from what you shared. Nothing is saved until you confirm — check each one and correct anything we got wrong.'
+                : 'Type it in, or add a screenshot or statement and check what we read.'
+            }
+            gapBelow={0}
+          />
 
           {error ? (
             <Card style={styles.errorCard} accessibilityLiveRegion="polite">
@@ -1025,23 +1017,10 @@ const makeStyles = (t: Theme) =>
     screen: { flex: 1, backgroundColor: t.bg },
     flex: { flex: 1 },
     content: {
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
       paddingBottom: spacing['3xl'],
     },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: spacing.sm,
-      marginBottom: spacing.base,
-    },
-    iconButton: {
-      width: MIN_TAP_TARGET,
-      height: MIN_TAP_TARGET,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.md,
-    },
-    subtitle: { marginTop: spacing.xs },
     card: { marginTop: spacing.xl, gap: spacing.base },
     fieldLabel: { marginBottom: spacing.sm },
     customPanel: {

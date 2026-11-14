@@ -5,13 +5,18 @@ import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { ArrowLeft, Check } from 'lucide-react-native';
-import { STARTER_HABITS, parseMoneyInput, type TrackedDomain } from '@synitheia/shared';
+import {
+  STARTER_HABITS,
+  formatClockTime,
+  parseMoneyInput,
+  type TrackedDomain,
+} from '@synitheia/shared';
 import { Button, Card, Chip, Input, Text, Touchable } from '../src/components/primitives.js';
 import { iconFor } from '../src/components/IconPicker.js';
 import { api } from '../src/api/client.js';
 import { errorLine } from '../src/api/errorCopy.js';
 import { useAuth } from '../src/store/auth.js';
-import { radius, spacing } from '../src/theme/theme.js';
+import { radius, screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
 
@@ -139,7 +144,7 @@ export default function Setup() {
               <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
             </Touchable>
           ) : (
-            <View style={styles.back} />
+            <View style={styles.backSpace} />
           )}
 
           <View style={styles.progress}>
@@ -155,7 +160,7 @@ export default function Setup() {
             ))}
           </View>
 
-          <View style={styles.back} />
+          <View style={styles.backSpace} />
         </View>
 
         <ScrollView
@@ -322,10 +327,10 @@ export default function Setup() {
                   {TIMES.map((time) => (
                     <Chip
                       key={time}
-                      label={time}
+                      label={formatClockTime(time)}
                       selected={reminder === time}
                       onPress={() => setReminder(time)}
-                      accessibilityLabel={`Remind me at ${time}`}
+                      accessibilityLabel={`Remind me at ${formatClockTime(time)}`}
                     />
                   ))}
 
@@ -367,16 +372,30 @@ const makeStyles = (t: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: spacing.lg,
+      paddingHorizontal: screen.gutter,
       minHeight: 56,
     },
-    back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    // Pulled left like every other back arrow, so the glyph starts on the gutter.
+    back: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -spacing.md,
+    },
+    // What the arrow takes up once pulled left. One each side keeps the dots centred,
+    // with or without an arrow.
+    backSpace: { width: 44 - spacing.md, height: 44 },
     progress: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     pip: { width: 8, height: 8, borderRadius: radius.full, backgroundColor: t.border },
     // Active/done fills use ACCENT, a runtime value — applied inline at the call site.
     pipActive: { width: 26 },
 
-    content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
+    content: {
+      paddingHorizontal: screen.gutter,
+      paddingTop: spacing.xl,
+      paddingBottom: spacing.xl,
+    },
     sub: { marginTop: spacing.sm, marginBottom: spacing.xl },
     hint: { marginTop: spacing.lg },
 
@@ -417,5 +436,5 @@ const makeStyles = (t: Theme) =>
 
     card: { gap: spacing.base },
     times: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    footer: { padding: spacing.lg },
+    footer: { paddingHorizontal: screen.gutter, paddingVertical: spacing.lg },
   });

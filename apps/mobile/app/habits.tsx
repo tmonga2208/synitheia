@@ -2,12 +2,11 @@ import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Leaf, Plus } from 'lucide-react-native';
+import { Leaf } from 'lucide-react-native';
 import type { TodayResponse } from '@synitheia/shared';
-import { EmptyState, ErrorState, Text, Touchable } from '../src/components/primitives.js';
-import { SkeletonList } from '../src/components/Skeleton.js';
+import { EmptyState, ErrorState } from '../src/components/primitives.js';
+import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { HabitCard, type TodayHabit } from '../src/components/HabitCard.js';
 import { lastSeven } from '../src/habits/lastSeven.js';
 import { api } from '../src/api/client.js';
@@ -15,7 +14,8 @@ import type { HabitHistory, ListResponse, WireHabit } from '../src/api/types.js'
 import { useHabitLog } from '../src/habits/useHabitLog.js';
 import { LogAmountSheet } from '../src/habits/LogAmountSheet.js';
 import { usePullRefresh } from '../src/feedback/pullRefresh.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
+import { HeaderAdd, ScreenHeader } from '../src/components/ScreenHeader.js';
+import { screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
 
@@ -83,51 +83,20 @@ export default function Habits() {
   });
   const todayDate = todayQuery.data?.localDate;
 
-  const back = (
-    <Touchable
-      onPress={() => goBackOrHome(router)}
-      style={styles.back}
-      haptic={false}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-    >
-      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-    </Touchable>
-  );
-
   const header = (
-    <View style={styles.header}>
-      <View style={styles.headerCopy}>
-        <Text variant="overline" color={t.textFaint}>
-          Your habits
-        </Text>
-        <Text variant="title">Habits</Text>
-      </View>
-
-      <Touchable
-        accessibilityRole="button"
-        accessibilityLabel="Add a new habit"
-        onPress={() => router.push('/habit/new')}
-        style={styles.add}
-      >
-        <Plus size={22} color={t.onAccent} strokeWidth={2} />
-      </Touchable>
-    </View>
+    <ScreenHeader
+      overline="Your habits"
+      title="Habits"
+      action={<HeaderAdd label="Add a new habit" onPress={() => router.push('/habit/new')} />}
+    />
   );
 
-  if (habitsQuery.isPending) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <SkeletonList />
-      </SafeAreaView>
-    );
-  }
+  if (habitsQuery.isPending) return <SkeletonScreen header={header} />;
 
   if (habitsQuery.error) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
           {header}
           <ErrorState
             error={habitsQuery.error}
@@ -152,7 +121,6 @@ export default function Habits() {
           />
         }
       >
-        {back}
         {header}
 
         {habits.length === 0 ? (
@@ -197,31 +165,9 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
     content: {
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
       paddingBottom: spacing.xl,
-    },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: spacing.sm,
-      marginBottom: spacing.lg,
-    },
-    headerCopy: { gap: spacing.xs },
-    add: {
-      width: MIN_TAP_TARGET + 4,
-      height: MIN_TAP_TARGET + 4,
-      borderRadius: radius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: t.accent,
     },
     list: { gap: spacing.base },
   });

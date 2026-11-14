@@ -21,7 +21,6 @@ import {
   formatVolume,
 } from '@synitheia/shared';
 import {
-  Button,
   Card,
   Chip,
   EmptyState,
@@ -33,6 +32,7 @@ import {
 import { SkeletonToday } from '../../src/components/Skeleton.js';
 import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { dayLine } from '../../src/today/dayLine.js';
+import { SuggestionCard } from '../../src/today/SuggestionCard.js';
 import { useSplashDone } from '../../src/components/splashState.js';
 import { HabitCard, type TodayHabit } from '../../src/components/HabitCard.js';
 import { WeeklyChart } from '../../src/components/WeeklyChart.js';
@@ -310,63 +310,13 @@ export default function Today() {
         {data.suggestions.length > 0 ? (
           <View style={styles.suggestions}>
             {data.suggestions.map((suggestion) => (
-              <Card key={suggestion.id} style={styles.suggestion}>
-                <View style={styles.tagRow}>
-                  <View style={styles.tag}>
-                    <Text variant="caption" color={t.textFaint}>
-                      detected
-                    </Text>
-                  </View>
-                </View>
-
-                <Text variant="cardTitle">{suggestion.title}</Text>
-
-                {suggestion.description ? (
-                  <Text variant="body" color={t.textMuted}>
-                    {suggestion.description}
-                  </Text>
-                ) : null}
-
-                {/* The evidence, in the user's own terms. A suggestion the user cannot
-                    check is a suggestion they can only obey or ignore. */}
-                {suggestion.evidence.map((item) => (
-                  <Text
-                    key={`${suggestion.id}:${item.label}`}
-                    variant="caption"
-                    color={t.textFaint}
-                  >
-                    {`• ${item.label}`}
-                  </Text>
-                ))}
-
-                <View style={styles.suggestionActions}>
-                  <Button
-                    label="Dismiss"
-                    variant="secondary"
-                    fullWidth={false}
-                    style={styles.suggestionButton}
-                    onPress={() =>
-                      resolveSuggestion.mutate({
-                        id: suggestion.id,
-                        action: 'reject',
-                        title: suggestion.title,
-                      })
-                    }
-                  />
-                  <Button
-                    label="Confirm"
-                    fullWidth={false}
-                    style={styles.suggestionButton}
-                    onPress={() =>
-                      resolveSuggestion.mutate({
-                        id: suggestion.id,
-                        action: 'confirm',
-                        title: suggestion.title,
-                      })
-                    }
-                  />
-                </View>
-              </Card>
+              <SuggestionCard
+                key={suggestion.id}
+                suggestion={suggestion}
+                onAnswer={(action) =>
+                  resolveSuggestion.mutate({ id: suggestion.id, action, title: suggestion.title })
+                }
+              />
             ))}
           </View>
         ) : null}
@@ -560,23 +510,6 @@ const makeStyles = (t: Theme) =>
       marginTop: spacing['2xl'],
       gap: spacing.base,
     },
-    suggestion: { gap: spacing.sm },
-    tagRow: { flexDirection: 'row' },
-    tag: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
-      borderRadius: radius.full,
-      backgroundColor: t.surfaceRaised,
-      borderWidth: 1,
-      borderColor: t.border,
-    },
-    suggestionActions: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      gap: spacing.md,
-      marginTop: spacing.sm,
-    },
-    suggestionButton: { minWidth: 120 },
     insight: {
       marginTop: spacing['2xl'],
       gap: spacing.sm,

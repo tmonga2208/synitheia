@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Wallet } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Wallet } from 'lucide-react-native';
 import {
   addMonths,
   firstOfMonth,
@@ -27,7 +27,6 @@ import { CountUp } from '../../src/components/CountUp.js';
 import { BillsRow, OwedBanner } from '../../src/components/OwedBanner.js';
 import { api } from '../../src/api/client.js';
 import type { ListResponse, WireExpense } from '../../src/api/types.js';
-import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useAuth } from '../../src/store/auth.js';
 import { MonthCalendar } from '../../src/expenses/MonthCalendar.js';
 import { PayeeStrip } from '../../src/expenses/PayeeStrip.js';
@@ -44,7 +43,8 @@ import {
   normalizeTotals,
   previousComparable,
 } from '../../src/expenses/monthView.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
+import { HeaderAdd, ScreenHeader } from '../../src/components/ScreenHeader.js';
+import { MIN_TAP_TARGET, radius, screen, spacing } from '../../src/theme/theme.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { usePullRefresh } from '../../src/feedback/pullRefresh.js';
@@ -230,27 +230,11 @@ export default function Expenses() {
     else scrollToDay(date, y);
   };
 
+  // Arrow and "+" only: the month and its total are this screen's heading.
   const header = (
-    <View style={styles.header}>
-      <Touchable
-        style={styles.iconButton}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        haptic={false}
-        onPress={() => goBackOrHome(router)}
-      >
-        <ArrowLeft size={22} color={t.textPrimary} />
-      </Touchable>
-
-      <Touchable
-        accessibilityRole="button"
-        accessibilityLabel="Add an expense"
-        onPress={() => router.push('/expenses/new')}
-        style={styles.add}
-      >
-        <Plus size={22} color={t.onAccent} strokeWidth={2} />
-      </Touchable>
-    </View>
+    <ScreenHeader
+      action={<HeaderAdd label="Add an expense" onPress={() => router.push('/expenses/new')} />}
+    />
   );
 
   // The header and month switcher always stay; only the month itself waits. Both the list
@@ -334,9 +318,11 @@ export default function Expenses() {
                   {' '}
                 </Text>
               )}
-              <Text variant="body" color={t.textMuted} center>
-                {comparison ?? ' '}
-              </Text>
+              {comparison ? (
+                <Text variant="body" color={t.textMuted} center>
+                  {comparison}
+                </Text>
+              ) : null}
               {budget ? (
                 <Text
                   variant="label"
@@ -346,6 +332,14 @@ export default function Expenses() {
                   {budget.text}
                 </Text>
               ) : null}
+              {/* The comparison's line is kept while there is none, so the calendar does
+                  not move when it arrives. Kept at the bottom: above the budget it was a
+                  blank row between the total and the line about it. */}
+              {comparison ? null : (
+                <Text variant="body" center>
+                  {' '}
+                </Text>
+              )}
             </View>
 
             <MonthCalendar
@@ -472,12 +466,10 @@ export default function Expenses() {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
-    content: { paddingHorizontal: spacing.xl, paddingBottom: spacing['4xl'] },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: spacing.sm,
+    content: {
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
+      paddingBottom: spacing['4xl'],
     },
     iconButton: {
       width: MIN_TAP_TARGET,
@@ -485,14 +477,6 @@ const makeStyles = (t: Theme) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radius.md,
-    },
-    add: {
-      width: MIN_TAP_TARGET,
-      height: MIN_TAP_TARGET,
-      borderRadius: radius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: t.accent,
     },
     monthBar: {
       flexDirection: 'row',

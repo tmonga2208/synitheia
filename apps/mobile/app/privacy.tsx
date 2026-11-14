@@ -12,10 +12,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image as ImageIcon, RefreshCw,
-  ArrowLeft,
   Download,
   Sparkles,
   Trash2,
@@ -28,7 +26,7 @@ import {
   Text,
   Touchable,
 } from '../src/components/primitives.js';
-import { SkeletonList } from '../src/components/Skeleton.js';
+import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { api } from '../src/api/client.js';
 import { describeError, errorLine } from '../src/api/errorCopy.js';
 import { nothingAllowedAlert } from '../src/health/healthCopy.js';
@@ -43,7 +41,6 @@ import type {
   InsightAvailability,
   ListResponse,
 } from '../src/api/types.js';
-import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { canForget, forgetConfirmation, forgottenNotice } from '../src/privacy/forgetSource.js';
 import { useAuth } from '../src/store/auth.js';
 import { backgroundSyncCopy } from '../src/sync/backgroundCopy.js';
@@ -51,7 +48,8 @@ import { syncBackgroundRegistration } from '../src/sync/backgroundTask.js';
 import { readSourcePrefs, writeSourcePrefs } from '../src/sync/sourcePrefs.js';
 import { useSourcePrefsMirror } from '../src/sync/useSourcePrefsMirror.js';
 import { SheetSurface } from '../src/components/SheetSurface.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
+import { ScreenHeader } from '../src/components/ScreenHeader.js';
+import { MIN_TAP_TARGET, radius, screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
 
@@ -366,24 +364,9 @@ export default function Privacy() {
     }
   }
 
-  const back = (
-    <Touchable
-      style={styles.iconButton}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-      haptic={false}
-      // Not router.back(): this screen can be the only one in the stack. See goBackOrHome.
-      onPress={() => goBackOrHome(router)}
-    >
-      <ArrowLeft size={22} color={t.textPrimary} />
-    </Touchable>
-  );
-
   if (sources.isPending || availability.isPending) {
     return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <SkeletonList />
-      </SafeAreaView>
+      <SkeletonScreen header={<ScreenHeader overline="Privacy" title="Connected Context" />} />
     );
   }
 
@@ -391,7 +374,7 @@ export default function Privacy() {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
+          <ScreenHeader overline="Privacy" title="Connected Context" />
           <ErrorState
             error={sources.error}
             message="We could not load your connected context."
@@ -412,18 +395,13 @@ export default function Privacy() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>{back}</View>
-
-        <Text variant="overline" color={t.textFaint}>
-          Privacy
-        </Text>
-        <Text variant="title" style={styles.heading}>
-          Connected Context
-        </Text>
-        <Text variant="body" color={t.textMuted} style={styles.intro}>
-          What Synítheia knows, and where it came from. A source you turn off is never read
-          again, even if your phone still allows it.
-        </Text>
+        {/* The cards under it each bring their own top margin, so the header adds none. */}
+        <ScreenHeader
+          overline="Privacy"
+          title="Connected Context"
+          subtitle="What Synítheia knows, and where it came from. A source you turn off is never read again, even if your phone still allows it."
+          gapBelow={0}
+        />
 
         {/* ─── Receipt images ──────────────────────────────────────────────── */}
         <Card style={styles.aiCard}>
@@ -820,24 +798,10 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
     content: {
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
       paddingBottom: spacing['4xl'],
     },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: spacing.sm,
-      marginBottom: spacing.base,
-    },
-    iconButton: {
-      width: MIN_TAP_TARGET,
-      height: MIN_TAP_TARGET,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.md,
-    },
-    heading: { marginTop: spacing.xs },
-    intro: { marginTop: spacing.sm },
     aiCard: { marginTop: spacing.xl },
     aiHeader: {
       flexDirection: 'row',

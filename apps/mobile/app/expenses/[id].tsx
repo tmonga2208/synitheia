@@ -6,7 +6,6 @@ import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  ArrowLeft,
   Camera,
   ImageIcon,
   Repeat,
@@ -28,7 +27,8 @@ import { ReceiptConsentSheet } from '../../src/components/ReceiptConsentSheet.js
 import { api } from '../../src/api/client.js';
 import { errorLine } from '../../src/api/errorCopy.js';
 import { useAuth } from '../../src/store/auth.js';
-import { radius, spacing } from '../../src/theme/theme.js';
+import { ScreenHeader } from '../../src/components/ScreenHeader.js';
+import { radius, screen, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 
@@ -206,25 +206,13 @@ export default function ExpenseDetail() {
     upload.mutate(asset);
   }
 
-  const back = (
-    <Touchable
-      onPress={() => goBackOrHome(router)}
-      style={styles.back}
-      haptic={false}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-    >
-      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-    </Touchable>
-  );
-
-  if (isPending) return <SkeletonScreen />;
+  if (isPending) return <SkeletonScreen header={<ScreenHeader />} />;
 
   if (error || !data) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
+          <ScreenHeader />
           <ErrorState
             error={error}
             message="Could not load this expense."
@@ -243,7 +231,8 @@ export default function ExpenseDetail() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {back}
+        {/* Arrow only: the amount is this screen's heading. */}
+        <ScreenHeader />
 
         <Text variant="overline" color={e.categoryColor} style={{ marginTop: spacing.base }}>
           {e.categoryName}
@@ -499,7 +488,11 @@ export default function ExpenseDetail() {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
+    content: {
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
+      paddingBottom: spacing['4xl'],
+    },
     deleteRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -507,13 +500,6 @@ const makeStyles = (t: Theme) =>
       gap: spacing.sm,
       marginTop: spacing['2xl'],
       paddingVertical: spacing.md,
-    },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
     },
     amount: { marginTop: spacing.xs, marginBottom: spacing.md },
     when: { marginTop: spacing.base },
