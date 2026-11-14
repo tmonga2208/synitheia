@@ -16,7 +16,7 @@ import { Button, Card, ErrorState, Input, Text, Touchable } from '../src/compone
 import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { api } from '../src/api/client.js';
 import { errorLine } from '../src/api/errorCopy.js';
-import { budgetInputValue } from '../src/expenses/budgetInput.js';
+import { moneyInputValue } from '../src/expenses/moneyInput.js';
 import { ScreenHeader } from '../src/components/ScreenHeader.js';
 import { screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
@@ -53,7 +53,7 @@ function TargetsForm({ initial }: { initial: TargetsView }) {
 
   const [water, setWater] = useState(String(initial.waterTargetMl));
   const [calories, setCalories] = useState(String(initial.calorieTarget));
-  const [budget, setBudget] = useState(budgetInputValue(initial.monthlyBudgetMinor, initial.currency));
+  const [budget, setBudget] = useState(moneyInputValue(initial.monthlyBudgetMinor, initial.currency));
   const [error, setError] = useState<string | null>(null);
 
   const save = useMutation({

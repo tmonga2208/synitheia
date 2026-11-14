@@ -102,6 +102,34 @@ export function ScreenHeader({
   );
 }
 
+/**
+ * A quiet round button for the header's right side, for an action on the thing the screen
+ * shows (editing it). Quieter than `HeaderAdd`, which is for making something new.
+ */
+export function HeaderButton({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: ReactNode;
+  label: string;
+  onPress: () => void;
+}) {
+  const styles = useThemedStyles(makeStyles);
+
+  return (
+    <Touchable
+      onPress={onPress}
+      style={styles.quiet}
+      haptic={false}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      {icon}
+    </Touchable>
+  );
+}
+
 /** The round "+" at the top right of a screen that lists things: add one. */
 export function HeaderAdd({ label, onPress }: { label: string; onPress: () => void }) {
   const t = useTheme();
@@ -145,6 +173,16 @@ const makeStyles = (t: Theme) =>
       height: MIN_TAP_TARGET,
       borderRadius: radius.full,
       backgroundColor: t.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    quiet: {
+      width: MIN_TAP_TARGET,
+      height: MIN_TAP_TARGET,
+      borderRadius: radius.full,
+      backgroundColor: t.surfaceRaised,
+      borderWidth: 1,
+      borderColor: t.border,
       alignItems: 'center',
       justifyContent: 'center',
     },

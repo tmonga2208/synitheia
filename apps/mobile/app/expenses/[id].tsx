@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   Camera,
   ImageIcon,
+  Pencil,
   Repeat,
   Sparkles,
   Trash2,
@@ -27,7 +28,8 @@ import { ReceiptConsentSheet } from '../../src/components/ReceiptConsentSheet.js
 import { api } from '../../src/api/client.js';
 import { errorLine } from '../../src/api/errorCopy.js';
 import { useAuth } from '../../src/store/auth.js';
-import { ScreenHeader } from '../../src/components/ScreenHeader.js';
+import { HeaderButton, ScreenHeader } from '../../src/components/ScreenHeader.js';
+import { EditExpenseSheet } from '../../src/expenses/EditExpenseSheet.js';
 import { radius, screen, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
@@ -38,6 +40,7 @@ interface WireExpenseDetail {
   _id: string;
   amountMinor: number;
   currency: string;
+  categoryId: string;
   categoryName: string;
   categoryColor: string;
   merchant: string | null;
@@ -95,6 +98,7 @@ export default function ExpenseDetail() {
   const timezone = useAuth((s) => s.user?.timezone) ?? 'UTC';
 
   const [askingConsent, setAskingConsent] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [pendingImage, setPendingImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   const { data, error, isPending, refetch } = useQuery({
@@ -121,6 +125,8 @@ export default function ExpenseDetail() {
     void queryClient.invalidateQueries({ queryKey: ['receipt', id] });
     void queryClient.invalidateQueries({ queryKey: ['expenses'] });
     void queryClient.invalidateQueries({ queryKey: ['today'] });
+    // A past day's page keeps its own copy of that day's totals.
+    void queryClient.invalidateQueries({ queryKey: ['day'] });
   };
 
   const upload = useMutation({
@@ -231,17 +237,35 @@ export default function ExpenseDetail() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Arrow only: the amount is this screen's heading. */}
-        <ScreenHeader />
+        {/* No title: the amount is this screen's heading. */}
+        <ScreenHeader
+          action={
+            <HeaderButton
+              label="Edit expense"
+              onPress={() => setEditing(true)}
+              icon={<Pencil size={18} color={t.textPrimary} strokeWidth={1.8} />}
+            />
+          }
+        />
 
-        <Text variant="overline" color={e.categoryColor} style={{ marginTop: spacing.base }}>
-          {e.categoryName}
-        </Text>
-        <Text variant="display" style={styles.amount}>
-          {formatMoney(asMinor(e.amountMinor), e.currency)}
-        </Text>
+        {/* The amount and who it went to are what people come here to fix, so they open
+            the editor too, not only the pencil. */}
+        <Touchable
+          onPress={() => setEditing(true)}
+          haptic={false}
+          accessibilityRole="button"
+          accessibilityLabel={`${formatMoney(asMinor(e.amountMinor), e.currency)} to ${e.merchant ?? e.categoryName}, ${e.categoryName}`}
+          accessibilityHint="Opens the editor"
+        >
+          <Text variant="overline" color={e.categoryColor} style={{ marginTop: spacing.base }}>
+            {e.categoryName}
+          </Text>
+          <Text variant="display" style={styles.amount}>
+            {formatMoney(asMinor(e.amountMinor), e.currency)}
+          </Text>
 
-        <Text variant="heading">{e.merchant ?? e.categoryName}</Text>
+          <Text variant="heading">{e.merchant ?? e.categoryName}</Text>
+        </Touchable>
 
         {/*
           The date is editable in place. It used to be a line of grey text, which meant an
@@ -467,6 +491,14 @@ export default function ExpenseDetail() {
           </Text>
         </Touchable>
       </ScrollView>
+
+      <EditExpenseSheet
+        visible={editing}
+        id={id}
+        expense={e}
+        onClose={() => setEditing(false)}
+        onSaved={invalidate}
+      />
 
       <ReceiptConsentSheet
         visible={askingConsent}
