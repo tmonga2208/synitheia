@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -21,6 +21,7 @@ import { MIN_TAP_TARGET, motion, radius, spacing } from '../theme/theme.js';
 import { useTheme } from '../theme/ThemeProvider.js';
 import { accentFor } from '../theme/theme.js';
 import type { RecentDay } from '../habits/lastSeven.js';
+import { fitsOnOneLine } from './metaLine.js';
 
 /** A habit as Today sees it: the domain record plus this local day's progress. */
 export type TodayHabit = TodayResponse['habits'][number];
@@ -65,7 +66,10 @@ interface HabitCardProps {
  * showing that day's own count instead, is already in `goal` for anything countable and
  * has nothing to say about a check habit. Silence is the honest option.
  */
-function metadataFor(habit: TodayHabit, readOnly: boolean): string {
+function metadataFor(
+  habit: TodayHabit,
+  readOnly: boolean,
+): { goal: string; streak: string | null } {
   const period = habit.frequency === 'daily' ? 'Daily' : 'Weekly';
   const measure = measureOf(habit);
 
@@ -76,13 +80,73 @@ function metadataFor(habit: TodayHabit, readOnly: boolean): string {
         ? `${formatHabitTarget(habit)} ${period.toLowerCase()}`
         : formatHabitProgress(habit, habit.todayCount);
 
-  if (readOnly) return goal;
+  if (readOnly) return { goal, streak: null };
 
   // A zero streak is a beginning, not a failure. "0D Streak" reads as a scolding.
   const streak =
     habit.currentStreak > 0 ? `${habit.currentStreak}-day streak` : 'First day';
 
-  return [goal, streak].join(' • ');
+  return { goal, streak };
+}
+
+/** The dot between the two facts, with the space either side of it. */
+const SEPARATOR = { dot: 3, gap: 6 } as const;
+const SEPARATOR_WIDTH = SEPARATOR.dot + SEPARATOR.gap * 2;
+
+/**
+ * The line under a habit's name: where it stands, and its streak.
+ *
+ * Side by side when they fit; otherwise the streak takes a line of its own. It used to be
+ * one line cut short — a walk part-way through its steps read "6,849 / 8,000 steps • 5-day
+ * stre…", and the streak, the thing a habit is kept for, was what went missing.
+ *
+ * Each fact is laid out at its natural width and the two are measured, rather than letting
+ * the text wrap where it runs out: a wrap could only fall mid-phrase or leave a dot at the
+ * start of a line.
+ */
+function MetaLine({
+  goal,
+  streak,
+  color,
+}: {
+  goal: string;
+  streak: string | null;
+  color: string;
+}) {
+  const [width, setWidth] = useState<{ box?: number; goal?: number; streak?: number }>({});
+
+  const measure = (part: 'box' | 'goal' | 'streak') => (e: LayoutChangeEvent) => {
+    const measured = Math.ceil(e.nativeEvent.layout.width);
+    setWidth((seen) => (seen[part] === measured ? seen : { ...seen, [part]: measured }));
+  };
+
+  const known =
+    width.box != null && width.goal != null && (streak == null || width.streak != null);
+  const stacked =
+    streak != null &&
+    known &&
+    !fitsOnOneLine(width.box ?? 0, [width.goal ?? 0, width.streak ?? 0], SEPARATOR_WIDTH);
+
+  return (
+    <View
+      onLayout={measure('box')}
+      // Hidden for the frame it takes to measure, so a long line is never seen running
+      // under the button before it moves.
+      style={[styles.meta, stacked && styles.metaStacked, !known && styles.metaUnmeasured]}
+    >
+      <Text variant="caption" color={color} numberOfLines={1} onLayout={measure('goal')}>
+        {goal}
+      </Text>
+      {streak != null ? (
+        <>
+          {stacked ? null : <View style={[styles.metaDot, { backgroundColor: color }]} />}
+          <Text variant="caption" color={color} numberOfLines={1} onLayout={measure('streak')}>
+            {streak}
+          </Text>
+        </>
+      ) : null}
+    </View>
+  );
 }
 
 /**
@@ -128,7 +192,8 @@ export function HabitCard({
   const plusStyle = useAnimatedStyle(() => ({ opacity: 1 - done.value }));
   const checkStyle = useAnimatedStyle(() => ({ opacity: done.value }));
 
-  const metadata = metadataFor(habit, readOnly);
+  const meta = metadataFor(habit, readOnly);
+  const metadata = [meta.goal, meta.streak].filter((part) => part != null).join(' • ');
 
   return (
     <Touchable
@@ -153,9 +218,7 @@ export function HabitCard({
             <Text variant="cardTitle" numberOfLines={1}>
               {habit.name}
             </Text>
-            <Text variant="caption" color={accent.text} numberOfLines={1}>
-              {metadata}
-            </Text>
+            <MetaLine goal={meta.goal} streak={meta.streak} color={accent.text} />
             {recent ? (
               <View
                 style={styles.dots}
@@ -268,6 +331,17 @@ const styles = StyleSheet.create({
   copy: {
     flex: 1,
     gap: spacing.xs,
+  },
+  meta: { flexDirection: 'row', alignItems: 'center' },
+  // flex-start, so each line keeps its natural width and can still be measured: stretched
+  // to the box, a line could never be found short enough to go back beside the other.
+  metaStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 2 },
+  metaUnmeasured: { opacity: 0 },
+  metaDot: {
+    width: SEPARATOR.dot,
+    height: SEPARATOR.dot,
+    borderRadius: radius.full,
+    marginHorizontal: SEPARATOR.gap,
   },
   dots: { flexDirection: 'row', gap: 5, marginTop: 2 },
   dot: { width: 8, height: 8, borderRadius: radius.full },

@@ -139,6 +139,18 @@ export function formatMoneyCompact(amount: Minor, currency: string): string {
   return `${sign}${symbol}${scaled % 1 === 0 ? scaled.toFixed(0) : scaled.toFixed(1)}${suffix}`;
 }
 
+/**
+ * An average, or any other worked-out amount, in whole units of its currency.
+ *
+ * Four Saturdays averaging ₹2,660.25 are not known to the paisa, and printing the paise
+ * says they are. A payment keeps its paise because it was that exact amount; a figure
+ * that was calculated is rounded to the rupee before it is shown.
+ */
+export function roundToWholeUnits(amount: number, currency: string): Minor {
+  const scale = 10 ** currencyMeta(currency).decimals;
+  return asMinor(Math.round(amount / scale) * scale);
+}
+
 export function sumMoney(amounts: readonly Minor[]): Minor {
   return asMinor(amounts.reduce<number>((acc, n) => acc + n, 0));
 }

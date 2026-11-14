@@ -1,9 +1,7 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Droplets, Trash2 } from 'lucide-react-native';
+import { Droplets, Trash2 } from 'lucide-react-native';
 import { WATER_PRESETS_ML, formatVolume, type TodayResponse } from '@synitheia/shared';
 import {
   Card,
@@ -29,7 +27,9 @@ import {
   type WireWaterEntry,
 } from '../src/water/waterCache.js';
 import { useAuth } from '../src/store/auth.js';
-import { radius, spacing } from '../src/theme/theme.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
+import { ScreenHeader } from '../src/components/ScreenHeader.js';
+import { radius, screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
 
@@ -50,10 +50,11 @@ export default function WaterScreen() {
   const queryClient = useQueryClient();
   const timezone = useAuth((s) => s.user?.timezone) ?? 'UTC';
 
-  const { data, error, isPending, isRefetching, refetch } = useQuery({
+  const { data, error, isPending, refetch } = useQuery({
     queryKey: WATER_KEY,
     queryFn: () => api.get<WaterResponse>('/water'),
   });
+  const pull = usePullRefresh(refetch);
 
   // The week comes from Today's load, which every screen shares; nothing extra is fetched.
   const todayQuery = useQuery({
@@ -97,25 +98,15 @@ export default function WaterScreen() {
     timeZone: timezone,
   });
 
-  const back = (
-    <Touchable
-      onPress={() => goBackOrHome(router)}
-      style={styles.back}
-      haptic={false}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-    >
-      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-    </Touchable>
-  );
+  const header = <ScreenHeader overline="Today" overlineColor={ACCENT.text} title="Water" />;
 
-  if (isPending) return <SkeletonScreen />;
+  if (isPending) return <SkeletonScreen header={header} />;
 
   if (error || !data) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
+          {header}
           <ErrorState
             error={error}
             message="Could not load your water."
@@ -137,18 +128,13 @@ export default function WaterScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => void refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={ACCENT.base}
           />
         }
       >
-        {back}
-
-        <Text variant="overline" color={ACCENT.text} style={{ marginTop: spacing.base }}>
-          Today
-        </Text>
-        <Text variant="title">Water</Text>
+        {header}
 
         <View style={styles.ring}>
           <ProgressRing percent={percent} color={ACCENT.base} size={168} strokeWidth={22}>
@@ -245,15 +231,12 @@ export default function WaterScreen() {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
+    content: {
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
+      paddingBottom: spacing['4xl'],
     },
-    ring: { alignItems: 'center', marginVertical: spacing.lg },
+    ring: { alignItems: 'center', marginBottom: spacing.lg },
     presets: {
       flexDirection: 'row',
       gap: spacing.md,

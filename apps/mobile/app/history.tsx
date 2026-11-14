@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import {
@@ -26,7 +25,8 @@ import {
 import { MonthGrid } from '../src/components/MonthGrid.js';
 import { api } from '../src/api/client.js';
 import { useAuth } from '../src/store/auth.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
+import { ScreenHeader } from '../src/components/ScreenHeader.js';
+import { MIN_TAP_TARGET, radius, screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { flowTint, type Theme } from '../src/theme/theme.js';
 
@@ -86,17 +86,9 @@ export default function History() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {/* Outside the scroll view with the month bar, so both stay put while a month loads. */}
       <View style={styles.header}>
-        <Touchable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          haptic={false}
-          onPress={() => goBackOrHome(router)}
-          style={styles.iconButton}
-        >
-          <ChevronLeft size={24} color={t.textPrimary} strokeWidth={1.8} />
-        </Touchable>
-        <Text variant="heading">History</Text>
+        <ScreenHeader title="History" gapBelow={spacing.base} />
       </View>
 
       {/*
@@ -227,7 +219,9 @@ function Stat({ value, label }: { value: string; label: string }) {
   return (
     <Card style={styles.stat}>
       <Text variant="heading">{value}</Text>
-      <Text variant="caption" color={t.textFaint}>
+      {/* Centred as text too: a label that wraps ("good days in a row") otherwise sets its
+          second line flush left under a centred first. */}
+      <Text variant="caption" color={t.textFaint} center>
         {label}
       </Text>
     </Card>
@@ -241,14 +235,11 @@ const makeStyles = (t: Theme) =>
       backgroundColor: t.bg,
     },
     header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.sm,
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
     },
     content: {
-      paddingHorizontal: spacing.lg,
+      paddingHorizontal: screen.gutter,
       paddingBottom: spacing['4xl'],
     },
     /**
@@ -259,12 +250,14 @@ const makeStyles = (t: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: spacing.lg,
+      // The steppers are 44pt targets with the chevron in the middle; pulled out by the
+      // slack so the chevrons, not their targets, stand on the gutter.
+      paddingHorizontal: screen.gutter - spacing.md,
       marginBottom: spacing.base,
     },
     /** Wraps the error card with the same horizontal margin `content` gives the loaded state. */
     state: {
-      paddingHorizontal: spacing.lg,
+      paddingHorizontal: screen.gutter,
     },
     iconButton: {
       minWidth: MIN_TAP_TARGET,
@@ -278,6 +271,8 @@ const makeStyles = (t: Theme) =>
       justifyContent: 'flex-end',
       gap: spacing.xs,
       marginTop: spacing.md,
+      // It sat directly on the heading below; the two read as one crowded line.
+      marginBottom: spacing.xl,
     },
     swatch: {
       width: spacing.md,

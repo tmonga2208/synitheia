@@ -7,6 +7,7 @@ import {
   netSpend,
   parseMoneyInput,
   percentChange,
+  roundToWholeUnits,
   splitEvenly,
   sumMoney,
 } from './money.js';
@@ -137,6 +138,27 @@ describe('formatMoneyCompact', () => {
     } finally {
       Intl.NumberFormat = Original;
     }
+  });
+});
+
+describe('roundToWholeUnits', () => {
+  it('rounds an average to whole rupees, so it never shows paise', () => {
+    // The mean of ₹2,640, ₹2,660 and ₹2,681.75 — 266,025 paise, and a third more.
+    const mean = (264_000 + 266_000 + 268_175) / 3;
+    expect(formatMoney(roundToWholeUnits(mean, 'INR'), 'INR')).toBe('₹2,661');
+  });
+
+  it('rounds half a unit up and under half down', () => {
+    expect(roundToWholeUnits(150, 'INR')).toBe(200);
+    expect(roundToWholeUnits(149.9, 'INR')).toBe(100);
+  });
+
+  it('leaves a currency with no minor unit as it is, to the nearest one', () => {
+    expect(roundToWholeUnits(1234.4, 'JPY')).toBe(1234);
+  });
+
+  it('gives back an integer count of minor units', () => {
+    expect(Number.isInteger(roundToWholeUnits(40_033.333, 'INR'))).toBe(true);
   });
 });
 

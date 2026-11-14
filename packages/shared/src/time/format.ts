@@ -45,3 +45,26 @@ export function formatShortDayLabel(localDate: LocalDate): string {
 export function formatMonthLabel(month: MonthKey): string {
   return MONTH.format(anchor(firstOfMonth(month)));
 }
+
+/**
+ * "19:30" → "7:30 PM".
+ *
+ * Reminder and habit times are stored as 24-hour "HH:mm". The timeline, the water log and
+ * the meals list all write times as "7:30 PM", so a stored time shown as it is kept made
+ * one screen read like a different app from the next.
+ *
+ * No timezone: the input is already a wall-clock time. Anything that is not a time comes
+ * back untouched rather than as "NaN:NaN AM".
+ */
+export function formatClockTime(hhmm: string): string {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
+  if (!match) return hhmm;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return hhmm;
+
+  const suffix = hour < 12 ? 'AM' : 'PM';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${match[2]} ${suffix}`;
+}

@@ -11,11 +11,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Bell, Minus, Plus, Trash2 } from 'lucide-react-native';
-import type { CreateReminderInput, ReminderKind } from '@synitheia/shared';
+import { Bell, Minus, Plus, Trash2 } from 'lucide-react-native';
+import { formatClockTime, type CreateReminderInput, type ReminderKind } from '@synitheia/shared';
 import {
   Button,
   Card,
@@ -26,7 +24,7 @@ import {
   Text,
   Touchable,
 } from '../src/components/primitives.js';
-import { SkeletonList } from '../src/components/Skeleton.js';
+import { SkeletonScreen } from '../src/components/Skeleton.js';
 import { api } from '../src/api/client.js';
 import { describeError, errorLine } from '../src/api/errorCopy.js';
 import type { ListResponse, WireReminder } from '../src/api/types.js';
@@ -37,7 +35,10 @@ import {
 } from '../src/reminders/permission.js';
 import { requestReminderRefresh } from '../src/reminders/schedule.js';
 import { useNotificationAccess } from '../src/reminders/useNotificationAccess.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
+import { SheetSurface } from '../src/components/SheetSurface.js';
+import { HeaderAdd, ScreenHeader } from '../src/components/ScreenHeader.js';
+import { MIN_TAP_TARGET, radius, screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
 
@@ -59,7 +60,7 @@ function describe(reminder: WireReminder): string {
     const interval = reminder.intervalMinutes == null ? 'Interval' : `Every ${reminder.intervalMinutes}m`;
     const window =
       reminder.windowStart != null && reminder.windowEnd != null
-        ? `${reminder.windowStart}–${reminder.windowEnd}`
+        ? `${formatClockTime(reminder.windowStart)}–${formatClockTime(reminder.windowEnd)}`
         : 'All day';
     return `${interval} · ${window}`;
   }
@@ -73,7 +74,7 @@ function describe(reminder: WireReminder): string {
           .map((d) => WEEKDAY_LABELS[d])
           .join(' · ');
 
-  return `${reminder.time ?? 'Time unavailable'} · ${days}`;
+  return `${reminder.time ? formatClockTime(reminder.time) : 'Time unavailable'} · ${days}`;
 }
 
 export default function Reminders() {
@@ -104,6 +105,7 @@ export default function Reminders() {
     queryKey: REMINDERS_KEY,
     queryFn: () => api.get<ListResponse<WireReminder>>('/reminders'),
   });
+  const pull = usePullRefresh(query.refetch);
 
   const toggle = useMutation({
     meta: { reportsOwnError: true },
@@ -171,51 +173,20 @@ export default function Reminders() {
     ]);
   }
 
-  const back = (
-    <Touchable
-      onPress={() => goBackOrHome(router)}
-      style={styles.back}
-      haptic={false}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-    >
-      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-    </Touchable>
-  );
-
   const header = (
-    <View style={styles.header}>
-      <View style={styles.headerCopy}>
-        <Text variant="overline" color={t.textFaint}>
-          On this device
-        </Text>
-        <Text variant="title">Reminders</Text>
-      </View>
-
-      <Touchable
-        accessibilityRole="button"
-        accessibilityLabel="Add a reminder"
-        onPress={() => setComposing(true)}
-        style={styles.add}
-      >
-        <Plus size={22} color={t.onAccent} strokeWidth={2} />
-      </Touchable>
-    </View>
+    <ScreenHeader
+      overline="On this device"
+      title="Reminders"
+      action={<HeaderAdd label="Add a reminder" onPress={() => setComposing(true)} />}
+    />
   );
 
-  if (query.isPending) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <SkeletonList />
-      </SafeAreaView>
-    );
-  }
+  if (query.isPending) return <SkeletonScreen header={header} />;
 
   if (query.error) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
           {header}
           <ErrorState
             error={query.error}
@@ -238,13 +209,12 @@ export default function Reminders() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={query.isRefetching}
-            onRefresh={() => void query.refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={t.accent}
           />
         }
       >
-        {back}
         {header}
 
         {blocked ? (
@@ -345,7 +315,7 @@ function ComposeSheet({
   const valid = label.trim().length > 0;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Touchable
           style={styles.backdropDismiss}
@@ -356,7 +326,7 @@ function ComposeSheet({
         />
 
         <KeyboardAvoidingView behavior="padding">
-          <SafeAreaView style={styles.sheet} edges={['bottom']}>
+          <SheetSurface style={styles.sheet}>
             <View style={styles.handle} />
 
             <Text variant="heading" style={styles.sheetTitle}>
@@ -457,7 +427,7 @@ function ComposeSheet({
                 }
               />
             </View>
-          </SafeAreaView>
+          </SheetSurface>
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -512,31 +482,9 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
     content: {
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
       paddingBottom: spacing.xl,
-    },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: spacing.sm,
-      marginBottom: spacing.lg,
-    },
-    headerCopy: { gap: spacing.xs },
-    add: {
-      width: MIN_TAP_TARGET + 4,
-      height: MIN_TAP_TARGET + 4,
-      borderRadius: radius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: t.accent,
     },
     list: { gap: spacing.md },
     blocked: { gap: spacing.sm, marginBottom: spacing.base },

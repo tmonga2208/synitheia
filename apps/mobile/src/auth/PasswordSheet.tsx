@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Input, Text, Touchable } from '../components/primitives.js';
 import { errorLine } from '../api/errorCopy.js';
 import { showToast } from '../feedback/toast.js';
 import { useAuth } from '../store/auth.js';
+import { SheetSurface } from '../components/SheetSurface.js';
 import { radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
@@ -70,7 +70,7 @@ export function PasswordSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
       <KeyboardAvoidingView style={styles.backdrop} behavior="padding">
         <Touchable
           style={styles.flex}
@@ -79,7 +79,7 @@ export function PasswordSheet({
           accessibilityLabel="Close"
           onPress={close}
         />
-        <SafeAreaView style={styles.sheet} edges={['bottom']}>
+        <SheetSurface style={styles.sheet}>
           <View style={styles.handle} />
           <Text variant="heading">{hasPassword ? 'Change password' : 'Add a password'}</Text>
           <Text variant="body" color={t.textMuted}>
@@ -114,7 +114,7 @@ export function PasswordSheet({
             loading={saving}
             onPress={() => void save()}
           />
-        </SafeAreaView>
+        </SheetSurface>
       </KeyboardAvoidingView>
     </Modal>
   );

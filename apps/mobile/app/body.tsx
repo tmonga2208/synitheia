@@ -6,10 +6,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, HeartPulse } from 'lucide-react-native';
+import { HeartPulse } from 'lucide-react-native';
 import type {
   BmiBand,
   BodyInsight,
@@ -34,7 +32,9 @@ import { missingSentence } from '../src/health/bodyCopy.js';
 import { BodyDetails } from '../src/health/BodyDetails.js';
 import { BodyDetailsForm } from '../src/health/BodyDetailsForm.js';
 import { WeightCard } from '../src/health/WeightCard.js';
-import { radius, spacing } from '../src/theme/theme.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
+import { ScreenHeader } from '../src/components/ScreenHeader.js';
+import { radius, screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
 
@@ -80,10 +80,11 @@ export default function Body() {
   const ACCENT = accentFor(ACCENT_COLOR, t);
   const queryClient = useQueryClient();
 
-  const { data, error, isPending, isRefetching, refetch } = useQuery({
+  const { data, error, isPending, refetch } = useQuery({
     queryKey: KEY,
     queryFn: () => api.get<BodyReport>('/health/body'),
   });
+  const pull = usePullRefresh(refetch);
 
   const pickGoal = useMutation({
     meta: { failed: 'Couldn’t set your calorie goal' },
@@ -99,25 +100,15 @@ export default function Body() {
     },
   });
 
-  const back = (
-    <Touchable
-      onPress={() => goBackOrHome(router)}
-      style={styles.back}
-      haptic={false}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-    >
-      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-    </Touchable>
-  );
+  const header = <ScreenHeader overline="Health" overlineColor={ACCENT.text} title="Your body" />;
 
-  if (isPending) return <SkeletonScreen />;
+  if (isPending) return <SkeletonScreen header={header} />;
 
   if (error || !data) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
+          {header}
           <ErrorState
             error={error}
             message="Could not load your body."
@@ -148,22 +139,25 @@ export default function Body() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={() => void refetch()}
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
               tintColor={ACCENT.base}
             />
           }
         >
-          {back}
-
           {/*
             Not "From Health Connect": some of what follows may have been typed in, and on
             Android sex and date of birth always are. BodyDetails says which is which.
+
+            Every block on this screen brings a top margin of its own, so the header leaves
+            only the difference.
           */}
-          <Text variant="overline" color={ACCENT.text} style={{ marginTop: spacing.base }}>
-            Health
-          </Text>
-          <Text variant="title">Your body</Text>
+          <ScreenHeader
+            overline="Health"
+            overlineColor={ACCENT.text}
+            title="Your body"
+            gapBelow={spacing.xs}
+          />
 
           {/*
             Nothing to compute from. Says exactly what is missing rather than showing a
@@ -249,7 +243,10 @@ export default function Body() {
 
           {options ? (
             <>
-              <SectionHeader title="Calorie goal" />
+              {/* Space above, or the heading sits on the card before it. */}
+              <View style={styles.goalHeading}>
+                <SectionHeader title="Calorie goal" />
+              </View>
 
               {GOALS.map((goal) => {
                 const option = options[goal.key];
@@ -311,13 +308,10 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
     flex: { flex: 1 },
-    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
+    content: {
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
+      paddingBottom: spacing['4xl'],
     },
     card: { gap: spacing.sm, marginTop: spacing.lg },
     figureRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.md },
@@ -333,6 +327,7 @@ const makeStyles = (t: Theme) =>
       borderColor: t.border,
       backgroundColor: t.surface,
     },
+    goalHeading: { marginTop: spacing['2xl'] },
     goalFigure: { alignItems: 'flex-end' },
     note: { marginTop: spacing.sm, lineHeight: 18 },
   });

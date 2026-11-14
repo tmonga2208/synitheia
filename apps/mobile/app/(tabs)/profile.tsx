@@ -30,6 +30,7 @@ import { useAuth } from '../../src/store/auth.js';
 import { PasswordSheet } from '../../src/auth/PasswordSheet.js';
 import { describeError } from '../../src/api/errorCopy.js';
 import { showToast } from '../../src/feedback/toast.js';
+import { SheetSurface } from '../../src/components/SheetSurface.js';
 import { MIN_TAP_TARGET, TAB_BAR_CLEARANCE, motion, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles, useThemePreference } from '../../src/theme/ThemeProvider.js';
 import type { ThemePreference } from '../../src/theme/ThemeProvider.js';
@@ -375,7 +376,7 @@ function AppearanceSheet({
   const styles = useThemedStyles(makeStyles);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Touchable
           style={styles.backdropDismiss}
@@ -385,7 +386,7 @@ function AppearanceSheet({
           onPress={onClose}
         />
 
-        <SafeAreaView style={styles.sheet} edges={['bottom']}>
+        <SheetSurface style={styles.sheet}>
           <View style={styles.handle} />
 
           <Text variant="heading" style={styles.sheetTitle}>
@@ -421,7 +422,7 @@ function AppearanceSheet({
               );
             })}
           </View>
-        </SafeAreaView>
+        </SheetSurface>
       </View>
     </Modal>
   );

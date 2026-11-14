@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArrowLeft, Flame, Trophy, Zap } from 'lucide-react-native';
+import { Archive, Flame, Trophy, Zap } from 'lucide-react-native';
 import {
+  formatClockTime,
   formatHabitProgress,
   formatHabitTarget,
   measureOf,
@@ -19,7 +20,7 @@ import {
   Text,
   Touchable,
 } from '../../src/components/primitives.js';
-import { SkeletonList } from '../../src/components/Skeleton.js';
+import { SkeletonScreen } from '../../src/components/Skeleton.js';
 import { ProgressRing } from '../../src/components/ProgressRing.js';
 import { iconFor } from '../../src/components/IconPicker.js';
 import { RecentDays } from '../../src/habits/RecentDays.js';
@@ -27,7 +28,8 @@ import { api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
 import { describeError } from '../../src/api/errorCopy.js';
 import type { HabitHistory, ListResponse, WireHabit } from '../../src/api/types.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
+import { ScreenHeader } from '../../src/components/ScreenHeader.js';
+import { MIN_TAP_TARGET, radius, screen, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 
@@ -101,31 +103,13 @@ export default function HabitDetail() {
     );
   }
 
-  const back = (
-    <Touchable
-      style={styles.iconButton}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-      haptic={false}
-      onPress={() => goBackOrHome(router)}
-    >
-      <ArrowLeft size={22} color={t.textPrimary} />
-    </Touchable>
-  );
-
-  if (habitsQuery.isPending) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <SkeletonList />
-      </SafeAreaView>
-    );
-  }
+  if (habitsQuery.isPending) return <SkeletonScreen header={<ScreenHeader />} />;
 
   if (habitsQuery.error || !habit) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
+          <ScreenHeader />
           <ErrorState
             error={habitsQuery.error}
             message="This habit no longer exists."
@@ -175,22 +159,17 @@ export default function HabitDetail() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          {back}
-          <View style={[styles.iconChip, { backgroundColor: accent.wash }]}>
-            <Icon size={22} color={accent.text} strokeWidth={1.5} />
-          </View>
-        </View>
-
-        <Text variant="overline" color={accent.text}>
-          {habit.category ?? period}
-        </Text>
-        <Text variant="title" style={styles.name}>
-          {habit.name}
-        </Text>
-        <Text variant="body" color={t.textMuted} style={styles.goal}>
-          {`Goal: ${goal}`}
-        </Text>
+        <ScreenHeader
+          overline={habit.category ?? period}
+          overlineColor={accent.text}
+          title={habit.name}
+          subtitle={`Goal: ${goal}`}
+          action={
+            <View style={[styles.iconChip, { backgroundColor: accent.wash }]}>
+              <Icon size={22} color={accent.text} strokeWidth={1.5} />
+            </View>
+          }
+        />
 
         <View style={styles.ring}>
           <ProgressRing
@@ -244,7 +223,7 @@ export default function HabitDetail() {
           <Card style={styles.reminderCard}>
             <Zap size={18} color={t.textMuted} strokeWidth={1.6} />
             <Text variant="body" color={t.textMuted}>
-              {`Gentle reminder at ${habit.reminderTime}`}
+              {`Gentle reminder at ${formatClockTime(habit.reminderTime)}`}
             </Text>
           </Card>
         ) : null}
@@ -272,33 +251,19 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
     content: {
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
       paddingBottom: spacing['4xl'],
     },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: spacing.sm,
-      marginBottom: spacing.base,
-    },
-    iconButton: {
+    // The height of the back arrow's target, so the two sit on one line.
+    iconChip: {
       width: MIN_TAP_TARGET,
       height: MIN_TAP_TARGET,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.md,
-    },
-    iconChip: {
-      width: 52,
-      height: 52,
       borderRadius: radius.md,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    name: { marginTop: spacing.xs },
-    goal: { marginTop: spacing.xs },
-    ring: { alignItems: 'center', marginTop: spacing.lg, gap: spacing.md },
+    ring: { alignItems: 'center', gap: spacing.md },
     ringCaption: { marginTop: spacing.xs },
     recent: { marginTop: spacing.xl, gap: spacing.base },
     chips: {

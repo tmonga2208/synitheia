@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Camera, Minus, Plus } from 'lucide-react-native';
+import { Camera, Minus, Plus } from 'lucide-react-native';
 import { scaleMacros, type Macros, type MealType } from '@synitheia/shared';
 import {
   Button,
@@ -16,7 +16,8 @@ import {
 } from '../../src/components/primitives.js';
 import { api } from '../../src/api/client.js';
 import { errorLine } from '../../src/api/errorCopy.js';
-import { radius, spacing } from '../../src/theme/theme.js';
+import { ScreenHeader } from '../../src/components/ScreenHeader.js';
+import { radius, screen, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 
@@ -101,19 +102,8 @@ export default function NewFood() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Touchable
-            onPress={() => goBackOrHome(router)}
-            style={styles.back}
-            haptic={false}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-          </Touchable>
-
-          <Text variant="title" style={{ marginTop: spacing.base }}>
-            Add a meal
-          </Text>
+          {/* The content spaces its own children (gap), so the header adds nothing more. */}
+          <ScreenHeader title="Add a meal" gapBelow={0} />
 
           {/* The camera is still one tap away — this is the fallback, not a replacement. */}
           <Touchable
@@ -287,13 +277,11 @@ function guessMeal(): MealType {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg, paddingBottom: spacing['4xl'], gap: spacing.base },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
+    content: {
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
+      paddingBottom: spacing['4xl'],
+      gap: spacing.base,
     },
     photoRow: {
       flexDirection: 'row',

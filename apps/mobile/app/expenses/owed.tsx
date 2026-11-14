@@ -1,9 +1,7 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, HandCoins } from 'lucide-react-native';
+import { Check, HandCoins } from 'lucide-react-native';
 import { asMinor, formatMoney } from '@synitheia/shared';
 import {
   Card,
@@ -15,7 +13,9 @@ import {
 import { SkeletonScreen } from '../../src/components/Skeleton.js';
 import { api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
-import { radius, spacing } from '../../src/theme/theme.js';
+import { usePullRefresh } from '../../src/feedback/pullRefresh.js';
+import { ScreenHeader } from '../../src/components/ScreenHeader.js';
+import { radius, screen, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 
@@ -58,10 +58,11 @@ export default function OwedScreen() {
   const queryClient = useQueryClient();
   const currency = useAuth((s) => s.user?.currency) ?? 'INR';
 
-  const { data, error, isPending, isRefetching, refetch } = useQuery({
+  const { data, error, isPending, refetch } = useQuery({
     queryKey: OWED_KEY,
     queryFn: () => api.get<OwedResponse>('/expenses/owed'),
   });
+  const pull = usePullRefresh(refetch);
 
   const settle = useMutation({
     meta: { failed: 'Couldn’t update who has paid' },
@@ -100,25 +101,17 @@ export default function OwedScreen() {
     },
   });
 
-  const back = (
-    <Touchable
-      onPress={() => goBackOrHome(router)}
-      style={styles.back}
-      haptic={false}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-    >
-      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-    </Touchable>
+  const header = (
+    <ScreenHeader overline="Split expenses" overlineColor={ACCENT.text} title="Owed to you" />
   );
 
-  if (isPending) return <SkeletonScreen />;
+  if (isPending) return <SkeletonScreen header={header} />;
 
   if (error || !data) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
+          {header}
           <ErrorState
             error={error}
             message="Could not load what you are owed."
@@ -143,18 +136,13 @@ export default function OwedScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => void refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={ACCENT.base}
           />
         }
       >
-        {back}
-
-        <Text variant="overline" color={ACCENT.text} style={{ marginTop: spacing.base }}>
-          Split expenses
-        </Text>
-        <Text variant="title">Owed to you</Text>
+        {header}
 
         {data.items.length === 0 ? (
           <EmptyState
@@ -225,15 +213,12 @@ export default function OwedScreen() {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
+    content: {
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
+      paddingBottom: spacing['4xl'],
     },
-    total: { marginTop: spacing.lg, marginBottom: spacing.xl },
+    total: { marginBottom: spacing.xl },
     person: { marginBottom: spacing.xl },
     personHeader: {
       flexDirection: 'row',

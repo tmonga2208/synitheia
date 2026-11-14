@@ -185,6 +185,19 @@ export const motion = {
 export const MIN_TAP_TARGET = 44;
 
 /**
+ * The frame every screen sits in.
+ *
+ * `gutter` is the space at each side. Half the screens had 20 and half had 24, so the
+ * left edge shifted by four points between Today and Track and again on opening Water.
+ * `top` is the space between the status bar and the first thing on a screen, which is the
+ * back arrow on any screen opened from another (ScreenHeader.tsx).
+ */
+export const screen = {
+  gutter: spacing.xl,
+  top: spacing.sm,
+} as const;
+
+/**
  * Space to leave under the last thing on a tab screen. The tab bar floats over the content,
  * so without it the last habit on Today and Sign out on You sat underneath it.
  */

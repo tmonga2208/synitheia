@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Apple,
   Banana,
@@ -40,6 +39,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { Chip, Input, Text, Touchable } from './primitives.js';
+import { SheetSurface } from './SheetSurface.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../theme/theme.js';
@@ -207,7 +207,7 @@ export function IconPicker({
   }, [query, category]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Touchable
           style={styles.backdropDismiss}
@@ -217,7 +217,7 @@ export function IconPicker({
           onPress={onClose}
         />
 
-        <SafeAreaView style={styles.sheet} edges={['bottom']}>
+        <SheetSurface style={styles.sheet}>
           <View style={styles.handle} />
 
           <View style={styles.titleRow}>
@@ -327,7 +327,7 @@ export function IconPicker({
               </Text>
             ) : null}
           </ScrollView>
-        </SafeAreaView>
+        </SheetSurface>
       </View>
     </Modal>
   );

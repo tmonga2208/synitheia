@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft } from 'lucide-react-native';
 import {
   asMinor,
   formatDayLabel,
@@ -20,7 +19,6 @@ import {
   ErrorState,
   SectionHeader,
   Text,
-  Touchable,
 } from '../../src/components/primitives.js';
 import { SkeletonList } from '../../src/components/Skeleton.js';
 import { ProgressRing } from '../../src/components/ProgressRing.js';
@@ -28,7 +26,9 @@ import { HabitCard } from '../../src/components/HabitCard.js';
 import { Timeline } from '../../src/components/Timeline.js';
 import { api } from '../../src/api/client.js';
 import { useAuth } from '../../src/store/auth.js';
-import { MIN_TAP_TARGET, spacing } from '../../src/theme/theme.js';
+import { ScreenHeader } from '../../src/components/ScreenHeader.js';
+import { splitDayLabel } from '../../src/today/dayLabel.js';
+import { screen, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 
@@ -80,21 +80,15 @@ export default function Day() {
     return parts.length > 0 ? parts.join('  ·  ') : null;
   }, [data, user?.currency]);
 
+  const [dayName, dayDate] = valid
+    ? splitDayLabel(formatDayLabel(date as LocalDate))
+    : [undefined, 'Unknown day'];
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Touchable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          haptic={false}
-          onPress={() => goBackOrHome(router)}
-          style={styles.back}
-        >
-          <ChevronLeft size={24} color={t.textPrimary} strokeWidth={1.8} />
-        </Touchable>
-        <Text variant="overline" color={t.textPrimary}>
-          {valid ? formatDayLabel(date as LocalDate) : 'Unknown day'}
-        </Text>
+        {/* "Saturday, November 14": the weekday over the date, as Today sets its own. */}
+        <ScreenHeader overline={dayName} title={dayDate} />
       </View>
 
       {!valid ? (
@@ -170,26 +164,16 @@ const makeStyles = (t: Theme) =>
       backgroundColor: t.bg,
     },
     header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.base,
-    },
-    back: {
-      minWidth: MIN_TAP_TARGET,
-      minHeight: MIN_TAP_TARGET,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
     },
     content: {
-      paddingHorizontal: spacing.lg,
+      paddingHorizontal: screen.gutter,
       paddingBottom: spacing['4xl'],
     },
     ring: {
       alignItems: 'center',
-      marginVertical: spacing.xl,
+      marginBottom: spacing.xl,
     },
     totals: {
       alignItems: 'center',

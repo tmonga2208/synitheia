@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react-native';
 import {
   HABIT_COLORS,
   HABIT_MEASURES,
@@ -26,7 +26,8 @@ import { DEFAULT_ICON, IconPicker, iconFor } from '../../src/components/IconPick
 import { api } from '../../src/api/client.js';
 import { errorLine } from '../../src/api/errorCopy.js';
 import { askForNotifications, type NotificationAccess } from '../../src/reminders/permission.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
+import { ScreenHeader } from '../../src/components/ScreenHeader.js';
+import { MIN_TAP_TARGET, radius, screen, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 
@@ -194,22 +195,12 @@ export default function NewHabit() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <Touchable
-              style={styles.iconButton}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              haptic={false}
-              onPress={() => goBackOrHome(router)}
-            >
-              <ArrowLeft size={22} color={t.textPrimary} />
-            </Touchable>
-          </View>
-
-          <Text variant="title">New habit</Text>
-          <Text variant="body" color={t.textMuted} style={styles.subtitle}>
-            Something small you want to do regularly.
-          </Text>
+          {/* Every card below brings its own top margin, so the header adds none. */}
+          <ScreenHeader
+            title="New habit"
+            subtitle="Something small you want to do regularly."
+            gapBelow={0}
+          />
 
           {/* ─── Name, icon, colour, category ─────────────────────────────── */}
           <Card style={styles.card}>
@@ -534,24 +525,10 @@ const makeStyles = (t: Theme) =>
     screen: { flex: 1, backgroundColor: t.bg },
     flex: { flex: 1 },
     content: {
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
       paddingBottom: spacing['3xl'],
     },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: spacing.sm,
-      marginBottom: spacing.base,
-    },
-    iconButton: {
-      width: MIN_TAP_TARGET,
-      height: MIN_TAP_TARGET,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.md,
-    },
-    subtitle: { marginTop: spacing.xs },
     card: { marginTop: spacing.xl, gap: spacing.base },
     nameRow: {
       flexDirection: 'row',

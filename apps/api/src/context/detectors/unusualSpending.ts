@@ -1,4 +1,10 @@
-import { asMinor, formatMoney, localWeekdayIndex, type LocalDate } from '@synitheia/shared';
+import {
+  asMinor,
+  formatMoney,
+  localWeekdayIndex,
+  roundToWholeUnits,
+  type LocalDate,
+} from '@synitheia/shared';
 import { WEEKDAY_NAMES } from './labels.js';
 import type { Detector, EventLean } from './types.js';
 
@@ -50,7 +56,8 @@ export const detectUnusualSpending: Detector = (ctx) => {
 
   const dayName = WEEKDAY_NAMES[weekday]!;
   const todayLabel = formatMoney(asMinor(today), currency);
-  const meanLabel = formatMoney(asMinor(Math.round(mean)), currency);
+  // An average, so whole rupees: "a usual ₹2,660.25" claims a precision it does not have.
+  const meanLabel = formatMoney(roundToWholeUnits(mean, currency), currency);
 
   return [
     {

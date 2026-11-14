@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { goBackOrHome } from '../../src/navigation/goBackOrHome.js';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { ArrowLeft, Info, Minus, PenLine, Plus } from 'lucide-react-native';
+import { Info, Minus, PenLine, Plus } from 'lucide-react-native';
 import {
   overallFoodConfidence,
   rescaleForPortion,
@@ -23,7 +23,8 @@ import {
 } from '../../src/components/primitives.js';
 import { api } from '../../src/api/client.js';
 import { errorLine } from '../../src/api/errorCopy.js';
-import { radius, spacing } from '../../src/theme/theme.js';
+import { ScreenHeader } from '../../src/components/ScreenHeader.js';
+import { radius, screen, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
 
@@ -166,23 +167,12 @@ export default function FoodPhotoScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Touchable
-          onPress={() => goBackOrHome(router)}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          style={styles.back}
-          haptic={false}
-        >
-          <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-        </Touchable>
-
-        <Text variant="title" style={{ marginTop: spacing.base }}>
-          Log with a photo
-        </Text>
-        <Text variant="body" color={t.textMuted} style={{ marginTop: spacing.xs }}>
-          Take a picture of your plate and we&apos;ll estimate what&apos;s in it. You
-          confirm before anything is logged.
-        </Text>
+        {/* The meal picker under it brings its own top margin. */}
+        <ScreenHeader
+          title="Log with a photo"
+          subtitle="Take a picture of your plate and we’ll estimate what’s in it. You confirm before anything is logged."
+          gapBelow={0}
+        />
 
         {/* Meal picker */}
         <View style={styles.meals}>
@@ -447,13 +437,10 @@ function guessMeal(): MealType {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
+    content: {
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
+      paddingBottom: spacing['4xl'],
     },
     meals: {
       flexDirection: 'row',

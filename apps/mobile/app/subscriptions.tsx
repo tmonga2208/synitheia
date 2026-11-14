@@ -9,10 +9,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Plus, Repeat, Trash2 } from 'lucide-react-native';
+import { Repeat, Trash2 } from 'lucide-react-native';
 import {
   CYCLE_LABEL,
   asMinor,
@@ -36,7 +34,9 @@ import { api } from '../src/api/client.js';
 import { errorLine } from '../src/api/errorCopy.js';
 import type { ListResponse, WireCategory } from '../src/api/types.js';
 import { useAuth } from '../src/store/auth.js';
-import { radius, spacing } from '../src/theme/theme.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
+import { HeaderAdd, ScreenHeader } from '../src/components/ScreenHeader.js';
+import { screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
 
@@ -83,10 +83,11 @@ export default function SubscriptionsScreen() {
   const currency = useAuth((s) => s.user?.currency) ?? 'INR';
   const [adding, setAdding] = useState(false);
 
-  const { data, error, isPending, isRefetching, refetch } = useQuery({
+  const { data, error, isPending, refetch } = useQuery({
     queryKey: SUBS_KEY,
     queryFn: () => api.get<SubsResponse>('/subscriptions'),
   });
+  const pull = usePullRefresh(refetch);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: SUBS_KEY });
@@ -107,25 +108,15 @@ export default function SubscriptionsScreen() {
     onSettled: invalidate,
   });
 
-  const back = (
-    <Touchable
-      onPress={() => goBackOrHome(router)}
-      style={styles.back}
-      haptic={false}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-    >
-      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-    </Touchable>
-  );
+  const header = <ScreenHeader overline="Recurring" overlineColor={ACCENT.text} title="Bills" />;
 
-  if (isPending) return <SkeletonScreen />;
+  if (isPending) return <SkeletonScreen header={header} />;
 
   if (error || !data) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
+          {header}
           <ErrorState
             error={error}
             message="Could not load your bills."
@@ -143,28 +134,18 @@ export default function SubscriptionsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => void refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={ACCENT.base}
           />
         }
       >
-        <View style={styles.header}>
-          {back}
-          <Touchable
-            style={styles.add}
-            onPress={() => setAdding(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Add a bill"
-          >
-            <Plus size={22} color={t.onAccent} strokeWidth={2.2} />
-          </Touchable>
-        </View>
-
-        <Text variant="overline" color={ACCENT.text} style={{ marginTop: spacing.base }}>
-          Recurring
-        </Text>
-        <Text variant="title">Bills</Text>
+        <ScreenHeader
+          overline="Recurring"
+          overlineColor={ACCENT.text}
+          title="Bills"
+          action={<HeaderAdd label="Add a bill" onPress={() => setAdding(true)} />}
+        />
 
         {data.items.length === 0 ? (
           <EmptyState
@@ -476,24 +457,12 @@ function AddBillSheet({
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg, paddingBottom: spacing['4xl'] },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
+    content: {
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
+      paddingBottom: spacing['4xl'],
     },
-    add: {
-      width: 44,
-      height: 44,
-      borderRadius: radius.full,
-      backgroundColor: t.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    total: { marginTop: spacing.xl, marginBottom: spacing.lg },
+    total: { marginBottom: spacing.lg },
     row: { marginBottom: spacing.md },
     rowTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
     rowBottom: {

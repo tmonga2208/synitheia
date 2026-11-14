@@ -11,6 +11,7 @@ import { Link, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Lock, Mail } from 'lucide-react-native';
 import { Button, Input, Text, Touchable } from '../../src/components/primitives.js';
+import { AppleMark, GoogleMark } from '../../src/components/ProviderMarks.js';
 import { api } from '../../src/api/client.js';
 import { errorLine } from '../../src/api/errorCopy.js';
 import { useAuth } from '../../src/store/auth.js';
@@ -168,6 +169,7 @@ export default function SignIn() {
               <Button
                 label="Continue with Apple"
                 variant="secondary"
+                leading={<AppleMark size={20} color={t.textPrimary} />}
                 loading={pending === 'apple'}
                 disabled={pending !== null}
                 onPress={() => void run('apple', signInWithApple)}
@@ -177,6 +179,7 @@ export default function SignIn() {
             <Button
               label="Continue with Google"
               variant="secondary"
+              leading={<GoogleMark size={20} />}
               loading={pending === 'google'}
               disabled={pending !== null}
               onPress={() => void run('google', signInWithGoogle)}

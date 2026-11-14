@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { goBackOrHome } from '../src/navigation/goBackOrHome.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Info, Sparkles } from 'lucide-react-native';
+import { Info, Sparkles } from 'lucide-react-native';
 import {
   asMinor,
   formatMoney,
@@ -22,7 +21,7 @@ import {
   Text,
   Touchable,
 } from '../src/components/primitives.js';
-import { Skeleton, SkeletonList } from '../src/components/Skeleton.js';
+import { Skeleton, SkeletonList, SkeletonScreen } from '../src/components/Skeleton.js';
 import { ApiError, api, isQueued } from '../src/api/client.js';
 import { errorLine } from '../src/api/errorCopy.js';
 import type {
@@ -32,7 +31,9 @@ import type {
   WireInsight,
 } from '../src/api/types.js';
 import { useAuth } from '../src/store/auth.js';
-import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
+import { ScreenHeader } from '../src/components/ScreenHeader.js';
+import { MIN_TAP_TARGET, radius, screen, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
 
@@ -94,6 +95,7 @@ export default function Insights() {
     // is a precondition of the request, not a filter applied to its response.
     enabled: ready,
   });
+  const pull = usePullRefresh(insights.refetch);
 
   /**
    * The server refuses to generate from thin data — under five days of history it
@@ -182,40 +184,14 @@ export default function Insights() {
       isQueued(result) ? undefined : queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
   });
 
-  const back = (
-    <Touchable
-      onPress={() => goBackOrHome(router)}
-      style={styles.back}
-      haptic={false}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-    >
-      <ArrowLeft size={22} color={t.textPrimary} strokeWidth={1.8} />
-    </Touchable>
-  );
+  const header = <ScreenHeader overline="Synítheia AI" title="Insights" />;
 
-  const header = (
-    <View style={styles.header}>
-      <Text variant="overline" color={t.textFaint}>
-        Synítheia AI
-      </Text>
-      <Text variant="title">Insights</Text>
-    </View>
-  );
-
-  if (availability.isPending) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <SkeletonList />
-      </SafeAreaView>
-    );
-  }
+  if (availability.isPending) return <SkeletonScreen header={header} />;
 
   if (availability.error || !availability.data) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.content}>
-          {back}
           {header}
           <ErrorState
             error={availability.error}
@@ -238,7 +214,6 @@ export default function Insights() {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {back}
           {header}
 
           <EmptyState
@@ -266,13 +241,12 @@ export default function Insights() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={insights.isRefetching}
-            onRefresh={() => void insights.refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={t.accent}
           />
         }
       >
-        {back}
         {header}
 
         {insights.isPending ? (
@@ -466,20 +440,9 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
     content: {
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: screen.gutter,
+      paddingTop: screen.top,
       paddingBottom: spacing.xl,
-    },
-    back: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: -spacing.md,
-    },
-    header: {
-      paddingVertical: spacing.sm,
-      marginBottom: spacing.lg,
-      gap: spacing.xs,
     },
     list: { gap: spacing.base },
     insight: {
