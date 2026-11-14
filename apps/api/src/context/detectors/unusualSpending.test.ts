@@ -31,6 +31,19 @@ describe('unusual spending', () => {
     expect(d!.evidence.some((e) => e.label.includes('3 Sundays'))).toBe(true);
   });
 
+  it('gives the usual amount in whole rupees: an average is not known to the paisa', () => {
+    const ctx = baseCtx({
+      events: [spend(90_000)],
+      // ₹400, ₹400 and ₹401 average ₹400.33.
+      history: [40_000, 40_000, 40_100].map((amount, i) => spend(amount, SUNDAYS[i])),
+    });
+
+    const [d] = detectUnusualSpending(ctx);
+
+    expect(d!.description).toBe('₹900 today, against a usual ₹400.');
+    expect(d!.evidence.map((e) => e.label).join(' ')).not.toMatch(/\.\d/);
+  });
+
   it('needs three prior same-weekdays before it says anything', () => {
     const ctx = baseCtx({
       events: [spend(90_000)],

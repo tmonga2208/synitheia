@@ -285,7 +285,7 @@ describe('low_water detector', () => {
     const s = await InferredContextModel.findOne({ userId, type: 'low_water' }).lean();
     expect(s).toBeTruthy();
     // Compared against the user's OWN average, not a "drink 8 glasses" slogan.
-    expect(s!.description).toContain('2000');
+    expect(s!.description).toContain('your usual 2 L');
   });
 
   it('does not fire in the morning, when everyone is legitimately "behind"', async () => {

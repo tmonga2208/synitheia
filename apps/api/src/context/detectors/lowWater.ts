@@ -1,4 +1,4 @@
-import { addLocalDays, localMinutesOfDay } from '@synitheia/shared';
+import { addLocalDays, formatVolume, localMinutesOfDay } from '@synitheia/shared';
 import type { Detector } from './types.js';
 
 const LOOKBACK_DAYS = 21;
@@ -43,12 +43,14 @@ export const detectLowWater: Detector = (ctx) => {
       detector: 'low_water_vs_baseline',
       type: 'low_water',
       confidence: 0.8,
-      title: `You've had ${todayMl} ml today`,
-      description: `That's well below your usual ${Math.round(baselineMl)} ml by this time. Your target is ${ctx.waterTargetMl} ml.`,
+      // formatVolume, as on the Water screen: "1.45 L", not a bare "1450 ml" that reads
+      // like a different app wrote it.
+      title: `You've had ${formatVolume(todayMl)} today`,
+      description: `That's well below your usual ${formatVolume(baselineMl)} by this time. Your target is ${formatVolume(ctx.waterTargetMl)}.`,
       evidence: [
         {
           eventId: null,
-          label: `Your recent daily average is ${Math.round(baselineMl)} ml`,
+          label: `Your recent daily average is ${formatVolume(baselineMl)}`,
           weight: 1,
         },
       ],
