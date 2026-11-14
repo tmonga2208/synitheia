@@ -1,9 +1,10 @@
 import { Modal, StyleSheet, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ImageIcon } from 'lucide-react-native';
 import { Button, Text } from './primitives.js';
 import { api } from '../api/client.js';
+import { SheetSurface } from './SheetSurface.js';
 import { radius, spacing } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
 import type { Theme } from '../theme/theme.js';
@@ -39,10 +40,10 @@ export function ReceiptConsentSheet({
   });
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <SafeAreaProvider>
         <View style={styles.scrim}>
-          <SafeAreaView style={styles.sheet} edges={['bottom']}>
+          <SheetSurface style={styles.sheet}>
             <View style={styles.handle} />
 
             <View style={styles.icon}>
@@ -80,7 +81,7 @@ export function ReceiptConsentSheet({
             <Text variant="caption" color={t.textFaint} center>
               Scanning a screenshot still works either way.
             </Text>
-          </SafeAreaView>
+          </SheetSurface>
         </View>
       </SafeAreaProvider>
     </Modal>

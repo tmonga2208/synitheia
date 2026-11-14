@@ -37,6 +37,8 @@ import {
 } from '../src/reminders/permission.js';
 import { requestReminderRefresh } from '../src/reminders/schedule.js';
 import { useNotificationAccess } from '../src/reminders/useNotificationAccess.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
+import { SheetSurface } from '../src/components/SheetSurface.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -104,6 +106,7 @@ export default function Reminders() {
     queryKey: REMINDERS_KEY,
     queryFn: () => api.get<ListResponse<WireReminder>>('/reminders'),
   });
+  const pull = usePullRefresh(query.refetch);
 
   const toggle = useMutation({
     meta: { reportsOwnError: true },
@@ -238,8 +241,8 @@ export default function Reminders() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={query.isRefetching}
-            onRefresh={() => void query.refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={t.accent}
           />
         }
@@ -345,7 +348,7 @@ function ComposeSheet({
   const valid = label.trim().length > 0;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Touchable
           style={styles.backdropDismiss}
@@ -356,7 +359,7 @@ function ComposeSheet({
         />
 
         <KeyboardAvoidingView behavior="padding">
-          <SafeAreaView style={styles.sheet} edges={['bottom']}>
+          <SheetSurface style={styles.sheet}>
             <View style={styles.handle} />
 
             <Text variant="heading" style={styles.sheetTitle}>
@@ -457,7 +460,7 @@ function ComposeSheet({
                 }
               />
             </View>
-          </SafeAreaView>
+          </SheetSurface>
         </KeyboardAvoidingView>
       </View>
     </Modal>

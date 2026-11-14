@@ -50,6 +50,7 @@ import { backgroundSyncCopy } from '../src/sync/backgroundCopy.js';
 import { syncBackgroundRegistration } from '../src/sync/backgroundTask.js';
 import { readSourcePrefs, writeSourcePrefs } from '../src/sync/sourcePrefs.js';
 import { useSourcePrefsMirror } from '../src/sync/useSourcePrefsMirror.js';
+import { SheetSurface } from '../src/components/SheetSurface.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -758,7 +759,7 @@ function DeleteAccountSheet({
   const matches = confirmEmail.trim().toLowerCase() === email.toLowerCase() && email.length > 0;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Touchable
           style={styles.backdropDismiss}
@@ -769,7 +770,7 @@ function DeleteAccountSheet({
         />
 
         <KeyboardAvoidingView behavior="padding">
-          <SafeAreaView style={styles.sheet} edges={['bottom']}>
+          <SheetSurface style={styles.sheet}>
             <View style={styles.handle} />
 
             <Text variant="heading" style={styles.sheetTitle}>
@@ -808,7 +809,7 @@ function DeleteAccountSheet({
 
               <Button label="Keep my account" variant="ghost" onPress={onClose} />
             </View>
-          </SafeAreaView>
+          </SheetSurface>
         </KeyboardAvoidingView>
       </View>
     </Modal>

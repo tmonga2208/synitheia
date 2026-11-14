@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
@@ -221,6 +221,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * How an opened screen arrives.
+ *
+ * On iPhone it is the system's own push: the screen slides in from the right and follows
+ * the thumb back out on a swipe from the edge. Every screen used to dissolve into the next
+ * instead, with both titles readable at once for a moment and no sense of where the last
+ * screen had gone.
+ *
+ * Android keeps the dissolve it shipped with. It has no edge swipe to match, and a change
+ * there has to be looked at on a phone first.
+ */
+const PUSH = Platform.OS === 'ios' ? 'default' : 'fade';
+
+/**
  * The status bar and the stack, split out from `RootLayout` for one reason: both need
  * `useTheme()`, which throws outside `<ThemeProvider>`, and this component only ever
  * renders inside it (see the provider order below).
@@ -237,12 +250,15 @@ function ThemedShell() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: t.bg },
-          animation: 'fade',
+          animation: PUSH,
         }}
       >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="onboarding" />
+        {/* Signing in, signing out and finishing setup swap the whole app for another
+            part of it. Nothing was "opened", so these dissolve rather than push. */}
+        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+        <Stack.Screen name="setup" options={{ animation: 'fade' }} />
         <Stack.Screen
           name="habit/new"
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}

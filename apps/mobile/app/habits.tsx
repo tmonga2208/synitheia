@@ -14,6 +14,7 @@ import { api } from '../src/api/client.js';
 import type { HabitHistory, ListResponse, WireHabit } from '../src/api/types.js';
 import { useHabitLog } from '../src/habits/useHabitLog.js';
 import { LogAmountSheet } from '../src/habits/LogAmountSheet.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -53,6 +54,7 @@ export default function Habits() {
     queryKey: HABITS_KEY,
     queryFn: () => api.get<ListResponse<WireHabit>>('/habits'),
   });
+  const pull = usePullRefresh(habitsQuery.refetch);
 
   const todayQuery = useQuery({
     queryKey: TODAY_KEY,
@@ -144,8 +146,8 @@ export default function Habits() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={habitsQuery.isRefetching}
-            onRefresh={() => void habitsQuery.refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={t.accent}
           />
         }

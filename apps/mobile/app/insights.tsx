@@ -32,6 +32,7 @@ import type {
   WireInsight,
 } from '../src/api/types.js';
 import { useAuth } from '../src/store/auth.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
 import { MIN_TAP_TARGET, radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import type { Theme } from '../src/theme/theme.js';
@@ -94,6 +95,7 @@ export default function Insights() {
     // is a precondition of the request, not a filter applied to its response.
     enabled: ready,
   });
+  const pull = usePullRefresh(insights.refetch);
 
   /**
    * The server refuses to generate from thin data — under five days of history it
@@ -266,8 +268,8 @@ export default function Insights() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={insights.isRefetching}
-            onRefresh={() => void insights.refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={t.accent}
           />
         }

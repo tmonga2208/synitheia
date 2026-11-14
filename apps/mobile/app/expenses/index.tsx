@@ -47,6 +47,7 @@ import {
 import { MIN_TAP_TARGET, radius, spacing } from '../../src/theme/theme.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
+import { usePullRefresh } from '../../src/feedback/pullRefresh.js';
 
 /** Payments per page. The month's total, calendar and payees come from totals, not the list. */
 const PAGE_SIZE = 10;
@@ -136,6 +137,10 @@ export default function Expenses() {
   const query = useInfiniteQuery(expensePagesQuery(month, chase));
   const totalsQuery = useQuery(monthTotalQuery(month));
   const previousQuery = useQuery(monthTotalQuery(previous));
+  // The month, its total and last month's: a pull re-reads all three.
+  const pull = usePullRefresh(() =>
+    Promise.all([query.refetch(), totalsQuery.refetch(), previousQuery.refetch()]),
+  );
   // The same query the Targets screen edits, so a new budget shows here at once.
   const targetsQuery = useQuery({
     queryKey: ['targets'],
@@ -178,10 +183,6 @@ export default function Expenses() {
   const dayY = useRef(new Map<string, number>());
   const [selected, setSelected] = useState<LocalDate | null>(null);
   const [highlighted, setHighlighted] = useState<LocalDate | null>(null);
-  // Only a pull shows the spinner. Tied to isRefetching, every quiet re-check of a month
-  // already on the phone (switching back to it, returning to the screen) dropped the
-  // spinner in at the top and pushed the whole month down.
-  const [pulling, setPulling] = useState(false);
   /** A day tapped on the calendar whose payments are on a page not loaded yet. */
   const [pendingDay, setPendingDay] = useState<LocalDate | null>(null);
 
@@ -268,15 +269,8 @@ export default function Expenses() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={pulling}
-            onRefresh={() => {
-              setPulling(true);
-              void Promise.all([
-                query.refetch(),
-                totalsQuery.refetch(),
-                previousQuery.refetch(),
-              ]).finally(() => setPulling(false));
-            }}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={t.accent}
           />
         }

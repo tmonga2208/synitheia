@@ -36,6 +36,7 @@ import { api } from '../src/api/client.js';
 import { errorLine } from '../src/api/errorCopy.js';
 import type { ListResponse, WireCategory } from '../src/api/types.js';
 import { useAuth } from '../src/store/auth.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
@@ -83,10 +84,11 @@ export default function SubscriptionsScreen() {
   const currency = useAuth((s) => s.user?.currency) ?? 'INR';
   const [adding, setAdding] = useState(false);
 
-  const { data, error, isPending, isRefetching, refetch } = useQuery({
+  const { data, error, isPending, refetch } = useQuery({
     queryKey: SUBS_KEY,
     queryFn: () => api.get<SubsResponse>('/subscriptions'),
   });
+  const pull = usePullRefresh(refetch);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: SUBS_KEY });
@@ -143,8 +145,8 @@ export default function SubscriptionsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => void refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={ACCENT.base}
           />
         }

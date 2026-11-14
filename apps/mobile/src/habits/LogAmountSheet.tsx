@@ -9,7 +9,6 @@ import {
   View,
   type LayoutChangeEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
   formatHabitProgress,
@@ -19,6 +18,7 @@ import {
   type TodayResponse,
 } from '@synitheia/shared';
 import { Button, Chip, Text, Touchable } from '../components/primitives.js';
+import { SheetSurface } from '../components/SheetSurface.js';
 import { accentFor, radius, spacing, type } from '../theme/theme.js';
 import type { Theme } from '../theme/theme.js';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider.js';
@@ -119,7 +119,7 @@ export function LogAmountSheet({ habit, onClose, onSave }: Props) {
   const targetFraction = Math.min(1, habit.targetCount / scale.max);
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Touchable
           style={styles.backdropDismiss}
@@ -130,7 +130,7 @@ export function LogAmountSheet({ habit, onClose, onSave }: Props) {
         />
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <SafeAreaView style={styles.sheet} edges={['bottom']}>
+        <SheetSurface style={styles.sheet}>
           <View style={styles.handle} />
           <Text variant="cardTitle" style={styles.title}>
             {habit.name}
@@ -207,7 +207,7 @@ export function LogAmountSheet({ habit, onClose, onSave }: Props) {
               onClose();
             }}
           />
-        </SafeAreaView>
+        </SheetSurface>
         </KeyboardAvoidingView>
       </View>
     </Modal>

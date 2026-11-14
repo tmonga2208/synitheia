@@ -26,6 +26,7 @@ import { summarizeWeek, weekOf } from '../../src/today/week.js';
 import { api } from '../../src/api/client.js';
 import { useAddWater } from '../../src/water/useAddWater.js';
 import { useAuth } from '../../src/store/auth.js';
+import { usePullRefresh } from '../../src/feedback/pullRefresh.js';
 import { TAB_BAR_CLEARANCE, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../../src/theme/theme.js';
@@ -71,10 +72,11 @@ export default function Trackers() {
   const user = useAuth((s) => s.user);
   const currency = user?.currency ?? 'INR';
 
-  const { data, error, isPending, isRefetching, refetch } = useQuery({
+  const { data, error, isPending, refetch } = useQuery({
     queryKey: TODAY_KEY,
     queryFn: () => api.get<TodayResponse>('/today'),
   });
+  const pull = usePullRefresh(refetch);
 
   /**
    * A glass shows at once, here and on the water screen, with or without a connection
@@ -197,8 +199,8 @@ export default function Trackers() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => void refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={t.accent}
           />
         }

@@ -49,6 +49,7 @@ import type {
   WireIngestion,
 } from '../../src/api/types.js';
 import { useAuth } from '../../src/store/auth.js';
+import { SheetSurface } from '../../src/components/SheetSurface.js';
 import { MIN_TAP_TARGET, radius, spacing, type as typeScale } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
@@ -967,7 +968,7 @@ function PasteSheet({
   const [text, setText] = useState('');
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Touchable
           style={styles.backdropDismiss}
@@ -978,7 +979,7 @@ function PasteSheet({
         />
 
         <KeyboardAvoidingView behavior="padding">
-          <SafeAreaView style={styles.sheet} edges={['bottom']}>
+          <SheetSurface style={styles.sheet}>
             <View style={styles.handle} />
 
             <Text variant="heading" style={styles.sheetTitle}>
@@ -1012,7 +1013,7 @@ function PasteSheet({
               }}
               style={styles.sheetCta}
             />
-          </SafeAreaView>
+          </SheetSurface>
         </KeyboardAvoidingView>
       </View>
     </Modal>

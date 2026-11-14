@@ -44,6 +44,7 @@ import { LogAmountSheet } from '../../src/habits/LogAmountSheet.js';
 import { useSourcePrefsMirror } from '../../src/sync/useSourcePrefsMirror.js';
 import { useHealthSync } from '../../src/health/useHealthSync.js';
 import { useAuth } from '../../src/store/auth.js';
+import { usePullRefresh } from '../../src/feedback/pullRefresh.js';
 import { MIN_TAP_TARGET, TAB_BAR_CLEARANCE, radius, spacing } from '../../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../../src/theme/ThemeProvider.js';
 import type { Theme } from '../../src/theme/theme.js';
@@ -150,7 +151,8 @@ export default function Today() {
     router.push(`/habit/${habit.id}`);
   }, []);
 
-  const { data, error, isPending, isRefetching, refetch } = query;
+  const { data, error, isPending, refetch } = query;
+  const pull = usePullRefresh(refetch);
 
   const overline = useMemo(
     () => (data ? formatDayLabel(data.localDate) : ''),
@@ -187,8 +189,8 @@ export default function Today() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => void refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={t.accent}
           />
         }

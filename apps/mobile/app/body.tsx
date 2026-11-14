@@ -34,6 +34,7 @@ import { missingSentence } from '../src/health/bodyCopy.js';
 import { BodyDetails } from '../src/health/BodyDetails.js';
 import { BodyDetailsForm } from '../src/health/BodyDetailsForm.js';
 import { WeightCard } from '../src/health/WeightCard.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
@@ -80,10 +81,11 @@ export default function Body() {
   const ACCENT = accentFor(ACCENT_COLOR, t);
   const queryClient = useQueryClient();
 
-  const { data, error, isPending, isRefetching, refetch } = useQuery({
+  const { data, error, isPending, refetch } = useQuery({
     queryKey: KEY,
     queryFn: () => api.get<BodyReport>('/health/body'),
   });
+  const pull = usePullRefresh(refetch);
 
   const pickGoal = useMutation({
     meta: { failed: 'Couldn’t set your calorie goal' },
@@ -148,8 +150,8 @@ export default function Body() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={() => void refetch()}
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
               tintColor={ACCENT.base}
             />
           }

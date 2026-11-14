@@ -29,6 +29,7 @@ import {
   type WireWaterEntry,
 } from '../src/water/waterCache.js';
 import { useAuth } from '../src/store/auth.js';
+import { usePullRefresh } from '../src/feedback/pullRefresh.js';
 import { radius, spacing } from '../src/theme/theme.js';
 import { useTheme, useThemedStyles } from '../src/theme/ThemeProvider.js';
 import { accentFor, type Theme } from '../src/theme/theme.js';
@@ -50,10 +51,11 @@ export default function WaterScreen() {
   const queryClient = useQueryClient();
   const timezone = useAuth((s) => s.user?.timezone) ?? 'UTC';
 
-  const { data, error, isPending, isRefetching, refetch } = useQuery({
+  const { data, error, isPending, refetch } = useQuery({
     queryKey: WATER_KEY,
     queryFn: () => api.get<WaterResponse>('/water'),
   });
+  const pull = usePullRefresh(refetch);
 
   // The week comes from Today's load, which every screen shares; nothing extra is fetched.
   const todayQuery = useQuery({
@@ -137,8 +139,8 @@ export default function WaterScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => void refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={ACCENT.base}
           />
         }
